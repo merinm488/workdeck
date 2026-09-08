@@ -9,10 +9,12 @@
  *   /              -> public/index.html   (Workdeck landing page)
  *   /js, /css      -> public assets
  *   /sheets/*      -> Sheets app (static)
+ *   /forms/*       -> Forms app (static)
  *   /docs/*        -> Docs build (static, vite base '/docs/')
  *   /api/workdeck  -> api/workdeck.js     (Workdeck API)
  *   /api/docs      -> api/docs.js         (Docs API, fetch-style handler)
  *   /api/users     -> api/users.js        (Sheets API)
+ *   /api/forms     -> api/forms.js        (Forms API)
  *
  * Storage: local JSON files under db/users/ (NODE_ENV=development).
  * Run with:  npm run dev   (port 4000)
@@ -46,6 +48,7 @@ process.env.NODE_ENV = 'development';
 const { default: workdeckHandler } = await import('../api/workdeck.js');
 const docsModule = await import('../api/docs.js');
 const { default: usersHandler } = await import('../api/users.js');
+const { default: formsHandler } = await import('../api/forms.js');
 
 const app = express();
 const PORT = 4000;
@@ -99,6 +102,7 @@ async function adaptDocsHandler(req, res, method) {
 app.all('/api/workdeck', (req, res) => workdeckHandler(req, res));
 app.all('/api/docs', (req, res) => adaptDocsHandler(req, res, req.method.toUpperCase()));
 app.all('/api/users', (req, res) => usersHandler(req, res));
+app.all('/api/forms', (req, res) => formsHandler(req, res));
 
 // ---------- Static apps ----------
 // Workdeck landing page + assets
@@ -113,6 +117,9 @@ app.get('/docs/*', (req, res) => {
 // Sheets (plain static)
 app.use('/sheets', express.static(path.join(ROOT_DIR, 'sheets'), { index: 'index.html' }));
 
+// Forms (plain static)
+app.use('/forms', express.static(path.join(ROOT_DIR, 'forms'), { index: 'index.html' }));
+
 // Root redirect to the Workdeck landing page
 app.get('/', (req, res) => {
   res.sendFile(path.join(ROOT_DIR, 'public', 'index.html'));
@@ -124,7 +131,8 @@ app.listen(PORT, () => {
   console.log(`📱 Workdeck:   http://localhost:${PORT}`);
   console.log(`📝 Docs:       http://localhost:${PORT}/docs/`);
   console.log(`📊 Sheets:     http://localhost:${PORT}/sheets/`);
-  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users`);
+  console.log(`📋 Forms:      http://localhost:${PORT}/forms/`);
+  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms`);
   console.log(`📁 Local DB:   ${path.join(ROOT_DIR, 'db')}`);
   console.log('\nPress Ctrl+C to stop\n');
 });

@@ -16,12 +16,13 @@
  *     docs:        [ ...docs... ],
  *     tags:        [ ...tags... ],
  *     sheets:       [ ...sheets... ],
+ *     forms:        [ ...forms... ],
  *     settings:     { theme, viewMode, lastOpened, createdAt, ... }
  *   }
  *
  * Each app only "owns" its own section(s). saveOwnedSections() merges writes
  * at the section level (settings merge at the key level) so that, for
- * example, a doc save from Docs never wipes a user's sheets.
+ * example, a doc save from Docs never wipes a user's sheets or forms.
  *
  * Environment detection mirrors the original projects:
  * - NODE_ENV === 'development' -> local files
@@ -152,7 +153,7 @@ async function postTextdbDoc(id, value) {
 // User documents
 // ================================================
 
-const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'settings'];
+const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'settings'];
 
 /** A stored doc counts as an existing account if it has any known section. */
 export function isValidUserDoc(doc) {
@@ -182,6 +183,7 @@ export async function getUserDoc(hash) {
   if (!Array.isArray(doc.docs)) doc.docs = [];
   if (!Array.isArray(doc.tags)) doc.tags = [];
   if (!Array.isArray(doc.sheets)) doc.sheets = [];
+  if (!Array.isArray(doc.forms)) doc.forms = [];
   if (!doc.settings || typeof doc.settings !== 'object') doc.settings = {};
 
   return doc;
@@ -207,7 +209,7 @@ export async function overwriteDoc(hash, doc) {
  * without clobbering each other.
  *
  * @param {string} hash
- * @param {{docs?:Array, tags?:Array, sheets?:Array, settings?:Object}} owned
+ * @param {{docs?:Array, tags?:Array, sheets?:Array, forms?:Array, settings?:Object}} owned
  * @returns {Promise<boolean>}
  */
 export async function saveOwnedSections(hash, owned) {
@@ -220,7 +222,7 @@ export async function saveOwnedSections(hash, owned) {
 
   const next = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : {};
 
-  for (const key of ['docs', 'tags', 'sheets']) {
+  for (const key of ['docs', 'tags', 'sheets', 'forms']) {
     if (owned[key] !== undefined) next[key] = owned[key];
   }
 
@@ -240,6 +242,7 @@ export async function createUserDoc(hash, defaults = {}) {
     docs: [],
     tags: [],
     sheets: [],
+    forms: [],
     settings: {
       theme: 'dark',
       viewMode: 'grid',

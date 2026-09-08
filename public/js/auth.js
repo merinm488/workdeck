@@ -9,12 +9,13 @@
  *
  * The hash is computed server-side (sha256(key + pepper)), so the raw key
  * never determines storage. On success, sessionStorage gets the Workdeck
- * session PLUS mirrors for both child apps, so Docs and Sheets are already
- * logged in when the user navigates to them:
+ * session PLUS mirrors for every child app, so Docs, Sheets and Forms are
+ * already logged in when the user navigates to them:
  *
  *   wd_hash / wd_key           -> Workdeck session
  *   docs_hash / docs_key       -> Docs expects these (useAuth.js)
  *   sheets_user_hash / ..._key -> Sheets expects these (js/auth.js)
+ *   forms_user_hash / ..._key  -> Forms expects these (js/auth.js)
  */
 
 const WD_AUTH_CONFIG = {
@@ -25,7 +26,9 @@ const WD_AUTH_CONFIG = {
         docsHash: 'docs_hash',
         docsKey: 'docs_key',
         sheetsHash: 'sheets_user_hash',
-        sheetsKey: 'sheets_user_key'
+        sheetsKey: 'sheets_user_key',
+        formsHash: 'forms_user_hash',
+        formsKey: 'forms_user_key'
     }
 };
 
@@ -115,7 +118,7 @@ class WdAuthManager {
     }
 
     /**
-     * Persist the session under all three apps' storage keys.
+     * Persist the session under all apps' storage keys.
      */
     storeSession(key, hash, userData) {
         const s = WD_AUTH_CONFIG.storageKeys;
@@ -125,6 +128,8 @@ class WdAuthManager {
         sessionStorage.setItem(s.docsKey, key);
         sessionStorage.setItem(s.sheetsHash, hash);
         sessionStorage.setItem(s.sheetsKey, key);
+        sessionStorage.setItem(s.formsHash, hash);
+        sessionStorage.setItem(s.formsKey, key);
 
         this.userHash = hash;
         this.userKey = key;
@@ -132,7 +137,7 @@ class WdAuthManager {
     }
 
     /**
-     * Remove all three apps' keys from sessionStorage.
+     * Remove all apps' keys from sessionStorage.
      */
     clearSession() {
         const s = WD_AUTH_CONFIG.storageKeys;

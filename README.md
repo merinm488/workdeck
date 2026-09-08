@@ -36,17 +36,24 @@ workdeck/
 │   ├── workdeck.css
 │   └── js/
 │       ├── themes.js       # light/dark/system theme manager
-│       ├── auth.js         # login + session (mirrors keys for docs & sheets)
+│       ├── auth.js         # login + session (mirrors keys for docs, sheets & forms)
 │       └── workdeck.js     # landing page application
 ├── api/
 │   ├── _lib/store.js       # shared storage: local files (dev) / textdb (prod)
 │   ├── workdeck.js         # Workdeck API: auth + unified file ops
 │   ├── docs.js             # Docs API (same shape as the original)
-│   └── users.js            # Sheets API (same shape as the original)
+│   ├── users.js            # Sheets API (same shape as the original)
+│   └── forms.js            # Forms API (incl. public response submission)
 ├── docs/                   # Docs build output (from docs-src, base /docs/)
 ├── docs-src/               # Docs source (React+Vite, with:
 │                           #   base '/docs/', ?doc= deep link, shared sessions)
 ├── sheets/                 # Sheets app (vanilla), paths adjusted to /sheets/
+├── forms/                  # Forms app (vanilla + Form.io builder)
+│   ├── editor.html         # builder (owner, needs Workdeck session)
+│   ├── shared.html         # public fill-out view (?shared=<id>)
+│   ├── styles.css
+│   ├── config/config.js
+│   └── js/                 # auth.js (complete) + storage/themes/editor/shared skeletons
 ├── server/dev-server.js    # one Express server mirroring the prod layout
 ├── vercel.json             # routing for production
 ├── .env                    # PEPPER_SECRET for local dev
@@ -63,6 +70,7 @@ document per hash in production):
   "docs": [ ... ],
   "tags": [ ... ],
   "sheets": [ ... ],
+  "forms": [ ... ],
   "settings": {
     "theme": "dark",
     "viewMode": "grid",
@@ -71,9 +79,10 @@ document per hash in production):
 }
 ```
 
-All three APIs share `api/_lib/store.js` and save **section-merged**: Docs
-only writes docs/tags, Sheets only writes sheets, Workdeck writes
-docs/tags/sheets/settings etc — so no app can wipe another's data.
+All four APIs share `api/_lib/store.js` and save **section-merged**: Docs
+only writes docs/tags, Sheets only writes sheets, Forms only writes
+forms, Workdeck writes docs/tags/sheets/forms/settings etc — so no app
+can wipe another's data.
 
 ### Authentication flow
 
@@ -101,7 +110,10 @@ document id. One account, one document, consistent recents everywhere.
 - `/docs/?doc=<id>` — opens a specific doc (Workdeck uses this for
   recent-docs clicks and New Doc).
 - `/sheets/editor.html?id=<id>` — opens a specific sheet.
+- `/forms/editor.html?id=<id>` — opens a specific form in the builder.
 - `/sheets/shared.html?shared=<id>`, `/docs/?shared=<id>` — public share views.
+- `/forms/shared.html?shared=<id>` — public fill-out view for a shared form
+  (recipients can answer; responses are stored with the shared form).
 
 ## 📄 License
 

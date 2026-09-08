@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+
+    <title>Form</title>
+    <meta name="description" content="Fill out this form.">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#7248b9">
+
+    <!-- App Icons (shared with the rest of Workdeck) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Form.io renderer (same UMD bundle as the editor; exposes `Formio`) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@formio/js@5.5.2/dist/formio.full.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@formio/js@5.5.2/dist/formio.full.min.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Form render container -->
+    <div id="sharedView">
+        <div class="shared-header">
+            <h1 class="shared-title" id="sharedFormTitle">Form</h1>
+            <p class="shared-subtitle">Powered by Workdeck Forms</p>
+        </div>
+        <div class="form-editor-container">
+            <div id="formio"></div>
+        </div>
+    </div>
+
+    <!-- Success panel after submit (hidden until the response is accepted) -->
+    <div id="submitResult" class="submit-result" style="display:none">
+        <h2>Thanks! Your response has been recorded.</h2>
+        <p id="submitResultText">You can close this page now.</p>
+        <button id="submitAgainBtn" class="btn submit-again-btn">Submit another response</button>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-spinner"></div>
+        <p>Loading form...</p>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Custom JavaScript -->
+    <script src="config/config.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/shared.js"></script>
+</body>
+</html>

@@ -30,6 +30,7 @@ import {
 
 const DEFAULT_SHEET_NAME = 'Untitled Sheet';
 const DEFAULT_DOC_TITLE = 'Untitled';
+const DEFAULT_FORM_TITLE = 'Untitled Form';
 
 /**
  * Build a fresh Univer workbook snapshot (matches what sheets/js/home.js
@@ -69,6 +70,23 @@ function createDefaultSheet(id) {
         }
       }
     },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * Build a fresh form record (matches what forms/js/storage.js creates, so
+ * the editor loads it without any migration). `components` is the Form.io
+ * builder schema — an empty array means "blank form".
+ */
+function createDefaultForm(id) {
+  return {
+    id,
+    name: DEFAULT_FORM_TITLE,
+    display: 'form',
+    components: [],
+    sharedId: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -201,6 +219,15 @@ export default async function handler(req, res) {
           break;
         }
 
+        // ---- Create a form (empty Form.io schema, named via data.name) ----
+        case 'createForm': {
+          const id = data?.id || generateId();
+          const form = createDefaultForm(id);
+          if (data?.name) form.name = data.name;
+          userData.forms.unshift(form);
+          break;
+        }
+
         // ---- Record that a file was just opened (recents ordering) ----
         case 'recordOpen': {
           const { fileId, app } = data || {};
@@ -209,7 +236,9 @@ export default async function handler(req, res) {
           }
           const target = app === 'sheets'
             ? userData.sheets.find(s => s.id === fileId)
-            : userData.docs.find(n => n.id === fileId);
+            : app === 'forms'
+              ? userData.forms.find(f => f.id === fileId)
+              : userData.docs.find(n => n.id === fileId);
 
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -227,9 +256,10 @@ export default async function handler(req, res) {
           if (!fileId || !name || !String(name).trim()) {
             return res.status(400).json({ success: false, error: 'fileId and name are required' });
           }
-          // Docs keep their name in `title`, sheets in `name`
+          // Docs keep their name in `title`, sheets & forms in `name`
           const isSheet = app === "sheets";
-          const collection = isSheet ? userData.sheets : userData.docs;
+          const isForm = app === "forms";
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -238,6 +268,8 @@ export default async function handler(req, res) {
           if (isSheet) {
             target.name = cleanName;
             if (target.data) target.data.name = cleanName;
+          } else if (isForm) {
+            target.name = cleanName;
           } else {
             target.title = cleanName;
           }
@@ -258,6 +290,12 @@ export default async function handler(req, res) {
               await deleteSharedDoc(sheet.sharedId);
             }
             userData.sheets = userData.sheets.filter(s => s.id !== fileId);
+          } else if (app === 'forms') {
+            const form = userData.forms.find(f => f.id === fileId);
+            if (form?.sharedId) {
+              await deleteSharedDoc(form.sharedId);
+            }
+            userData.forms = userData.forms.filter(f => f.id !== fileId);
           } else {
             const doc = userData.docs.find(n => n.id === fileId);
             if (doc?.sharedId) {
@@ -289,6 +327,7 @@ export default async function handler(req, res) {
         docs: userData.docs,
         tags: userData.tags,
         sheets: userData.sheets,
+        forms: userData.forms,
         settings: userData.settings
       });
 

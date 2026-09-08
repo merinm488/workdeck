@@ -32,6 +32,13 @@ const SHEET_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" 
     + '<path d="M3 10h18M3 14h18m-9-4v8m-7-6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2z" />'
     + '</svg>';
 
+const FORM_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"></path>'
+    + '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>'
+    + '<line x1="9" y1="12" x2="15" y2="12"></line>'
+    + '<line x1="9" y1="16" x2="13" y2="16"></line>'
+    + '</svg>';
+
 /**
  * App registry — the single source of truth for every Workdeck app.
  * Adding an app (Forms, Slides, ...) = one new entry here plus API support.
@@ -71,6 +78,22 @@ const WD_APPS = [
             }
         },
         contentSearch: false
+    },
+    {
+        id: 'forms',
+        name: 'Forms',
+        label: 'Form',
+        accent: 'form',
+        icon: FORM_ICON,
+        route: '/forms/editor.html',
+        editorParam: 'id',
+        create: {
+            action: 'createForm',
+            payload: {},
+            // The API unshifts, so the newest form is first.
+            pickNewest: function (data) { return data.forms && data.forms[0]; }
+        },
+        contentSearch: false
     }
 ];
 
@@ -87,6 +110,7 @@ const state = {
     userHash: null,
     docs: [],
     sheets: [],
+    forms: [],
     settings: {},
     searchQuery: '',
     filter: 'all',       // 'all' | app id from WD_APPS
@@ -163,7 +187,18 @@ function getAllFiles() {
         };
     });
 
-    return docs.concat(sheetFiles).sort(function (a, b) {
+    const formFiles = state.forms.map(function (f) {
+        return {
+            id: f.id,
+            app: 'forms',
+            name: f.name || 'Untitled Form',
+            updatedAt: f.updatedAt,
+            lastOpened: lastOpened[f.id] || null,
+            content: ''
+        };
+    });
+
+    return docs.concat(sheetFiles).concat(formFiles).sort(function (a, b) {
         const aTime = a.lastOpened || a.updatedAt || '';
         const bTime = b.lastOpened || b.updatedAt || '';
         return bTime.localeCompare(aTime);
@@ -226,6 +261,7 @@ async function loadUserData() {
 function applyUserData(data) {
     state.docs = data.docs || [];
     state.sheets = data.sheets || [];
+    state.forms = data.forms || [];
     state.settings = data.settings || {};
     render();
 }
@@ -653,6 +689,8 @@ async function confirmDelete() {
     // Optimistic removal
     if (file.app === "sheets") {
         state.sheets = state.sheets.filter(function (s) { return s.id !== file.id; });
+    } else if (file.app === "forms") {
+        state.forms = state.forms.filter(function (f) { return f.id !== file.id; });
     } else {
         state.docs = state.docs.filter(function (n) { return n.id !== file.id; });
     }
