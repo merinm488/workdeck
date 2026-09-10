@@ -4,40 +4,105 @@
  * ================================================
  * Coordinates everything on the form editor page:
  *   - session check
- *   - loading the form record and rendering the Form.io BUILDER
+ *   - loading the form record and rendering the form-js EDITOR
  *   - save (manual Ctrl+S + auto-save) via FormsStorage
  *   - rename by clicking the title
  *   - settings dropdown: Theme / View My Key / Share / Delete Account / Logout
  *
  *
  * =====================================================
- * FORM.IO QUICK REFERENCE (the only library APIs you need)
+ * FORM-JS QUICK REFERENCE (the only library APIs you need)
  * =====================================================
- *   Formio.builder(element, schema, options) -> Promise<builderInstance>
- *       element : DOM node, e.g. document.getElementById('builder')
- *       schema  : { display: 'form', components: [ ... ] }
- *       options : { builder: { basic: true, advanced: true, layout: true,
- *                              data: true, premium: false } }
- *                 -> groups shown in the left palette (premium is paid: keep false)
+ *   FormEditor.createFormEditor(options) -> Promise<editorInstance>
+ *       options : { container: DOM node (e.g. #builder),
+ *                   schema: { type: 'default', components: [ ... ] } }
+ *                 (also accepts palettes/keyboard, but the defaults are fine)
  *
- *   builderInstance.schema         -> CURRENT schema incl. edits: {display, components}
- *   builderInstance.on('change', cb) -> fires whenever the user edits the form
- *   builderInstance.destroy()        -> free the DOM when leaving the page
+ *   editorInstance.saveSchema()      -> CURRENT schema incl. edits:
+ *                                       { type: 'default', components: [...] }
+ *                                       (+ id/schemaVersion/exporter metadata)
+ *   editorInstance.on('changed', cb) -> fires whenever the user edits the form
+ *   editorInstance.destroy()         -> free the DOM when leaving the page
  *
- *   (For the shared/public side you'll use Formio.createForm instead —
+ *   Tap-to-add: the palette supports DRAG (desktop) and Enter (keyboard)
+ *   only, so on touch devices we bind click ourselves and call the same
+ *   modeling.addFormField() the Enter path uses. See initBuilder().
+ *
+ *   (For the shared/public side you'll use FormViewer.createForm —
  *    see js/shared.js.)
  * =====================================================
  */
+
+/**
+ * Every field type the form-js palette offers (verified against the
+ * @bpmn-io/form-js 1.25.0 bundle). Used to detect records saved with the
+ * old form.io schema so they can be reset instead of crashing the builder.
+ */
+const FORMJS_FIELD_TYPES = new Set([
+    // Input
+    'textfield', 'textarea', 'number', 'datetime', 'filepicker',
+    // Selection
+    'checkbox', 'checklist', 'radio', 'select', 'taglist',
+    // Presentation
+    'text', 'image', 'table', 'html', 'documentPreview', 'spacer', 'separator',
+    // Containers
+    'group', 'dynamiclist', 'iframe',
+    // Action
+    'button'
+]);
 
 class FormsEditorApp {
     constructor() {
         this.isInitialized = false;
         this.formId = null;          // from ?id=...
-        this.formRecord = null;      // { id, name, display, components, sharedId, ... }
-        this.builderInstance = null; // Form.io builder handle
+        this.formRecord = null;      // { id, name, components, sharedId, ... }
+        this.builderInstance = null; // form-js editor handle
         this.hasUnsavedChanges = false;
         this.autoSaveInterval = null;
         this.titleElementReplaced = false;
+        // The Responses view (js/responses.js). Created during init once the
+        // form id is known; null until then.
+        this.responsesView = null;
+        // Which tab is open: 'questions' | 'responses'
+        this.activeTab = 'questions';
+    }
+
+    // ================================================
+    // Tabs (Questions / Responses)
+    // ================================================
+
+    /**
+     * Swap between the builder tab and the Responses summary tab.
+     * @param {'questions'|'responses'} tabName
+     */
+    async switchTab(tabName) {
+        if (this.activeTab === tabName) return;
+        this.activeTab = tabName;
+
+        const tabQuestions = document.getElementById('tabQuestions');
+        const tabResponses = document.getElementById('tabResponses');
+        if (tabQuestions) {
+            tabQuestions.classList.toggle('active', this.activeTab === 'questions');
+            tabQuestions.setAttribute('aria-selected',
+                this.activeTab === 'questions' ? 'true' : 'false');
+        }
+        if (tabResponses) {
+            tabResponses.classList.toggle('active', this.activeTab === 'responses');
+            tabResponses.setAttribute('aria-selected',
+                this.activeTab === 'responses' ? 'true' : 'false');
+        }
+
+        const builderTabPanel = document.getElementById('builderTabPanel');
+        const responsesTabPanel = document.getElementById('responsesTabPanel');
+        if (builderTabPanel) {
+            builderTabPanel.classList.toggle('hidden', this.activeTab !== 'questions');
+        }
+        if (responsesTabPanel) {
+            responsesTabPanel.classList.toggle('hidden', this.activeTab !== 'responses');
+        }
+        if (tabName === 'responses' && this.responsesView) {
+            await this.responsesView.load(this.formId);
+        }
     }
 
     // ================================================
@@ -83,6 +148,10 @@ class FormsEditorApp {
             // 7. Show the saved name in nav + browser tab
             this.updateFormTitle(this.formRecord.name);
 
+            // 7b. Responses view — create the handle now (it reads
+            //     this.formId when its tab is opened).
+            this.responsesView = new FormsResponsesView();
+
             // 8. Build the drag-and-drop editor
             await this.initBuilder();
 
@@ -110,31 +179,130 @@ class FormsEditorApp {
         return {
             id: id,
             name: 'Untitled Form',
-            display: 'form',
-            components: [],
+            // form-js does NOT add a submit button automatically (unlike
+            // form.io) — seed one so a fresh form is submittable as-is.
+            // Last, so fields added by the owner land above it. The owner
+            // can relabel or delete it in the builder.
+            components: [
+                { type: 'button', label: 'Submit', action: 'submit' }
+            ],
             sharedId: null
         };
     }
 
+    /**
+     * The public page can only submit via a button field, and form-js has
+     * no form-level submit control — if the owner deleted every button the
+     * share link would collect nothing. ensureSubmitButton() re-adds one
+     * when the schema has none; the builder's own saveSchema() output keeps
+     * everything else intact.
+     * @param {Array} components - schema components (mutated in place)
+     */
+    ensureSubmitButton(components) {
+        const hasButton = components.some(c => c && c.type === 'button');
+        if (!hasButton) {
+            components.push({ type: 'button', label: 'Submit', action: 'submit' });
+        }
+    }
+
     // ================================================
-    // Builder (Form.io)
+    // Builder (form-js)
     // ================================================
 
     /**
      * Create the drag-and-drop builder inside #builder.
-     * The 'change' hook is what drives auto-save.
+     * The 'changed' hook is what drives auto-save.
+     *
+     * Tap-to-add: form-js only wires its palette to DRAG (and to Enter for
+     * keyboard users — same API), so on touch devices there is no way to
+     * add a field. We bind click/tap ourselves and call the same
+     * modeling.addFormField() the Enter path uses, reading data-field-type
+     * off the palette button. Desktop drag is untouched.
      */
     async initBuilder() {
-        if (typeof Formio === 'undefined') {
+        if (typeof FormEditor === 'undefined') {
             this.showError('Form library failed to load. Please refresh.');
             return;
         }
+
+        // Stored records keep { name, components }; the builder wants the
+        // schema root { type: 'default', components }. Legacy records saved
+        // before form-js (form.io shapes) don't import cleanly — start the
+        // owner on the seeded default rather than crashing the builder.
+        let components = this.formRecord.components || [];
+        const isLegacy = components.some(c => c.type && !FORMJS_FIELD_TYPES.has(c.type));
+        if (isLegacy) {
+            components = [];
+            this.showNotification('Form rebuilt for the new editor — please re-add its fields', 'info');
+        }
+        const schema = {
+            type: 'default',
+            components
+        };
+
         const element = document.getElementById('builder');
-        this.builderInstance = await Formio.builder(element, {
-            display: this.formRecord.display || 'form',
-            components: this.formRecord.components || []
-        }, { builder: APP_CONFIG.builder });
-        this.builderInstance.on('change', () => this.markAsChanged());
+        this.builderInstance = await FormEditor.createFormEditor({
+            container: element,
+            schema: schema
+        });
+        this.builderInstance.on('changed', () => this.markAsChanged());
+
+        // Tap-to-add (see docstring above). Delegated on #builder — the
+        // container form-js renders INTO, never replaces — so the handler
+        // survives palette redraws. Scoped to palette entry buttons; canvas
+        // rows carry the same class family but sit outside .fjs-palette.
+        // addFormField goes through the command stack, so undo/redo and the
+        // 'changed' event fire exactly like a drag-drop add does, keeping
+        // dirty tracking and auto-save working. On phones the palette is a
+        // drawer (see setupPaletteDrawer), so a tap also closes it.
+        element.addEventListener('click', (e) => {
+            if (!this.builderInstance) return;
+            const paletteBtn = e.target.closest('.fjs-palette .fjs-palette-field');
+            if (!paletteBtn) return;
+            e.preventDefault();
+            this.addPaletteField(paletteBtn.dataset.fieldType);
+        });
+
+        this.setupPaletteDrawer();
+    }
+
+    /**
+     * Add a field of the given type (tap-to-add + the palette drawer's
+     * entry point). Inserts ABOVE a trailing submit button so the action
+     * stays last, like form.io's builder kept it.
+     * @param {string} type - form-js field type, e.g. 'textfield'
+     */
+    addPaletteField(type) {
+        if (!this.builderInstance || !type) return;
+        const modeling = this.builderInstance.get('modeling');
+        const { schema: current } = this.builderInstance._getState();
+        const comps = current.components || [];
+        let index = comps.length;
+        if (comps.length > 0 && comps[comps.length - 1].type === 'button') {
+            index -= 1;
+        }
+        modeling.addFormField({ type }, current, index);
+        this.closePaletteDrawer();
+    }
+
+    /**
+     * Phone-only palette drawer: the FAB opens it, the backdrop closes it.
+     * On desktop both controls are display:none (CSS) and drag just works.
+     */
+    setupPaletteDrawer() {
+        const builderPanel = document.getElementById('builderTabPanel');
+        const addBtn = document.getElementById('builderAddBtn');
+        const backdrop = document.getElementById('builderBackdrop');
+        if (!builderPanel || !addBtn || !backdrop) return;
+
+        addBtn.addEventListener('click', () => {
+            builderPanel.classList.toggle('palette-open');
+        });
+        backdrop.addEventListener('click', () => this.closePaletteDrawer());
+    }
+
+    closePaletteDrawer() {
+        document.getElementById('builderTabPanel')?.classList.remove('palette-open');
     }
 
     /**
@@ -143,12 +311,12 @@ class FormsEditorApp {
      */
     getBuilderSchema() {
         if(!this.builderInstance) return null;
-        const schema = this.builderInstance.schema;
+        const schema = this.builderInstance.saveSchema();
+        const components = schema.components || [];
+        this.ensureSubmitButton(components);
         return {
-        
             name: (this.formRecord && this.formRecord.name) || this.currentTitle(),
-            display: schema.display || 'form',
-            components: schema.components || []
+            components
         };
     }
 
@@ -291,6 +459,27 @@ class FormsEditorApp {
             });
         }
 
+        // --- Tabs: Questions / Responses ---
+        const tabQuestions = document.getElementById('tabQuestions');
+        const tabResponses = document.getElementById('tabResponses');
+        if (tabQuestions) {
+            tabQuestions.addEventListener('click', () => this.switchTab('questions'));
+        }
+        if (tabResponses) {
+            tabResponses.addEventListener('click', () => this.switchTab('responses'));
+        }
+
+        // --- Responses tab controls ---
+        const responsesRefreshBtn = document.getElementById('responsesRefreshBtn');
+        if (responsesRefreshBtn) {
+            responsesRefreshBtn.addEventListener('click', () => this.responsesView?.refresh());
+        }
+
+        const responsesClearBtn = document.getElementById('responsesClearBtn');
+        if (responsesClearBtn) {
+            responsesClearBtn.addEventListener('click', () => this.showClearResponsesModal());
+        }
+
         const saveBtn = document.getElementById('saveBtn');
         if (saveBtn) {
             saveBtn.addEventListener('click', () => this.save());
@@ -421,6 +610,22 @@ class FormsEditorApp {
             deleteAccountModalClose.addEventListener('click', () => this.hideDeleteAccountModal());
         }
 
+        // --- Clear responses modal ---
+        const clearResponsesModalClose = document.getElementById('clearResponsesModalClose');
+        if (clearResponsesModalClose) {
+            clearResponsesModalClose.addEventListener('click', () => this.hideClearResponsesModal());
+        }
+
+        const cancelClearResponses = document.getElementById('cancelClearResponses');
+        if (cancelClearResponses) {
+            cancelClearResponses.addEventListener('click', () => this.hideClearResponsesModal());
+        }
+
+        const confirmClearResponses = document.getElementById('confirmClearResponses');
+        if (confirmClearResponses) {
+            confirmClearResponses.addEventListener('click', () => this.confirmClearResponses());
+        }
+
         const cancelDeleteAccount = document.getElementById('cancelDeleteAccount');
         if (cancelDeleteAccount) {
             cancelDeleteAccount.addEventListener('click', () => this.hideDeleteAccountModal());
@@ -499,6 +704,62 @@ class FormsEditorApp {
         }
     }
     
+
+    // ================================================
+    // Clear responses modal
+    // ================================================
+
+    /** Show the confirm dialog (mirrors showDeleteAccountModal). */
+    showClearResponsesModal() {
+        if (!this.formRecord?.sharedId) {
+            this.showError('This form has not been shared yet');
+            return;
+        }
+
+        const modal = document.getElementById('clearResponsesModal');
+        const settingsDropdown = document.getElementById('settingsDropdown');
+        const errorEl = document.getElementById('clearResponsesError');
+
+        if (modal) {
+            modal.classList.add('active');
+        }
+        if (settingsDropdown) {
+            settingsDropdown.classList.remove('active');
+        }
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.classList.add('hidden');
+        }
+    }
+
+    /** Hide the confirm dialog (mirrors hideDeleteAccountModal). */
+    hideClearResponsesModal() {
+        const modal = document.getElementById('clearResponsesModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    /**
+     * The dangerous button: wipe every response for this form.
+     * Mirrors confirmDeleteAccount()'s shape.
+     */
+    async confirmClearResponses() {
+        const ok = await formsStorage.deleteResponses(this.formId);
+
+        if (!ok) {
+            const errorEl = document.getElementById('clearResponsesError');
+            if (errorEl) {
+                errorEl.textContent = 'Failed to delete responses';
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+
+        this.hideClearResponsesModal();
+        this.showNotification('All responses deleted', 'success');
+        await this.responsesView?.refresh();
+    }
 
     // ================================================
     // Delete account modal
@@ -698,7 +959,7 @@ class FormsEditorApp {
     // Teardown
     // ================================================
 
-    
+
     async destroy() {
         if (this.hasUnsavedChanges) {
             await this.save({ explicit: false });
@@ -706,6 +967,7 @@ class FormsEditorApp {
         clearInterval(this.autoSaveInterval);
         if (this.builderInstance) {
             this.builderInstance.destroy();
+            this.builderInstance = null;
         }
     }
 }
@@ -716,14 +978,14 @@ class FormsEditorApp {
 
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // Wait for the Form.io CDN bundle (up to 10s), like Sheets waits for Univer.
+        // Wait for the form-js CDN bundle (up to 10s), like Sheets waits for Univer.
         let attempts = 0;
-        while (typeof Formio === 'undefined' && attempts < 100) {
+        while (typeof FormEditor === 'undefined' && attempts < 100) {
             await new Promise(resolve => setTimeout(resolve, 100));
             attempts++;
         }
 
-        if (typeof Formio === 'undefined') {
+        if (typeof FormEditor === 'undefined') {
             document.body.innerHTML =
                 '<div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;font-family:sans-serif">' +
                 '<h2>Failed to load form library</h2>' +

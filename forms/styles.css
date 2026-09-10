@@ -17,6 +17,7 @@
     --accent-hover: #5d3a9e;
     --accent-light: rgba(114, 72, 185, 0.12);
     --danger: #dc2626;
+    --danger-light: rgba(220, 38, 38, 0.10);
     --shadow-color: rgba(0, 0, 0, 0.08);
     --radius: 12px;
     --radius-sm: 8px;
@@ -33,6 +34,7 @@
     --accent-hover: #c4b5fd;
     --accent-light: rgba(167, 139, 250, 0.15);
     --danger: #ef4444;
+    --danger-light: rgba(239, 68, 68, 0.14);
     --shadow-color: rgba(0, 0, 0, 0.25);
 }
 
@@ -40,6 +42,13 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
+
+/* Generic visibility toggle used across the app's JS (tab panels, states,
+   modals). Previously inherited from the form.io bundle's Bootstrap
+   utilities — now owned here. */
+.hidden {
+    display: none !important;
 }
 
 html, body {
@@ -243,233 +252,276 @@ body {
 
 .form-editor-container {
     height: calc(100vh - 59px);   /* below the top nav */
-    overflow-y: auto;
-    padding: 24px 16px 120px;
-}
-
-#builder,
-#formio {
-    max-width: 860px;
-    margin: 0 auto;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    padding: 8px;
+    overflow: hidden;             /* form-js panes scroll internally */
+    position: relative;           /* anchors the phone palette drawer + FAB */
 }
 
 /* ============================================================
-   Form.io grid patch
-   Form.io's templates emit Bootstrap grid classes (.row, .col-*)
-   for the builder sidebar/canvas, the Columns component and the
-   settings dialogs — but formio.full.min.css v5 no longer ships
-   Bootstrap's grid. Without this, nothing sits side by side and
-   inputs keep their browser-default width. Gutters are 8px to
-   match the #builder/#formio padding above.
+   form-js theming
+   form-js reads Carbon-design `--cds-*` custom properties for its
+   colors. We map them onto the Workdeck theme variables so the
+   builder and every shared form follow our light/dark themes, and
+   override the default IBM Plex font with our Inter stack.
+   Scoped to .fjs-container / .fjs-editor-container so nothing leaks.
    ============================================================ */
 
-.row {
-    display: flex;
-    flex-wrap: wrap;
-    margin: -8px;
+/* ---------- Shared tokens (both editor and viewer) ---------- */
+.fjs-container {
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+    /* Light theme (default) — mirrors the Workdeck palette */
+    --cds-text-primary: var(--text-primary);
+    --cds-text-secondary: var(--text-secondary);
+    --cds-text-placeholder: var(--text-secondary);
+    --cds-text-error: var(--danger);
+    --cds-text-disabled: var(--text-secondary);
+    --cds-background: var(--bg-secondary);
+    --cds-layer: var(--bg-primary);
+    --cds-layer-01: var(--bg-primary);
+    --cds-layer-02: var(--bg-tertiary);
+    --cds-layer-accent: var(--bg-tertiary);
+    --cds-field: var(--bg-primary);
+    --cds-field-01: var(--bg-primary);
+    --cds-field-02: var(--bg-tertiary);
+    --cds-field-hover-02: var(--accent-light);
+    --cds-border-subtle: var(--border-color);
+    --cds-border-subtle-01: var(--border-color);
+    --cds-border-strong: var(--border-color);
+    --cds-border-strong-01: var(--text-secondary);
+    --cds-border-disabled: var(--border-color);
+    --cds-border-interactive: var(--accent-color);
+    --cds-interactive: var(--accent-color);
+    --cds-link-primary: var(--accent-color);
+    --cds-button-primary: var(--accent-color);
+    --cds-icon-primary: var(--text-primary);
+    --cds-icon-secondary: var(--text-secondary);
+    --cds-icon-disabled: var(--text-secondary);
+    --cds-highlight: var(--accent-light);
+    --cds-focus: var(--accent-color);
+    --cds-toggle-off: var(--border-color);
+    --cds-shadow: var(--shadow-color);
+    --cds-background-inverse: var(--text-primary);
+    --cds-background-inverse-hover: var(--text-secondary);
+    --cds-background-active: var(--accent-light);
+    --cds-background-hover: var(--accent-light);
+    --cds-text-inverse: var(--bg-secondary);
+    --cds-icon-inverse: var(--bg-secondary);
+    --cds-text-on-color-disabled: var(--bg-secondary);
+    --cds-border-inverse: var(--bg-secondary);
 }
 
-.row > [class*="col-"],
-.row > .col {
-    width: 100%;
-    padding: 8px;
+/* Dark theme — the same mapping picks up the dark Workdeck values */
+[data-theme="dark"] .fjs-container,
+[data-theme="dark"] .fjs-editor-container {
+    --cds-text-primary: var(--text-primary);
+    --cds-text-secondary: var(--text-secondary);
+    --cds-background: var(--bg-secondary);
+    --cds-layer: var(--bg-primary);
+    --cds-layer-01: var(--bg-primary);
+    --cds-layer-02: var(--bg-tertiary);
+    --cds-layer-accent: var(--bg-tertiary);
+    --cds-field: var(--bg-tertiary);
+    --cds-field-01: var(--bg-tertiary);
+    --cds-field-02: var(--bg-secondary);
 }
 
-.row > .col {
-    flex: 1 0 0%;
+/* Purple accent on the Submit button. form-js's own accent rule
+   (.fjs-container .fjs-button[type='submit']) is outranked by its
+   :read-only rule (buttons always match :read-only), which would leave
+   every button looking disabled-gray. ID-scoped selectors beat that
+   specificity and restore the primary-action look in both the builder
+   canvas and the shared form. */
+#formjs .fjs-button[type='submit'],
+#builder .fjs-button[type='submit'] {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: #ffffff;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    padding: 10px 20px;
+    min-width: 120px;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-/* xs (phones): only the builder row is explicitly split */
-.row > .col-xs-4 { flex: 0 0 33.3333%; max-width: 33.3333%; }
-.row > .col-xs-8 { flex: 0 0 66.6667%; max-width: 66.6667%; }
-
-/* sm ≥ 576px */
-@media (min-width: 576px) {
-    .row > .col-sm-1  { flex: 0 0 8.3333%; max-width: 8.3333%; }
-    .row > .col-sm-2  { flex: 0 0 16.6667%; max-width: 16.6667%; }
-    .row > .col-sm-3  { flex: 0 0 25%; max-width: 25%; }
-    .row > .col-sm-4  { flex: 0 0 33.3333%; max-width: 33.3333%; }
-    .row > .col-sm-5  { flex: 0 0 41.6667%; max-width: 41.6667%; }
-    .row > .col-sm-6  { flex: 0 0 50%; max-width: 50%; }
-    .row > .col-sm-7  { flex: 0 0 58.3333%; max-width: 58.3333%; }
-    .row > .col-sm-8  { flex: 0 0 66.6667%; max-width: 66.6667%; }
-    .row > .col-sm-9  { flex: 0 0 75%; max-width: 75%; }
-    .row > .col-sm-10 { flex: 0 0 83.3333%; max-width: 83.3333%; }
-    .row > .col-sm-11 { flex: 0 0 91.6667%; max-width: 91.6667%; }
-    .row > .col-sm-12 { flex: 0 0 100%; max-width: 100%; }
+#formjs .fjs-button[type='submit']:hover,
+#builder .fjs-button[type='submit']:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: #ffffff;
 }
 
-/* md ≥ 768px */
-@media (min-width: 768px) {
-    .row > .col-md-1  { flex: 0 0 8.3333%; max-width: 8.3333%; }
-    .row > .col-md-2  { flex: 0 0 16.6667%; max-width: 16.6667%; }
-    .row > .col-md-3  { flex: 0 0 25%; max-width: 25%; }
-    .row > .col-md-4  { flex: 0 0 33.3333%; max-width: 33.3333%; }
-    .row > .col-md-5  { flex: 0 0 41.6667%; max-width: 41.6667%; }
-    .row > .col-md-6  { flex: 0 0 50%; max-width: 50%; }
-    .row > .col-md-7  { flex: 0 0 58.3333%; max-width: 58.3333%; }
-    .row > .col-md-8  { flex: 0 0 66.6667%; max-width: 66.6667%; }
-    .row > .col-md-9  { flex: 0 0 75%; max-width: 75%; }
-    .row > .col-md-10 { flex: 0 0 83.3333%; max-width: 83.3333%; }
-    .row > .col-md-11 { flex: 0 0 91.6667%; max-width: 91.6667%; }
-    .row > .col-md-12 { flex: 0 0 100%; max-width: 100%; }
+.fjs-container .fjs-button {
+    border-radius: var(--radius-sm);
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-/* Form.io emits .form-control on inputs but v5 doesn't style it.
-   Full width + 16px font (≥16px stops iOS Safari zooming the page
-   on focus) + 40px min-height for a comfortable touch target. */
-.form-control {
-    display: block;
-    width: 100%;
-    min-height: 40px;
-    padding: 8px 12px;
-    font-family: inherit;
-    font-size: 16px;
-    color: var(--text-primary);
+.fjs-container .fjs-button:hover {
+    filter: brightness(1.08);
+}
+
+/* Keep third-party branding visible but quiet: the license requires the
+   bpmn.io link to stay, so we shrink it to a discreet footer mark. */
+.fjs-container .fjs-powered-by {
+    opacity: 0.55;
+    padding: 4px 8px 6px;
+}
+
+.fjs-container .fjs-powered-by:hover {
+    opacity: 1;
+}
+
+/* Shared (public) view: keep the card look around the rendered form */
+#formjs {
+    max-width: 860px;
+    margin: 16px auto 0;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 3px var(--shadow-color);
+    padding: 20px;
 }
 
-.form-control:focus {
-    outline: none;
-    border-color: var(--accent-color);
+#formjs .fjs-form {
+    gap: 4px;
 }
 
-/* Phones: stack the builder palette above the canvas — a 1/3-wide
-   sidebar is too cramped for the palette buttons. */
-@media (max-width: 576px) {
-    .formio.builder.row > .formcomponents,
-    .formio.builder.row > .formarea {
-        flex: 0 0 100%;
-        max-width: 100%;
+/* ============================================================
+   Builder (editor) layout
+   form-js lays out its own 3-pane row (palette | canvas |
+   properties) inside #builder; we just size the host and polish
+   the frame. Widths come from the library's own --palette-width
+   (270px) and --properties-panel-width (300px) tokens.
+   ============================================================ */
+
+#builder {
+    height: 100%;
+}
+
+/* Remove the editor's outer border so it fills the workspace cleanly */
+#builder .fjs-editor-container {
+    height: 100%;
+    border: none;
+    background: var(--bg-primary);
+}
+
+/* Editor canvas (center pane): the page card, inset from the panes */
+#builder .fjs-form-container {
+    padding: 16px 12px;
+    background: var(--bg-primary);
+}
+
+#builder .fjs-form > .fjs-element:first-child {
+    margin-top: 0;
+}
+
+/* Palette: align its background with the canvas surface */
+#builder .fjs-palette-container {
+    background: var(--bg-secondary);
+}
+
+/* Properties panel: match too */
+#builder .fjs-properties-container {
+    background: var(--bg-secondary);
+}
+
+/* ============================================================
+   Builder responsiveness
+   The 3-pane row (270px palette + canvas + 300px properties) needs
+   ~1100px.
+   - Below 1100px: hide the properties panel; the canvas still shows
+     every field and edits still land on save.
+   - Below 700px: the palette becomes an off-canvas drawer opened by
+     the floating "+" button (markup + toggle live in editor.js /
+     editor.html). Adding a field via tap-to-add closes the drawer.
+   ============================================================ */
+
+@media (max-width: 1100px) {
+    #builder .fjs-properties-container {
+        display: none;
     }
 }
 
-/* Bootstrap utilities Form.io templates rely on but formio.full.min.css
-   v5 doesn't include (verified against the bundle). Themed to match. */
+@media (max-width: 700px) {
+    /* The editor container is the drawer's positioning anchor */
+    #builder .fjs-editor-container {
+        position: relative;
+    }
 
-/* Screen-reader-only content — Form.io uses it to hide component labels
-   (25 uses). Without it, "hidden" labels render visibly and overlap. */
-.visually-hidden {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    padding: 0 !important;
-    margin: -1px !important;
-    overflow: hidden !important;
-    clip: rect(0, 0, 0, 0) !important;
-    white-space: nowrap !important;
-    border: 0 !important;
+    #builder .fjs-palette-container {
+        position: absolute;
+        z-index: 60;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: min(270px, 78vw);
+        box-shadow: 0 0 40px var(--shadow-color);
+        transform: translateX(-105%);
+        transition: transform 0.2s ease;
+    }
+
+    /* .palette-open is toggled on #builderTabPanel by the floating "+" */
+    #builderTabPanel.palette-open #builder .fjs-palette-container {
+        transform: translateX(0);
+    }
+
+    /* Dimmed backdrop behind the drawer; tapping it closes */
+    .builder-backdrop {
+        position: absolute;
+        inset: 0;
+        z-index: 55;
+        background: rgba(0, 0, 0, 0.35);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+    }
+
+    #builderTabPanel.palette-open .builder-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Floating action button, bottom-right of the builder area */
+    .builder-add-btn {
+        position: absolute;
+        right: 18px;
+        bottom: 18px;
+        z-index: 50;
+        width: 52px;
+        height: 52px;
+        border: none;
+        border-radius: 50%;
+        background: var(--accent-color);
+        color: #ffffff;
+        font-size: 26px;
+        line-height: 1;
+        cursor: pointer;
+        box-shadow: 0 4px 14px var(--shadow-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .builder-add-btn:active {
+        transform: scale(0.96);
+    }
+
+    /* Drawer open: hide the FAB (its job is done) */
+    #builderTabPanel.palette-open .builder-add-btn {
+        display: none;
+    }
 }
 
-/* Checkboxes / radios — Form.io emits .form-check wrappers (13 uses). */
-.form-check {
-    display: block;
-    position: relative;
-    min-height: 1.5rem;
-    padding-left: 1.75em;
-    margin-bottom: 0.125rem;
+/* Wide screens never see the FAB or the backdrop — phones only */
+@media (min-width: 701px) {
+    .builder-add-btn,
+    .builder-backdrop {
+        display: none !important;
+    }
 }
 
-.form-check .form-check-input {
-    float: left;
-    margin-left: -1.75em;
-}
-
-.form-check-input {
-    width: 1.1em;
-    height: 1.1em;
-    margin-top: 0.2em;
-    vertical-align: top;
-    appearance: none;
-    -webkit-appearance: none;
-    background-color: var(--bg-secondary);
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-    border: 1px solid var(--text-secondary);
-    cursor: pointer;
-}
-
-.form-check-input[type="checkbox"] { border-radius: 0.25em; }
-.form-check-input[type="radio"] { border-radius: 50%; }
-
-.form-check-input:focus {
-    outline: none;
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 0.2rem var(--accent-light);
-}
-
-.form-check-input:checked {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-}
-
-.form-check-input:checked[type="checkbox"] {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
-}
-
-.form-check-input:checked[type="radio"] {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%23fff'/%3e%3c/svg%3e");
-}
-
-.form-check-label {
-    cursor: pointer;
-}
-
-/* Help text under fields */
-.form-text {
-    margin-top: 0.25rem;
-    font-size: 0.875em;
-    color: var(--text-secondary);
-}
-
-/* Error / emphasis text color (validation messages, delete buttons) */
-.text-danger { color: var(--danger); }
-
-/* Button variants used by the component edit dialog and builder controls.
-   (Sizes come from Form.io's own CSS; these only supply theme colors.) */
-.btn-primary {
-    background: var(--accent-color);
-    border: 1px solid var(--accent-color);
-    color: #ffffff;
-}
-
-.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-
-.btn-secondary,
-.btn-light {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-}
-
-.btn-secondary:hover,
-.btn-light:hover { background: var(--accent-light); }
-
-.btn-danger {
-    background: var(--danger);
-    border: 1px solid var(--danger);
-    color: #ffffff;
-}
-
-/* Base .btn — Form.io templates put .btn on nearly every control (palette
-   buttons, dialog actions, wizard nav) but v5's CSS only styles a couple of
-   scoped selectors, not the base class. */
-.btn {
-    display: inline-block;
-    padding: 8px 14px;
-    font-family: inherit;
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1.4;
-    text-align: center;
-    text-decoration: none;
+/* ============================================================
+   Loading overlay / notification / modals
+   ============================================================ */
     cursor: pointer;
     user-select: none;
     background: var(--bg-tertiary);
@@ -496,24 +548,6 @@ body {
 .btn-outline-primary:hover {
     background: var(--accent-color);
     color: #ffffff;
-}
-
-/* Palette buttons: wrap instead of clipping, full-width tap targets,
-   left-aligned like form.io's classic look. */
-.formcomponents .formcomponent {
-    display: block;
-    width: 100%;
-    text-align: left;
-    margin: 0 0 6px 0;
-}
-
-@media (max-width: 576px) {
-    .formcomponents .formcomponent {
-        display: inline-block;
-        width: auto;
-        max-width: 100%;
-        margin: 0 6px 6px 0;
-    }
 }
 
 /* ============================================================
@@ -934,10 +968,6 @@ body {
     margin-top: 6px;
 }
 
-#formio {
-    margin-top: 16px;
-}
-
 /* Success / error panel after submit */
 .submit-result {
     max-width: 640px;
@@ -995,5 +1025,382 @@ body {
         left: 0;
         top: calc(100% + 6px);
         min-width: 0;
+    }
+}
+
+/* ============================================================
+   Editor tabs (Questions / Responses)
+   ============================================================ */
+
+.editor-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 14px;
+    align-self: stretch;
+}
+
+.editor-tab {
+    position: relative;
+    padding: 0 14px;
+    height: 100%;
+    align-self: stretch;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+/* The active marker is the underline (Google-Forms-style), not a fill */
+.editor-tab::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 0;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: transparent;
+    transition: background 0.15s ease;
+}
+
+.editor-tab:hover {
+    color: var(--text-primary);
+}
+
+.editor-tab.active {
+    color: var(--accent-color);
+}
+
+.editor-tab.active::after {
+    background: var(--accent-color);
+}
+
+/* ============================================================
+   Responses tab (owner-only summary)
+   ============================================================ */
+
+.responses-tab-panel {
+    height: calc(100vh - 59px);   /* below the top nav, like the builder */
+    overflow-y: auto;
+    padding: 24px 16px 120px;
+}
+
+.responses-header {
+    max-width: 860px;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.responses-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.responses-header-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.responses-header-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.responses-header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Ghost-danger variant: quiet until hover, then unmistakably destructive */
+.btn-danger-ghost {
+    color: var(--danger);
+    border-color: transparent;
+    background: transparent;
+}
+
+.btn-danger-ghost:hover {
+    background: var(--danger-light);
+    border-color: var(--danger);
+}
+
+.responses-state {
+    max-width: 860px;
+    margin: 60px auto;
+    text-align: center;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.responses-state h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.responses-state p {
+    font-size: 14px;
+}
+
+/* ---------- Stat tiles ---------- */
+
+.responses-tiles {
+    max-width: 860px;
+    margin: 0 auto 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.responses-tile {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.responses-tile-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+/* Proportional figures (NOT tabular-nums) on a large standalone value */
+.responses-tile-value {
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--text-primary);
+}
+
+/* "3h ago" doesn't deserve display size — keep the tile aligned though */
+.responses-tile-value-small {
+    font-size: 16px;
+    padding-top: 8px;
+}
+
+/* ---------- Question summary cards ---------- */
+
+.responses-question-list {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.responses-question-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+}
+
+.responses-question-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.responses-question-label {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.responses-question-meta {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    /* tabular-nums is right HERE: a column of "N of M" strings that
+       should align across cards */
+    font-variant-numeric: tabular-nums;
+}
+
+.responses-question-body:empty {
+    display: none;
+}
+
+/* ---------- Choice bar meters ----------
+   Nominal categories -> every bar wears the SAME hue (the accent).
+   Track = a light step of the same ramp (accent-light); fill = accent.
+   Thin mark (10px), 4px rounded data-end, square at the baseline. */
+
+.responses-choice {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.responses-choice-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Label sits ABOVE the bar so long option labels wrap instead of
+   squeezing the bar */
+.responses-choice-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.responses-choice-bar-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.responses-meter {
+    flex: 1;
+    height: 10px;
+    border-radius: 0 5px 5px 0;   /* square at the baseline (left)... */
+    overflow: hidden;
+    background: var(--accent-light);   /* track: same ramp, lighter step */
+}
+
+.responses-meter-fill {
+    height: 100%;
+    width: 0%;                       /* responses.js sets the real width */
+    min-width: 0;
+    background: var(--accent-color);
+    border-radius: 0 4px 4px 0;      /* ...rounded at the data end (right) */
+    transition: width 0.4s ease;
+}
+
+.responses-choice-count {
+    flex-shrink: 0;
+    min-width: 24px;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Text answer chips ---------- */
+
+.responses-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.responses-chip {
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    font-size: 13px;
+    color: var(--text-primary);
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.responses-chip-more {
+    background: transparent;
+    color: var(--text-secondary);
+    border-style: dashed;
+}
+
+/* ---------- Number stats (Low / Average / High) ---------- */
+
+.responses-numbers {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+}
+
+.responses-number {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.responses-number-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.responses-number-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* ---------- Shared small states ---------- */
+
+.responses-no-data {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.responses-no-questions {
+    max-width: 860px;
+    margin: 0 auto 16px;
+    padding: 12px 16px;
+    background: var(--accent-light);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--accent-color);
+    text-align: center;
+}
+
+.responses-clear-error {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--danger);
+    text-align: center;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 640px) {
+    /* The title and tabs share one row; give tabs the room they need */
+    .form-title {
+        max-width: 22vw;
+    }
+
+    .editor-tabs {
+        margin-left: 8px;
+        gap: 0;
+    }
+
+    .editor-tab {
+        padding: 0 8px;
+        font-size: 13px;
+    }
+
+    .responses-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .responses-header-actions {
+        justify-content: flex-end;
+    }
+
+    .responses-numbers {
+        gap: 20px;
     }
 }

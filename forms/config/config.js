@@ -38,24 +38,6 @@ const APP_CONFIG = {
     autoSave: {
         enabled: true,
         interval: 30000   // 30 seconds
-    },
-
-    // Form.io builder options.
-    // The community (free) edition of @formio/js includes every component
-    // below with no paid tier required. Trim this list if you want a
-    // simpler palette in the builder.
-    //
-    // NOTE (form.io v5): each group must be an OBJECT (empty is fine — the
-    // library fills in title/weight) or `false` to hide the group. Passing
-    // `true` crashes the builder with
-    // "TypeError: Cannot create property 'key' on boolean 'true'".
-    builder: {
-        // Component groups shown in the builder's left palette
-        basic: {},         // textfield, textarea, number, checkbox, radio, select, button...
-        advanced: {},      // email, url, phone, tags, datetime, day, time, currency, survey...
-        layout: {},        // columns, fieldset, panel, table, tabs, well
-        data: {},          // datagrid, containers, editgrid
-        premium: false     // premium components (signature, file...) are paid — keep off
     }
 };
 

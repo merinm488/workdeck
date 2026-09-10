@@ -204,6 +204,42 @@ class FormsStorage {
     }
 
     /**
+     * Fetch the responses for one of MY forms (OWNER only — sends the hash,
+     * unlike getSharedForm() which is public).
+     * Goes through PUT /api/forms { hash, action: 'getResponses', data }.
+     *
+     * @param {string} formId
+     * @returns {Promise<{responses: Array, form: object}|null>}
+     */
+    async getResponses(formId) {
+        const hash = getFormsUserHash();
+        if (!hash) {
+            console.error('[STORAGE] No user hash found');
+            return null;
+        }
+        try {
+            const response = await fetch(this.apiEndpoint, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    hash,
+                    action: 'getResponses',
+                    data: { formId: formId }
+                })
+            });
+            const result = await response.json();
+
+            return result.success
+                ? { responses: result.responses || [], form: result.form }
+                : null;
+
+        } catch (error) {
+            console.error('[STORAGE] Get responses error:', error);
+            return null;
+        }
+    }
+
+    /**
      * Fetch a shared form (PUBLIC — no session needed). Used by shared.html.
     
      *
@@ -218,7 +254,9 @@ class FormsStorage {
                 return null;
             }
             const result = await response.json();
-            return result.success ? {form:result.form, responses: result.responses || []} : null;
+            // The public endpoint returns form + sharedAt only — responses
+            // never travel over the public link (owner uses getResponses()).
+            return result.success ? { form: result.form } : null;
         }catch(error){
             console.error('[STORAGE] Get shared form error:', error);
             return null;

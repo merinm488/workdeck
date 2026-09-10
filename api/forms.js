@@ -17,7 +17,8 @@
  *
  * Request shapes:
  *   GET  ?hash=<hash>                       -> whole user document
- *   GET  ?shared=<shareId>                  -> { form, sharedAt, responses }
+ *   GET  ?shared=<shareId>                  -> { form, sharedAt }  (PUBLIC:
+ *                                              questions only — never responses)
  *   POST { key, action: 'login'|'create' }  -> auth (same as Sheets)
  *   POST { shareId, action: 'submitResponse', data: { response } }
  *                                           -> PUBLIC: append a submission
@@ -29,6 +30,10 @@
  *   deleteForm      { formId }             -> delete form + its shared copy
  *   updateSettings  { settings }           -> merge into user settings
  *   shareForm       { formId }             -> create/reuse the share link
+ *   getResponses    { formId }             -> { responses, form } — the form
+ *                                            is the SHARED snapshot, i.e. the
+ *                                            exact questions responders saw.
+ *                                            (OWNER ONLY — requires hash)
  *   deleteResponses { formId }             -> clear all responses for a form
  */
 
@@ -84,11 +89,12 @@ export default async function handler(req, res) {
           });
         }
 
+        // SECURITY: responses are NEVER sent over the public link — the
+        // owner reads them via the authenticated `getResponses` PUT action.
         return res.status(200).json({
           success: true,
           form: doc.form,
-          sharedAt: doc.sharedAt,
-          responses: doc.responses || []
+          sharedAt: doc.sharedAt
         });
       }
 
@@ -394,6 +400,56 @@ export default async function handler(req, res) {
           shareId: newShareId,
           shareUrl: `${baseUrl}/forms/shared.html?shared=${newShareId}`,
           alreadyShared: false
+        });
+      }
+
+      // GET RESPONSES — the owner reads submissions for one of their forms.
+      // Runs inside the PUT branch, so the hash above was already required
+      // and checked: this is the OWNER-ONLY door to responses.
+      if (action === 'getResponses') {
+        const { formId } = data || {};
+
+        // 1. Find this form in the user's own document.
+        //    (Array.prototype.find returns the form record — which holds the
+        //    form's `sharedId` — or undefined when formId isn't one of ours.)
+        //    Guard: reject with 404 { success:false, error:'Form not found' }
+        //    when it isn't found. Look at how `deleteForm` above does exactly
+        //    this with `userData.forms.find(...)`.
+        const form = userData.forms.find(f => f.id === formId);
+        if (!form){
+          return res.status(404).json({success:false, error:'Form not found'});
+        }
+
+        // 2. No share link yet -> the form was never shared, so it cannot
+        //    have responses. Return success with an EMPTY array (that's not
+        //    an error — the UI shows an empty state).
+        if (!form.sharedId) {
+          return res.status(200).json({
+            success: true,
+            responses: [],
+            form: null
+          });
+        }
+
+        // 3. Fetch the shared document: `getSharedDoc(form.sharedId)` is
+        //    already imported at the top of this file.
+        const sharedDoc = await getSharedDoc(form.sharedId);
+
+        // 4. Send the responses back. Mimic the shape of the old public GET:
+        //      res.status(200).json({
+        //        success: true,
+        //        responses: ...,
+        //        form: ...
+        //      });
+        //    Responses come from `sharedDoc.responses` (may be undefined on an
+        //    old share — use `|| []` so the client always gets an array).
+        //    Also return `form: sharedDoc.form` — the SHARED snapshot, i.e.
+        //    the exact questions responders saw (the owner may have edited
+        //    the form since sharing; the summary must match what was asked).
+        return res.status(200).json({
+          success: true,
+          responses: sharedDoc.responses || [],
+          form: sharedDoc.form
         });
       }
 

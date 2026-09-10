@@ -18,9 +18,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Form.io renderer (same UMD bundle as the editor; exposes `Formio`) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@formio/js@5.5.2/dist/formio.full.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/@formio/js@5.5.2/dist/formio.full.min.js"></script>
+    <!-- form-js viewer (same package as the editor; exposes `FormViewer`).
+         form-js.css covers the rendered fields and the design tokens. -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@bpmn-io/form-js@1.25.0/dist/assets/form-js.css">
+    <script src="https://cdn.jsdelivr.net/npm/@bpmn-io/form-js@1.25.0/dist/form-viewer.umd.js"></script>
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="styles.css">
@@ -33,7 +34,7 @@
             <p class="shared-subtitle">Powered by Workdeck Forms</p>
         </div>
         <div class="form-editor-container">
-            <div id="formio"></div>
+            <div id="formjs"></div>
         </div>
     </div>
 

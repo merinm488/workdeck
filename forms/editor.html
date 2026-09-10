@@ -18,11 +18,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Form.io (free community edition, UMD bundle). Exposes the global
-         `Formio` with Formio.builder() and Formio.createForm().
-         formio.full.* = renderer + builder + all community components. -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@formio/js@5.5.2/dist/formio.full.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/@formio/js@5.5.2/dist/formio.full.min.js"></script>
+    <!-- form-js (bpmn.io, MIT-licensed UMD bundle). Exposes the global
+         `FormEditor` with FormEditor.createFormEditor().
+         Two stylesheets are required: form-js.css (fields + design tokens)
+         and form-js-editor.css (palette / canvas / properties panel).
+         The bundles are self-contained — no jQuery, Bootstrap or other
+         external CSS is needed. -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@bpmn-io/form-js@1.25.0/dist/assets/form-js.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@bpmn-io/form-js@1.25.0/dist/assets/form-js-editor.css">
+    <script src="https://cdn.jsdelivr.net/npm/@bpmn-io/form-js@1.25.0/dist/form-editor.umd.js"></script>
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="styles.css">
@@ -37,6 +41,17 @@
                 </svg>
             </button>
             <h1 id="formTitle" class="form-title" title="Click to rename">Untitled Form</h1>
+            <!-- Questions / Responses tabs (like Google Forms' tab strip) -->
+            <div class="editor-tabs" role="tablist" aria-label="Form sections">
+                <button id="tabQuestions" class="editor-tab active" role="tab"
+                        aria-selected="true" aria-controls="builderTabPanel">
+                    Questions
+                </button>
+                <button id="tabResponses" class="editor-tab" role="tab"
+                        aria-selected="false" aria-controls="responsesTabPanel">
+                    Responses
+                </button>
+            </div>
         </div>
 
         <div class="top-nav-right">
@@ -145,9 +160,73 @@
         </div>
     </nav>
 
-    <!-- Builder Container (Form.io renders the drag-and-drop builder here) -->
-    <div class="form-editor-container">
+    <!-- Builder Container (form-js renders the drag-and-drop builder here).
+         The backdrop + floating "+" button are the phone-only palette
+         drawer controls; hidden on desktop via CSS. -->
+    <div id="builderTabPanel" class="form-editor-container">
         <div id="builder"></div>
+        <div id="builderBackdrop" class="builder-backdrop"></div>
+        <button id="builderAddBtn" class="builder-add-btn" type="button"
+                aria-label="Add a field" title="Add a field">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Responses Tab (owner-only summary; hidden until the tab is opened) -->
+    <div id="responsesTabPanel" class="responses-tab-panel hidden">
+        <div class="responses-header">
+            <div class="responses-header-info">
+                <span class="responses-header-title">Responses</span>
+                <span class="responses-header-hint">Summary of every submission to this form's share link</span>
+            </div>
+            <div class="responses-header-actions">
+                <button id="responsesRefreshBtn" class="btn">Refresh</button>
+                <button id="responsesClearBtn" class="btn btn-danger-ghost">Delete all responses</button>
+            </div>
+        </div>
+
+        <!-- Loading state -->
+        <div id="responsesLoading" class="responses-state">
+            <div class="loading-spinner"></div>
+            <p>Loading responses...</p>
+        </div>
+
+        <!-- Empty state (never shared, or shared with zero responses) -->
+        <div id="responsesEmpty" class="responses-state hidden">
+            <h2 id="responsesEmptyTitle">No responses yet</h2>
+            <p id="responsesEmptyText">Share your form to start collecting responses.</p>
+        </div>
+
+        <!-- Error state -->
+        <div id="responsesError" class="responses-state hidden">
+            <h2>Couldn't load responses</h2>
+            <p>Check your connection and try the Refresh button.</p>
+        </div>
+
+        <!-- Summary (the actual data view) -->
+        <div id="responsesSummary" class="responses-summary hidden">
+            <!-- Stat tiles: a number is not a chart, so these are tiles -->
+            <div class="responses-tiles">
+                <div class="responses-tile">
+                    <span class="responses-tile-label">Total responses</span>
+                    <span class="responses-tile-value" id="responsesCountValue">0</span>
+                </div>
+                <div class="responses-tile">
+                    <span class="responses-tile-label">Last submission</span>
+                    <span class="responses-tile-value responses-tile-value-small" id="responsesLastValue">-</span>
+                </div>
+            </div>
+
+            <p id="responsesNoQuestions" class="responses-no-questions hidden">
+                This form has no questions yet — add some on the Questions tab.
+            </p>
+
+            <!-- One card per question, built by responses.js -->
+            <div id="responsesQuestionList" class="responses-question-list"></div>
+        </div>
     </div>
 
     <!-- Loading Overlay -->
@@ -200,6 +279,28 @@
                     <button id="cancelDeleteAccount" class="btn">Cancel</button>
                     <button id="confirmDeleteAccount" class="btn btn-danger">Delete Account</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear Responses Confirmation Modal -->
+    <div id="clearResponsesModal" class="key-modal">
+        <div class="key-modal-content">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title">Delete all responses</h3>
+                <button class="key-modal-close" id="clearResponsesModalClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <p>
+                    This permanently deletes every response to this form. The
+                    form and its share link keep working — only the submissions
+                    are erased. This cannot be undone.
+                </p>
+                <div class="modal-actions">
+                    <button id="cancelClearResponses" class="btn">Cancel</button>
+                    <button id="confirmClearResponses" class="btn btn-danger">Delete responses</button>
+                </div>
+                <p id="clearResponsesError" class="responses-clear-error hidden"></p>
             </div>
         </div>
     </div>
@@ -281,6 +382,7 @@
     <script src="config/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/storage.js"></script>
+    <script src="js/responses.js"></script>
     <script src="js/themes.js"></script>
     <script src="js/editor.js"></script>
 </body>

@@ -8,40 +8,40 @@
  * No login required — the shareId IS the access. Flow:
  *   1. Parse ?shared= from the URL
  *   2. formsStorage.getSharedForm(shareId)     (public GET)
- *   3. Formio.createForm(element, { display, components })
+ *   3. FormViewer.createForm({ container, schema })
  *   4. on submit -> formsStorage.submitResponse(shareId, payload)
  *   5. show the thank-you panel; "Submit another response" re-renders
  *
 
  *
  * =====================================================
- * FORM.IO QUICK REFERENCE (renderer side)
+ * FORM-JS QUICK REFERENCE (renderer side)
  * =====================================================
- *   Formio.createForm(element, form, options) -> Promise<formInstance>
- *       element : DOM node (#formio)
- *       form    : { display: 'form', components: [ ... ] }
- *       options : { readOnly: true|false }   (not needed for fill-out)
+ *   FormViewer.createForm(options) -> Promise<formInstance>
+ *       options : { container: DOM node (#formjs),
+ *                   schema: { type: 'default', components: [ ... ] } }
  *
- *   formInstance.on('submit', handler(submission)) // user pressed Submit
- *       submission = { data: {...}, ... }
- *       IMPORTANT: inside the handler call event.preventDefault() — we
- *       submit to OUR API (formsStorage.submitResponse), not form.io's.
- *   formInstance.redraw() / destroy()
+ *   formInstance.on('submit', handler(result)) // user pressed Submit
+ *       result = { data: {...}, errors: {...}, files: Map }
+ *       Fires even when validation FAILED — check result.errors first;
+ *       only an empty errors object means every field is valid. The
+ *       library shows the inline error messages itself.
+ *   formInstance.destroy()
  * =====================================================
  */
 
 class SharedFormApp {
     constructor() {
         this.shareId = null;
-        this.formRecord = null;      // { name, display, components, ... }
-        this.formInstance = null;    // Form.io renderer handle
+        this.formRecord = null;      // { name, components, ... }
+        this.formInstance = null;    // form-js viewer handle
     }
 
     // ================================================
     // Initialization
     // ================================================
 
-    
+
     async init() {
         // 1. The share ID is the page's only credential — without it, bail.
         this.shareId = this.parseURL('shared');
@@ -77,27 +77,36 @@ class SharedFormApp {
 
     async renderForm() {
         // 1. The renderer bundle comes from a CDN — bail out if it never loaded.
-        if (typeof Formio === 'undefined') {
+        if (typeof FormViewer === 'undefined') {
             this.showErrorPanel('Failed to load the form library');
             return;
         }
 
         // 2. The empty container div the form gets rendered into.
-        const element = document.getElementById('formio');
+        const element = document.getElementById('formjs');
 
-        // 3. Build the form; await pauses here until form.io is done rendering.
-        this.formInstance = await Formio.createForm(element, {
-            display: this.formRecord.display || 'form',
-            components: this.formRecord.components || []
+        // 3. Build the form; await pauses here until form-js is done rendering.
+        this.formInstance = await FormViewer.createForm({
+            container: element,
+            schema: {
+                type: 'default',
+                components: this.formRecord.components || []
+            }
         });
 
         // 4. This callback runs LATER — every time the recipient clicks Submit.
-        this.formInstance.on('submit', async (submission) => {
-            // Stop form.io from POSTing to its own servers — we use our API.
-            if (event) event.preventDefault();
+        //    form-js runs its own validation first and renders the inline
+        //    error messages; 'submit' fires either way, so we only accept
+        //    the submission when there are no errors.
+        this.formInstance.on('submit', async (result) => {
+            const errors = result.errors || {};
+            if (Object.keys(errors).length > 0) {
+                // Library already highlighted the fields — nothing to add.
+                return;
+            }
 
             const payload = {
-                data: submission.data,               // the answers
+                data: result.data,                   // the answers
                 meta: { userAgent: navigator.userAgent }
             };
 
@@ -199,14 +208,14 @@ class SharedFormApp {
 
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // Wait for the Form.io CDN bundle (up to 10s), like the editor does.
+        // Wait for the form-js CDN bundle (up to 10s), like the editor does.
         let attempts = 0;
-        while (typeof Formio === 'undefined' && attempts < 100) {
+        while (typeof FormViewer === 'undefined' && attempts < 100) {
             await new Promise(resolve => setTimeout(resolve, 100));
             attempts++;
         }
 
-        if (typeof Formio === 'undefined') {
+        if (typeof FormViewer === 'undefined') {
             document.body.innerHTML =
                 '<div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;font-family:sans-serif">' +
                 '<h2>Failed to load form library</h2>' +
