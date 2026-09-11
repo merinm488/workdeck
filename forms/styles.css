@@ -1005,6 +1005,16 @@ body {
     margin-top: 6px;
 }
 
+/* The public page has no editor chrome: form-js renders the form inline and
+   the PAGE must scroll. The editor container's fixed height + overflow:hidden
+   (its panes scroll internally) clipped everything past the first viewport —
+   including the Submit button — so long forms could never be submitted. */
+#sharedView .form-editor-container {
+    height: auto;
+    min-height: calc(100vh - 150px);
+    overflow: visible;
+}
+
 /* Success / error panel after submit */
 .submit-result {
     max-width: 640px;
