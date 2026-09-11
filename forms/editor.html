@@ -175,16 +175,91 @@
         </button>
     </div>
 
-    <!-- Responses Tab (owner-only summary; hidden until the tab is opened) -->
+    <!-- Responses Tab (owner-only; hidden until the tab is opened).
+         Google-Forms-style layout: "N responses" + Sheets/Refresh/more
+         icons on top, Summary | Individual sub-tabs below, then the active
+         view's content. -->
     <div id="responsesTabPanel" class="responses-tab-panel hidden">
         <div class="responses-header">
             <div class="responses-header-info">
-                <span class="responses-header-title">Responses</span>
-                <span class="responses-header-hint">Summary of every submission to this form's share link</span>
+                <span class="responses-header-title" id="responsesCountLabel">0 responses</span>
+                <div class="responses-subtabs" role="tablist" aria-label="Response views">
+                    <button id="responsesSubtabSummary" class="responses-subtab active" role="tab"
+                            aria-selected="true" aria-controls="responsesSummary">
+                        Summary
+                    </button>
+                    <button id="responsesSubtabIndividual" class="responses-subtab" role="tab"
+                            aria-selected="false" aria-controls="responsesIndividual">
+                        Individual
+                    </button>
+                </div>
             </div>
+
             <div class="responses-header-actions">
-                <button id="responsesRefreshBtn" class="btn">Refresh</button>
-                <button id="responsesClearBtn" class="btn btn-danger-ghost">Delete all responses</button>
+                <!-- Link to Sheets: unlinked -> opens the link modal; linked
+                     -> opens the spreadsheet in the Sheets app -->
+                <button id="responsesSheetsBtn" class="responses-icon-btn" aria-label="Link to Sheets">
+                    <svg class="sheets-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2.5" fill="#188038"></rect>
+                        <path d="M7.5 9.5h9M7.5 12.5h9M7.5 15.5h9M7.5 9.5v6M12 9.5v6M16.5 9.5v6"
+                              stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"></path>
+                    </svg>
+                </button>
+
+                <button id="responsesRefreshBtn" class="responses-icon-btn" aria-label="Refresh" title="Refresh">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                </button>
+
+                <!-- More menu (⋮): CSV download, unlink, delete all -->
+                <div class="responses-more">
+                    <button id="responsesMoreBtn" class="responses-icon-btn" aria-label="More options"
+                            aria-haspopup="true" title="More options">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="5" r="2"></circle>
+                            <circle cx="12" cy="12" r="2"></circle>
+                            <circle cx="12" cy="19" r="2"></circle>
+                        </svg>
+                    </button>
+                    <div id="responsesMoreMenu" class="responses-more-menu">
+                        <button class="responses-more-item" id="responsesCsvBtn">
+                            <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span class="item-text">Download responses (.csv)</span>
+                        </button>
+                        <button class="responses-more-item" id="responsesUnlinkBtn">
+                            <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="15 7 18 7 21 4"></polyline>
+                                <polyline points="9 17 6 17 3 20"></polyline>
+                                <line x1="18" y1="14" x2="18" y2="17"></line>
+                                <line x1="21" y1="17" x2="22" y2="17"></line>
+                                <line x1="14" y1="10" x2="14" y2="13"></line>
+                                <line x1="19" y1="15" x2="21" y2="15"></line>
+                                <line x1="17" y1="18" x2="19" y2="18"></line>
+                                <line x1="3" y1="7" x2="6" y2="7"></line>
+                                <line x1="7" y1="3" x2="7" y2="6"></line>
+                                <line x1="10" y1="6" x2="10" y2="9"></line>
+                                <line x1="6" y1="11" x2="9" y2="11"></line>
+                                <line x1="7" y1="14" x2="7" y2="17"></line>
+                            </svg>
+                            <span class="item-text">Unlink from Sheets</span>
+                        </button>
+                        <div class="responses-more-divider"></div>
+                        <button class="responses-more-item danger" id="responsesDeleteAllBtn">
+                            <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            <span class="item-text">Delete all responses</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -206,14 +281,10 @@
             <p>Check your connection and try the Refresh button.</p>
         </div>
 
-        <!-- Summary (the actual data view) -->
+        <!-- Summary sub-tab -->
         <div id="responsesSummary" class="responses-summary hidden">
-            <!-- Stat tiles: a number is not a chart, so these are tiles -->
+            <!-- Stat tile: the total lives in the header ("N responses") -->
             <div class="responses-tiles">
-                <div class="responses-tile">
-                    <span class="responses-tile-label">Total responses</span>
-                    <span class="responses-tile-value" id="responsesCountValue">0</span>
-                </div>
                 <div class="responses-tile">
                     <span class="responses-tile-label">Last submission</span>
                     <span class="responses-tile-value responses-tile-value-small" id="responsesLastValue">-</span>
@@ -226,6 +297,29 @@
 
             <!-- One card per question, built by responses.js -->
             <div id="responsesQuestionList" class="responses-question-list"></div>
+        </div>
+
+        <!-- Individual sub-tab: one response at a time, ‹ › to move -->
+        <div id="responsesIndividual" class="responses-individual hidden">
+            <div class="responses-individual-card">
+                <div class="responses-individual-head">
+                    <span id="individualPosition" class="responses-individual-position">Response 1 of 1</span>
+                    <div class="responses-individual-arrows">
+                        <button id="individualPrevBtn" class="responses-arrow-btn" aria-label="Previous response">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <button id="individualNextBtn" class="responses-arrow-btn" aria-label="Next response">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <p id="individualTimestamp" class="responses-individual-timestamp"></p>
+                <div id="individualQuestionList" class="responses-individual-list"></div>
+            </div>
         </div>
     </div>
 
@@ -272,8 +366,7 @@
             </div>
             <div class="key-modal-body">
                 <p>
-                    Are you sure you want to delete your account? This permanently removes
-                    all your docs, sheets and forms and cannot be undone.
+                    Are you sure you want to delete your account? This cannot be undone.
                 </p>
                 <div class="modal-actions">
                     <button id="cancelDeleteAccount" class="btn">Cancel</button>
@@ -292,15 +385,62 @@
             </div>
             <div class="key-modal-body">
                 <p>
-                    This permanently deletes every response to this form. The
-                    form and its share link keep working — only the submissions
-                    are erased. This cannot be undone.
+                    Are you sure you want to delete all the responses?
                 </p>
                 <div class="modal-actions">
                     <button id="cancelClearResponses" class="btn">Cancel</button>
                     <button id="confirmClearResponses" class="btn btn-danger">Delete responses</button>
                 </div>
                 <p id="clearResponsesError" class="responses-clear-error hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Link to Sheets Modal (creates "<Form> (Responses)" in the Sheets app) -->
+    <div id="linkSheetModal" class="key-modal">
+        <div class="key-modal-content">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title">Link to Sheets</h3>
+                <button class="key-modal-close" id="linkSheetModalClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <p>
+                    Responses to <strong id="linkSheetFormName">this form</strong> will be
+                    copied into a spreadsheet named
+                    <strong id="linkSheetSheetName">Untitled Form (Responses)</strong>
+                    in your Sheets app.
+                </p>
+                <p>
+                    Existing responses are imported, and new responses are added as
+                    rows whenever you open the Responses tab.
+                </p>
+                <div class="modal-actions">
+                    <button id="cancelLinkSheet" class="btn">Cancel</button>
+                    <button id="confirmLinkSheet" class="btn btn-primary">Create spreadsheet</button>
+                </div>
+                <p id="linkSheetError" class="responses-clear-error hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unlink from Sheets Confirmation Modal -->
+    <div id="unlinkSheetModal" class="key-modal">
+        <div class="key-modal-content">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title">Unlink from Sheets</h3>
+                <button class="key-modal-close" id="unlinkSheetModalClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <p>
+                    This form will stop sending responses to its spreadsheet.
+                    The spreadsheet and the rows already copied stay untouched
+                    in your Sheets app.
+                </p>
+                <div class="modal-actions">
+                    <button id="cancelUnlinkSheet" class="btn">Cancel</button>
+                    <button id="confirmUnlinkSheet" class="btn btn-danger">Unlink</button>
+                </div>
+                <p id="unlinkSheetError" class="responses-clear-error hidden"></p>
             </div>
         </div>
     </div>

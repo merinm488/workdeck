@@ -30,11 +30,22 @@
  *   deleteForm      { formId }             -> delete form + its shared copy
  *   updateSettings  { settings }           -> merge into user settings
  *   shareForm       { formId }             -> create/reuse the share link
- *   getResponses    { formId }             -> { responses, form } — the form
- *                                            is the SHARED snapshot, i.e. the
- *                                            exact questions responders saw.
+ *   getResponses    { formId }             -> { responses, form, linkedSheet }
+ *                                            — the form is the SHARED snapshot,
+ *                                            i.e. the exact questions responders
+ *                                            saw. Also mirrors any new
+ *                                            responses into the linked
+ *                                            spreadsheet (sync-on-open).
  *                                            (OWNER ONLY — requires hash)
  *   deleteResponses { formId }             -> clear all responses for a form
+ *                                            (spreadsheet rows are kept)
+ *   linkSheet       { formId }             -> create a spreadsheet in the
+ *                                            user's Sheets app named
+ *                                            "<Form> (Responses)", backfill
+ *                                            existing responses, and record
+ *                                            form.linkedSheet
+ *   unlinkSheet     { formId }             -> drop form.linkedSheet; the
+ *                                            spreadsheet and its rows stay
  */
 
 import {
@@ -57,6 +68,265 @@ async function saveFormsSections(hash, userData) {
     forms: userData.forms,
     settings: userData.settings
   });
+}
+
+// ================================================
+// Linked spreadsheet (Google-Forms-style "Link to Sheets")
+// A form can be linked to one spreadsheet in the user's `sheets[]`. The
+// link state lives ONLY on the private form record — never in the public
+// shared doc, which anyone with the share link can read (the user hash IS
+// the account credential). Sync therefore runs exclusively inside
+// owner-authenticated PUT actions: at link time and on every `getResponses`.
+// ================================================
+
+/** Component types that carry no answer and get no spreadsheet column. */
+const SHEET_SKIP_TYPES = new Set([
+  'button', 'hidden',
+  // presentation-only components
+  'text', 'image', 'html', 'separator', 'spacer', 'documentPreview',
+  'iframe', 'table'
+]);
+
+/** Univer cell type codes (@univerjs/core CellValueType). */
+const CELL_STRING = 1;
+const CELL_NUMBER = 2;
+
+/**
+ * Depth-first walk of the form-js component tree — same traversal as
+ * FormsResponsesView.flattenComponents() in forms/js/responses.js.
+ */
+function flattenComponents(components) {
+  const out = [];
+  const walk = (list) => {
+    for (const c of list || []) {
+      if (!c) continue;
+      if (c.components) {
+        walk(c.components);
+      } else {
+        out.push(c);
+      }
+    }
+  };
+  walk(components || []);
+  return out;
+}
+
+/**
+ * Ordered spreadsheet columns for a form snapshot: Timestamp first, then
+ * one column per answerable question. Columns are APPEND-ONLY across
+ * syncs (see syncFormResponsesToSheet) — never reordered — so existing
+ * rows stay aligned when the owner edits the form.
+ * @returns {Array<{key: string, label: string}>}
+ */
+function buildColumns(components) {
+  return flattenComponents(components)
+    .filter(c => c.type && c.key && !SHEET_SKIP_TYPES.has(c.type))
+    .map(c => ({ key: c.key, label: c.label || c.key }));
+}
+
+/**
+ * Map of questionKey -> options array, so submitted option VALUES ('red')
+ * can be written as their human LABELS ('Red') — the same resolution the
+ * responses view does client-side. Options live top-level on form-js
+ * components and under data.values on legacy survey fields.
+ */
+function buildOptionsByKey(components) {
+  const map = {};
+  for (const c of flattenComponents(components)) {
+    if (!c || !c.key) continue;
+    const options = c.values || c.data?.values;
+    if (Array.isArray(options) && options.length > 0) {
+      map[c.key] = options;
+    }
+  }
+  return map;
+}
+
+/**
+ * One submitted answer -> a Univer cell ({v, t}) or null for "no answer".
+ * Multi-select arrays join with ", "; booleans read as Yes/No; numbers
+ * stay numeric so the sheet can sort them; option values resolve to
+ * labels when `options` is supplied.
+ */
+function cellValueFor(answer, options) {
+  if (answer === undefined || answer === null || answer === '') return null;
+  if (Array.isArray(answer)) {
+    const text = answer
+      .map(item => {
+        const cell = cellValueFor(item, options);
+        return cell === null ? '' : String(cell.v);
+      })
+      .filter(s => s !== '')
+      .join(', ');
+    return { v: text, t: CELL_STRING };
+  }
+  if (typeof answer === 'boolean') {
+    return { v: answer ? 'Yes' : 'No', t: CELL_STRING };
+  }
+  if (typeof answer === 'number' && Number.isFinite(answer)) {
+    return { v: answer, t: CELL_NUMBER };
+  }
+  if (typeof answer === 'object') {
+    return { v: JSON.stringify(answer), t: CELL_STRING };
+  }
+  if (options) {
+    const match = options.find(
+      opt => opt && (opt.value === answer || opt.label === answer)
+    );
+    if (match) {
+      return { v: match.label, t: CELL_STRING };
+    }
+  }
+  return { v: String(answer), t: CELL_STRING };
+}
+
+/**
+ * Cell matrix for a set of responses, oldest first so the sheet reads
+ * chronologically. Row = [Timestamp, ...one cell per column].
+ */
+function responseRows(columns, responses, optionsByKey = {}) {
+  const ordered = [...(responses || [])].sort((a, b) =>
+    String((a && a.submittedAt) || '').localeCompare(String((b && b.submittedAt) || ''))
+  );
+  return ordered.map(response => [
+    { v: (response && response.submittedAt) || '', t: CELL_STRING },
+    ...columns.map(col =>
+      cellValueFor(
+        response && response.data ? response.data[col.key] : undefined,
+        optionsByKey[col.key]
+      ))
+  ]);
+}
+
+/** Write one row of cells into Univer's cellData (string keys, sparse). */
+function writeRow(cellData, rowIndex, cells) {
+  const row = {};
+  cells.forEach((cell, colIndex) => {
+    if (cell !== null) {
+      row[String(colIndex)] = cell;
+    }
+  });
+  if (Object.keys(row).length > 0) {
+    cellData[String(rowIndex)] = row;
+  }
+}
+
+/** Grow the worksheet grid so an append can never be silently clipped. */
+function ensureSheetCapacity(worksheet, rowCount, columnCount) {
+  worksheet.rowCount = Math.max(worksheet.rowCount || 84, rowCount);
+  worksheet.columnCount = Math.max(worksheet.columnCount || 60, columnCount);
+}
+
+/**
+ * Build a sheets-app spreadsheet record holding the header row + one row
+ * per response. The snapshot shape matches what sheets/js/home.js creates
+ * client-side (and api/workdeck.js server-side), so the Sheets editor
+ * loads it without migration; `resources` is optional and omitted.
+ */
+function buildResponsesSheetRecord(sheetId, name, columns, responses, components) {
+  const worksheetId = `sheet-${Date.now().toString(36)}`;
+  const headers = ['Timestamp', ...columns.map(c => c.label)];
+  const rows = responseRows(columns, responses, buildOptionsByKey(components));
+
+  const cellData = {};
+  writeRow(cellData, 0, headers.map(h => ({ v: h, t: CELL_STRING })));
+  rows.forEach((cells, index) => writeRow(cellData, index + 1, cells));
+
+  return {
+    id: sheetId,
+    name,
+    formatVersion: 2,
+    data: {
+      id: `wb_${sheetId}`,
+      name,
+      appVersion: '0.25.1',
+      locale: 'enUS',
+      styles: {},
+      sheetOrder: [worksheetId],
+      sheets: {
+        [worksheetId]: {
+          id: worksheetId,
+          name: 'Sheet1',
+          tabColor: '',
+          hidden: 0,
+          freeze: { xOffset: 0, yOffset: 0, startRow: -1, startColumn: -1, xSplit: 0, ySplit: 0 },
+          rowCount: Math.max(84, rows.length + 26),
+          columnCount: Math.max(60, headers.length + 3),
+          zoomRatio: 1,
+          scrollTop: 0,
+          scrollLeft: 0,
+          defaultColumnWidth: 73,
+          defaultRowHeight: 19,
+          mergeData: [],
+          cellData,
+          rowData: {},
+          columnData: {}
+        }
+      }
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * Append responses that arrived since the last sync into the form's
+ * linked spreadsheet. Mutates `userData` (form record + sheet record);
+ * the caller saves once. Returns true when anything changed.
+ *
+ * Columns are append-only: keys already in link.sheetColumns keep their
+ * index, question keys the sheet has never seen go to the end. If the
+ * spreadsheet was deleted from the Sheets app, the stale link is dropped.
+ */
+function syncFormResponsesToSheet(userData, form, sharedResponses, sharedForm) {
+  const link = form.linkedSheet;
+  if (!link || !link.sheetId) return false;
+
+  const sheetRecord = (userData.sheets || []).find(s => s.id === link.sheetId);
+  if (!sheetRecord || !sheetRecord.data || !sheetRecord.data.sheets) {
+    delete form.linkedSheet;
+    return true;
+  }
+
+  const worksheet = sheetRecord.data.sheets[sheetRecord.data.sheetOrder?.[0]];
+  if (!worksheet || !worksheet.cellData) return false;
+
+  if (!Array.isArray(link.syncedResponseIds)) {
+    link.syncedResponseIds = [];
+  }
+  const synced = new Set(link.syncedResponseIds);
+  const missing = (sharedResponses || []).filter(r => r && r.id && !synced.has(r.id));
+
+  // Merge in columns for questions the sheet has never seen.
+  const columns = [...(link.sheetColumns || [])];
+  for (const col of buildColumns(sharedForm ? sharedForm.components || [] : [])) {
+    if (!columns.some(c => c.key === col.key)) {
+      columns.push(col);
+    }
+  }
+
+  if (missing.length === 0 && columns.length === (link.sheetColumns || []).length) {
+    return false;
+  }
+
+  // Append below the last used row (headers live at row 0) so rows the
+  // owner added by hand are never overwritten.
+  const usedRows = Object.keys(worksheet.cellData)
+    .map(Number)
+    .filter(n => Number.isFinite(n));
+  let nextRow = usedRows.length > 0 ? Math.max(...usedRows) + 1 : 0;
+
+  for (const cells of responseRows(
+      columns, missing, buildOptionsByKey(sharedForm ? sharedForm.components || [] : []))) {
+    writeRow(worksheet.cellData, nextRow, cells);
+    nextRow += 1;
+  }
+  link.syncedResponseIds.push(...missing.map(r => r.id));
+  link.sheetColumns = columns;
+
+  ensureSheetCapacity(worksheet, nextRow + 25, columns.length + 4);
+  sheetRecord.updatedAt = new Date().toISOString();
+  return true;
 }
 
 // ================================================
@@ -405,51 +675,67 @@ export default async function handler(req, res) {
 
       // GET RESPONSES — the owner reads submissions for one of their forms.
       // Runs inside the PUT branch, so the hash above was already required
-      // and checked: this is the OWNER-ONLY door to responses.
+      // and checked: this is the OWNER-ONLY door to responses. Also the
+      // sync point for the linked spreadsheet (sync-on-open).
       if (action === 'getResponses') {
         const { formId } = data || {};
 
-        // 1. Find this form in the user's own document.
-        //    (Array.prototype.find returns the form record — which holds the
-        //    form's `sharedId` — or undefined when formId isn't one of ours.)
-        //    Guard: reject with 404 { success:false, error:'Form not found' }
-        //    when it isn't found. Look at how `deleteForm` above does exactly
-        //    this with `userData.forms.find(...)`.
         const form = userData.forms.find(f => f.id === formId);
         if (!form){
           return res.status(404).json({success:false, error:'Form not found'});
         }
 
-        // 2. No share link yet -> the form was never shared, so it cannot
-        //    have responses. Return success with an EMPTY array (that's not
-        //    an error — the UI shows an empty state).
+        // No share link yet -> the form was never shared, so it cannot have
+        // responses. Success with an EMPTY array (the UI shows an empty
+        // state), plus the link state so the header renders correctly.
         if (!form.sharedId) {
           return res.status(200).json({
             success: true,
             responses: [],
-            form: null
+            form: null,
+            linkedSheet: form.linkedSheet || null
           });
         }
 
-        // 3. Fetch the shared document: `getSharedDoc(form.sharedId)` is
-        //    already imported at the top of this file.
         const sharedDoc = await getSharedDoc(form.sharedId);
 
-        // 4. Send the responses back. Mimic the shape of the old public GET:
-        //      res.status(200).json({
-        //        success: true,
-        //        responses: ...,
-        //        form: ...
-        //      });
-        //    Responses come from `sharedDoc.responses` (may be undefined on an
-        //    old share — use `|| []` so the client always gets an array).
-        //    Also return `form: sharedDoc.form` — the SHARED snapshot, i.e.
-        //    the exact questions responders saw (the owner may have edited
-        //    the form since sharing; the summary must match what was asked).
+        // Dangling share (deleted outside the app): respond empty instead
+        // of crashing on a null doc.
+        if (!sharedDoc || !sharedDoc.form) {
+          return res.status(200).json({
+            success: true,
+            responses: [],
+            form: null,
+            linkedSheet: form.linkedSheet || null
+          });
+        }
+
+        const responses = sharedDoc.responses || [];
+
+        // Mirror any responses that arrived since the last sync into the
+        // linked spreadsheet. Best-effort: a failed sheet write must never
+        // fail the read.
+        if (form.linkedSheet) {
+          try {
+            const changed = syncFormResponsesToSheet(
+              userData, form, responses, sharedDoc.form
+            );
+            if (changed) {
+              await saveOwnedSections(hash, {
+                forms: userData.forms,
+                sheets: userData.sheets
+              });
+            }
+          } catch (syncError) {
+            console.error('[FORMS API] Sheet sync failed:', syncError);
+          }
+        }
+
         return res.status(200).json({
           success: true,
-          responses: sharedDoc.responses || [],
-          form: sharedDoc.form
+          responses,
+          form: sharedDoc.form,
+          linkedSheet: form.linkedSheet || null
         });
       }
 
@@ -481,6 +767,121 @@ export default async function handler(req, res) {
         }
 
         return res.status(200).json({ success: true, message: 'Responses cleared' });
+      }
+
+      // LINK SHEET — create a spreadsheet in the user's Sheets app holding
+      // the form's responses (headers + one row per response), and record
+      // the link on the form. Requires the form to be shared (that's where
+      // responses live). Idempotent: an existing live link is returned as-is.
+      if (action === 'linkSheet') {
+        const { formId } = data || {};
+
+        const form = userData.forms.find(f => f.id === formId);
+        if (!form) {
+          return res.status(404).json({
+            success: false,
+            error: 'Form not found'
+          });
+        }
+
+        if (!form.sharedId) {
+          return res.status(400).json({
+            success: false,
+            error: 'Share the form before linking it to a spreadsheet'
+          });
+        }
+
+        // Already linked and the spreadsheet still exists: hand it back.
+        if (form.linkedSheet && form.linkedSheet.sheetId) {
+          const existing = (userData.sheets || []).find(
+            s => s.id === form.linkedSheet.sheetId
+          );
+          if (existing) {
+            return res.status(200).json({
+              success: true,
+              sheetId: existing.id,
+              sheetUrl: `${getBaseUrl(req)}/sheets/editor.html?id=${existing.id}`,
+              alreadyLinked: true
+            });
+          }
+          // The spreadsheet was deleted from the Sheets app — drop the
+          // stale link and create a fresh spreadsheet below.
+          delete form.linkedSheet;
+        }
+
+        const sharedDoc = await getSharedDoc(form.sharedId);
+        if (!sharedDoc || !sharedDoc.form) {
+          return res.status(400).json({
+            success: false,
+            error: 'Shared form not found — re-share the form first'
+          });
+        }
+
+        const responses = sharedDoc.responses || [];
+        const columns = buildColumns(sharedDoc.form.components || []);
+        const sheetId = generateId();
+        const sheetName = `${form.name || 'Untitled Form'} (Responses)`;
+
+        if (!userData.sheets) {
+          userData.sheets = [];
+        }
+        userData.sheets.push(
+          buildResponsesSheetRecord(
+            sheetId, sheetName, columns, responses, sharedDoc.form.components || []
+          )
+        );
+
+        form.linkedSheet = {
+          sheetId,
+          sheetColumns: columns,
+          syncedResponseIds: responses.filter(r => r && r.id).map(r => r.id),
+          linkedAt: new Date().toISOString()
+        };
+
+        const saved = await saveOwnedSections(hash, {
+          forms: userData.forms,
+          sheets: userData.sheets
+        });
+        if (!saved) {
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to link spreadsheet'
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          sheetId,
+          sheetUrl: `${getBaseUrl(req)}/sheets/editor.html?id=${sheetId}`,
+          alreadyLinked: false
+        });
+      }
+
+      // UNLINK SHEET — drop the link; the spreadsheet and its rows are kept
+      // (matches Google Forms, which leaves the linked sheet behind).
+      if (action === 'unlinkSheet') {
+        const { formId } = data || {};
+
+        const form = userData.forms.find(f => f.id === formId);
+        if (!form) {
+          return res.status(404).json({
+            success: false,
+            error: 'Form not found'
+          });
+        }
+
+        if (form.linkedSheet) {
+          delete form.linkedSheet;
+          const saved = await saveFormsSections(hash, userData);
+          if (!saved) {
+            return res.status(500).json({
+              success: false,
+              error: 'Failed to unlink spreadsheet'
+            });
+          }
+        }
+
+        return res.status(200).json({ success: true, message: 'Form unlinked' });
       }
 
       return res.status(400).json({

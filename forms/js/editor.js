@@ -160,9 +160,12 @@ class FormsEditorApp {
                 this.setupAutoSave();
             }
 
-            // 10. Ready
+            // 10. Ready. ?id= stays in the address bar on purpose: a refresh
+            //     then reloads THIS form in THIS tab. (Stripping it made the
+            //     auth guard treat every refresh as "no form requested" and
+            //     bounce the tab to Workdeck, where re-opening the form
+            //     spawned yet another tab.)
             this.hideLoading();
-            this.cleanURL();
 
             // 11.
             this.isInitialized = true;
@@ -247,6 +250,16 @@ class FormsEditorApp {
         });
         this.builderInstance.on('changed', () => this.markAsChanged());
 
+        // Mobile/narrow properties drawer: selecting a field slides the
+        // properties panel in from the right (CSS on
+        // #builderTabPanel.properties-open); deselecting closes it. On
+        // wide screens the panel is a static third pane and the class
+        // is harmless.
+        this.builderInstance.on('selection.changed', (event) => {
+            document.getElementById('builderTabPanel')?.classList
+                .toggle('properties-open', !!event?.selection);
+        });
+
         // Tap-to-add (see docstring above). Delegated on #builder — the
         // container form-js renders INTO, never replaces — so the handler
         // survives palette redraws. Scoped to palette entry buttons; canvas
@@ -264,6 +277,10 @@ class FormsEditorApp {
         });
 
         this.setupPaletteDrawer();
+
+        // Keep the caret in properties-panel inputs when form-js's canvas
+        // re-render steals focus mid-typing (see setupFocusPreservation).
+        this.setupFocusPreservation();
     }
 
     /**
@@ -298,11 +315,127 @@ class FormsEditorApp {
         addBtn.addEventListener('click', () => {
             builderPanel.classList.toggle('palette-open');
         });
-        backdrop.addEventListener('click', () => this.closePaletteDrawer());
+        backdrop.addEventListener('click', () => {
+            this.closePaletteDrawer();
+            this.closePropertiesDrawer();
+        });
     }
 
     closePaletteDrawer() {
         document.getElementById('builderTabPanel')?.classList.remove('palette-open');
+    }
+
+    /** Slide the properties drawer back out (mobile/narrow layouts). */
+    closePropertiesDrawer() {
+        document.getElementById('builderTabPanel')?.classList.remove('properties-open');
+    }
+
+    /**
+     * form-js re-renders its canvas on every schema change, and the
+     * selected field row re-focuses itself as part of that (a
+     * useLayoutEffect inside the library's Element component calls
+     * focus() when mounted). When the change comes from a properties-
+     * panel input — the ~300ms debounced commit that lands shortly
+     * after the user stops typing — that re-focus yanks the caret out
+     * of the input mid-sentence: every pause in typing threw the cursor
+     * back onto the canvas row.
+     *
+     * Fix: when `changed` fires while the user is in a text entry inside
+     * the properties panel, remember that element and its caret position,
+     * then put both back once the re-render has settled — but only if
+     * focus was actually stolen (canvas row or nothing), never when the
+     * user moved it somewhere on purpose.
+     */
+    setupFocusPreservation() {
+        const builderElement = document.getElementById('builder');
+        let snapshot = null;   // { el, caret } — where the user was typing
+        let restoreTimer = null;
+
+        const isTextEntry = (el) =>
+            el instanceof HTMLElement &&
+            (el.isContentEditable ||
+             el instanceof HTMLInputElement ||
+             el instanceof HTMLTextAreaElement);
+
+        const captureCaret = (active) => {
+            if (active instanceof HTMLInputElement ||
+                active instanceof HTMLTextAreaElement) {
+                return { kind: 'text', start: active.selectionStart, end: active.selectionEnd };
+            }
+            // Contenteditable entries (label/description use a CodeMirror
+            // editor): the DOM selection is the caret.
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount && active.contains(sel.anchorNode)) {
+                return { kind: 'dom', range: sel.getRangeAt(0).cloneRange() };
+            }
+            return { kind: 'end' };
+        };
+
+        const placeCaretAtEnd = (el) => {
+            const sel = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        };
+
+        const restore = () => {
+            restoreTimer = null;
+            if (!snapshot) return;
+            const { el, caret } = snapshot;
+            snapshot = null;
+
+            // Panel entry ids are stable, so the same input is found even
+            // if a re-render did replace the node (it usually does not).
+            const target = el.isConnected ? el
+                : (el.id ? document.getElementById(el.id) : null);
+            if (!target) return;
+
+            // Only step in when form-js actually stole focus — never when
+            // the user deliberately clicked somewhere else in the meantime.
+            const now = document.activeElement;
+            const stolen = now === document.body ||
+                (now instanceof Element && now.classList.contains('fjs-editor-selected'));
+            if (!stolen) return;
+
+            target.focus();
+
+            if (caret.kind === 'text') {
+                // Plain input: ?? (not ||) so a caret at position 0 counts.
+                try {
+                    const end = caret.end ?? target.value.length;
+                    target.setSelectionRange(caret.start ?? end, end);
+                } catch {
+                    // Some input types (e.g. number) have no selection API.
+                }
+            } else if (caret.kind === 'dom' && caret.range.startContainer.isConnected) {
+                try {
+                    const range = document.createRange();
+                    range.setStart(caret.range.startContainer, caret.range.startOffset);
+                    range.setEnd(caret.range.endContainer, caret.range.endOffset);
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                } catch {
+                    placeCaretAtEnd(target);
+                }
+            } else {
+                placeCaretAtEnd(target);
+            }
+        };
+
+        this.builderInstance.on('changed', () => {
+            const panel = builderElement.querySelector('.bio-properties-panel');
+            const active = document.activeElement;
+            if (panel && active && panel.contains(active) && isTextEntry(active)) {
+                snapshot = { el: active, caret: captureCaret(active) };
+                if (restoreTimer) clearTimeout(restoreTimer);
+                // The library's re-render + focus steal land in the next
+                // microtask flush, so a macrotask is safely after them.
+                restoreTimer = setTimeout(restore, 0);
+            }
+        });
     }
 
     /**
@@ -475,9 +608,102 @@ class FormsEditorApp {
             responsesRefreshBtn.addEventListener('click', () => this.responsesView?.refresh());
         }
 
-        const responsesClearBtn = document.getElementById('responsesClearBtn');
-        if (responsesClearBtn) {
-            responsesClearBtn.addEventListener('click', () => this.showClearResponsesModal());
+        const responsesDeleteAllBtn = document.getElementById('responsesDeleteAllBtn');
+        if (responsesDeleteAllBtn) {
+            responsesDeleteAllBtn.addEventListener('click', () => {
+                this.hideResponsesMoreMenu();
+                this.showClearResponsesModal();
+            });
+        }
+
+        // Summary / Individual sub-tabs
+        const responsesSubtabSummary = document.getElementById('responsesSubtabSummary');
+        if (responsesSubtabSummary) {
+            responsesSubtabSummary.addEventListener('click',
+                () => this.responsesView?.switchView('summary'));
+        }
+
+        const responsesSubtabIndividual = document.getElementById('responsesSubtabIndividual');
+        if (responsesSubtabIndividual) {
+            responsesSubtabIndividual.addEventListener('click',
+                () => this.responsesView?.switchView('individual'));
+        }
+
+        // Individual response navigation (‹ ›)
+        const individualPrevBtn = document.getElementById('individualPrevBtn');
+        if (individualPrevBtn) {
+            individualPrevBtn.addEventListener('click',
+                () => this.responsesView?.moveIndividual(-1));
+        }
+
+        const individualNextBtn = document.getElementById('individualNextBtn');
+        if (individualNextBtn) {
+            individualNextBtn.addEventListener('click',
+                () => this.responsesView?.moveIndividual(1));
+        }
+
+        // Link to Sheets: opens the spreadsheet when linked, the link
+        // modal when not.
+        const responsesSheetsBtn = document.getElementById('responsesSheetsBtn');
+        if (responsesSheetsBtn) {
+            responsesSheetsBtn.addEventListener('click', () => this.handleSheetsButtonClick());
+        }
+
+        // More menu (⋮)
+        const responsesMoreBtn = document.getElementById('responsesMoreBtn');
+        if (responsesMoreBtn) {
+            responsesMoreBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('responsesMoreMenu')?.classList.toggle('active');
+            });
+        }
+
+        const responsesCsvBtn = document.getElementById('responsesCsvBtn');
+        if (responsesCsvBtn) {
+            responsesCsvBtn.addEventListener('click', () => {
+                this.hideResponsesMoreMenu();
+                this.responsesView?.downloadCsv();
+            });
+        }
+
+        const responsesUnlinkItem = document.getElementById('responsesUnlinkBtn');
+        if (responsesUnlinkItem) {
+            responsesUnlinkItem.addEventListener('click', () => {
+                this.hideResponsesMoreMenu();
+                this.showUnlinkSheetModal();
+            });
+        }
+
+        // --- Link to Sheets modal ---
+        const linkSheetModalClose = document.getElementById('linkSheetModalClose');
+        if (linkSheetModalClose) {
+            linkSheetModalClose.addEventListener('click', () => this.hideLinkSheetModal());
+        }
+
+        const cancelLinkSheet = document.getElementById('cancelLinkSheet');
+        if (cancelLinkSheet) {
+            cancelLinkSheet.addEventListener('click', () => this.hideLinkSheetModal());
+        }
+
+        const confirmLinkSheet = document.getElementById('confirmLinkSheet');
+        if (confirmLinkSheet) {
+            confirmLinkSheet.addEventListener('click', () => this.confirmLinkSheet());
+        }
+
+        // --- Unlink from Sheets modal ---
+        const unlinkSheetModalClose = document.getElementById('unlinkSheetModalClose');
+        if (unlinkSheetModalClose) {
+            unlinkSheetModalClose.addEventListener('click', () => this.hideUnlinkSheetModal());
+        }
+
+        const cancelUnlinkSheet = document.getElementById('cancelUnlinkSheet');
+        if (cancelUnlinkSheet) {
+            cancelUnlinkSheet.addEventListener('click', () => this.hideUnlinkSheetModal());
+        }
+
+        const confirmUnlinkSheet = document.getElementById('confirmUnlinkSheet');
+        if (confirmUnlinkSheet) {
+            confirmUnlinkSheet.addEventListener('click', () => this.confirmUnlinkSheet());
         }
 
         const saveBtn = document.getElementById('saveBtn');
@@ -527,6 +753,9 @@ class FormsEditorApp {
             }
             if (themeSubmenu && !e.target.closest('.theme-dropdown-container')) {
                 themeSubmenu.classList.remove('active');
+            }
+            if (!e.target.closest('.responses-more')) {
+                this.hideResponsesMoreMenu();
             }
         });
 
@@ -762,6 +991,170 @@ class FormsEditorApp {
     }
 
     // ================================================
+    // Responses: more menu + Sheets link
+    // ================================================
+
+    /** Collapse the ⋮ menu (outside click, item click, or item action). */
+    hideResponsesMoreMenu() {
+        document.getElementById('responsesMoreMenu')?.classList.remove('active');
+    }
+
+    /**
+     * The green Sheets button: linked -> open the spreadsheet in a new
+     * tab (synchronous, so the user gesture carries); unlinked -> the
+     * link modal.
+     */
+    handleSheetsButtonClick() {
+        const url = this.responsesView?.sheetUrl;
+        if (url) {
+            this.openSheetsTab(url);
+            return;
+        }
+        this.showLinkSheetModal();
+    }
+
+    /**
+     * Open a Sheets spreadsheet in a new tab WITHOUT 'noopener'. Only a
+     * tab opened with a live opener (an auxiliary browsing context)
+     * inherits a copy of this tab's sessionStorage, which is where the
+     * Sheets editor looks for its session — with 'noopener' the new tab
+     * comes up logged out and bounces to the Sheets key-entry page, even
+     * though the account is the same. The opener link is detached right
+     * after creation (Workdeck's openInNewTab does the same), so the
+     * Sheets tab still can't reach back into Forms.
+     * @param {string} url
+     * @returns {Window|null} the new tab, or null when pop-ups are blocked
+     */
+    openSheetsTab(url) {
+        const win = window.open(url, '_blank');
+        if (win) {
+            win.opener = null;
+        }
+        return win;
+    }
+
+    // ================================================
+    // Link to Sheets modal
+    // ================================================
+
+    /** Show the link dialog (Google-Forms-style destination picker). */
+    showLinkSheetModal() {
+        if (!this.formRecord?.sharedId) {
+            this.showError('Share the form before linking it to Sheets');
+            return;
+        }
+
+        const name = this.formRecord?.name || 'Untitled Form';
+        const formNameEl = document.getElementById('linkSheetFormName');
+        const sheetNameEl = document.getElementById('linkSheetSheetName');
+        const errorEl = document.getElementById('linkSheetError');
+
+        if (formNameEl) {
+            formNameEl.textContent = name;
+        }
+        if (sheetNameEl) {
+            sheetNameEl.textContent = `${name} (Responses)`;
+        }
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.classList.add('hidden');
+        }
+        document.getElementById('linkSheetModal')?.classList.add('active');
+    }
+
+    hideLinkSheetModal() {
+        document.getElementById('linkSheetModal')?.classList.remove('active');
+    }
+
+    /**
+     * Create "<Form> (Responses)" via the API and adopt the link. The
+     * spreadsheet is opened in a new tab when the browser allows it
+     * (the await drops user activation, so pop-ups can be blocked —
+     * the now-green Sheets icon always works as a fallback).
+     */
+    async confirmLinkSheet() {
+        const button = document.getElementById('confirmLinkSheet');
+        if (button) {
+            button.disabled = true;
+        }
+
+        const result = await formsStorage.linkSheet(this.formId);
+
+        if (button) {
+            button.disabled = false;
+        }
+
+        if (!result) {
+            const errorEl = document.getElementById('linkSheetError');
+            if (errorEl) {
+                errorEl.textContent = 'Failed to create the spreadsheet';
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+
+        // Adopt the link immediately so the header flips to "Open in
+        // Sheets" without a refetch.
+        if (this.responsesView) {
+            this.responsesView.linkedSheet = { sheetId: result.sheetId };
+            this.responsesView.updateSheetsUI();
+        }
+
+        this.hideLinkSheetModal();
+        this.showNotification(
+            result.alreadyLinked ? 'Already linked to a spreadsheet' : 'Spreadsheet created',
+            'success'
+        );
+
+        if (result.sheetUrl) {
+            const win = this.openSheetsTab(result.sheetUrl);
+            if (!win) {
+                this.showNotification(
+                    'Pop-up blocked — use the green Sheets icon to open the spreadsheet',
+                    'info'
+                );
+            }
+        }
+    }
+
+    // ================================================
+    // Unlink from Sheets modal
+    // ================================================
+
+    showUnlinkSheetModal() {
+        if (!this.responsesView?.linkedSheet) {
+            return;
+        }
+        const errorEl = document.getElementById('unlinkSheetError');
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.classList.add('hidden');
+        }
+        document.getElementById('unlinkSheetModal')?.classList.add('active');
+    }
+
+    hideUnlinkSheetModal() {
+        document.getElementById('unlinkSheetModal')?.classList.remove('active');
+    }
+
+    /** Drop the link; the spreadsheet and its copied rows stay. */
+    async confirmUnlinkSheet() {
+        const ok = await formsStorage.unlinkSheet(this.formId);
+        if (!ok) {
+            const errorEl = document.getElementById('unlinkSheetError');
+            if (errorEl) {
+                errorEl.textContent = 'Failed to unlink the spreadsheet';
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+
+        this.hideUnlinkSheetModal();
+        this.responsesView?.clearLinkedSheet();
+        this.showNotification('Form unlinked from Sheets', 'success');
+    }
+
+    // ================================================
     // Delete account modal
     // ================================================
 
@@ -908,15 +1301,6 @@ class FormsEditorApp {
      */
     parseURL(name) {
         return new URLSearchParams(window.location.search).get(name);
-    }
-
-    /**
-     * Strip the query string once the deep link was consumed.
-     */
-    cleanURL() {
-        if (window.location.search) {
-            window.history.replaceState(null, '', window.location.pathname);
-        }
     }
 
     // ================================================

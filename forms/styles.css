@@ -360,10 +360,17 @@ body {
 }
 
 /* Keep third-party branding visible but quiet: the license requires the
-   bpmn.io link to stay, so we shrink it to a discreet footer mark. */
+   bpmn.io link to stay fully visible*/
 .fjs-container .fjs-powered-by {
-    opacity: 0.55;
-    padding: 4px 8px 6px;
+    opacity: 0.2;
+    padding: 1px 8px 2px;
+}
+
+/* The logo SVG ships with width="53" height="21" attributes; CSS wins
+   over those, and height follows the viewBox's 14.02:5.57 ratio. */
+.fjs-container .fjs-powered-by svg {
+    width: 30px;
+    height: auto;
 }
 
 .fjs-container .fjs-powered-by:hover {
@@ -383,6 +390,14 @@ body {
 
 #formjs .fjs-form {
     gap: 4px;
+}
+
+/* Editor empty state: drop the "Use the preview window to test your
+   form." hint (the second <span> in the library's card). Hiding an
+   informational line is fine — unlike the bpmn.io watermark, none of
+   this is license-protected. */
+.fjs-editor-container .fjs-empty-editor-card span:nth-of-type(2) {
+    display: none;
 }
 
 /* ============================================================
@@ -419,8 +434,8 @@ body {
     background: var(--bg-secondary);
 }
 
-/* Properties panel: match too */
-#builder .fjs-properties-container {
+/* Properties panel: match too (class is fjs-editor-properties-container) */
+#builder .fjs-editor-properties-container {
     background: var(--bg-secondary);
 }
 
@@ -435,9 +450,31 @@ body {
      editor.html). Adding a field via tap-to-add closes the drawer.
    ============================================================ */
 
+/* Between 701–1100px the canvas alone can't fit the properties panel
+   beside it, so it becomes an overlay drawer on the right, opened by
+   selecting a field (see editor.js). */
 @media (max-width: 1100px) {
-    #builder .fjs-properties-container {
-        display: none;
+    #builder .fjs-editor-properties-container {
+        position: absolute;
+        z-index: 60;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: min(300px, 82vw);
+        box-shadow: 0 0 40px var(--shadow-color);
+        transform: translateX(105%);
+        transition: transform 0.2s ease;
+    }
+
+    #builderTabPanel.properties-open #builder .fjs-editor-properties-container {
+        transform: translateX(0);
+    }
+
+    /* Dimmed backdrop; tap it (or select another field) to close */
+    #builderTabPanel.properties-open .builder-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+        z-index: 55;
     }
 }
 
@@ -1081,13 +1118,35 @@ body {
 }
 
 /* ============================================================
-   Responses tab (owner-only summary)
+   Responses tab (owner-only; Google-Forms-style)
+   The tab panel also owns the CVD-validated categorical palette
+   used by the summary pie charts — slots 1-6 of the dataviz
+   reference palette, with dark-mode steps re-selected for the
+   dark surface (not an automatic flip). --viz-other is the
+   neutral gray for the folded "Other" slice.
    ============================================================ */
 
 .responses-tab-panel {
+    --viz-1: #2a78d6;   /* blue */
+    --viz-2: #eb6834;   /* orange */
+    --viz-3: #1baf7a;   /* aqua */
+    --viz-4: #eda100;   /* yellow */
+    --viz-5: #e87ba4;   /* magenta */
+    --viz-6: #008300;   /* green */
+    --viz-other: #898781;
     height: calc(100vh - 59px);   /* below the top nav, like the builder */
     overflow-y: auto;
     padding: 24px 16px 120px;
+}
+
+[data-theme="dark"] .responses-tab-panel {
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+    --viz-5: #d55181;
+    --viz-6: #008300;
+    --viz-other: #898781;
 }
 
 .responses-header {
@@ -1106,32 +1165,184 @@ body {
     gap: 2px;
 }
 
+/* The Google-Forms-style "N responses" headline */
 .responses-header-title {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
 }
 
-.responses-header-hint {
-    font-size: 12px;
+/* Summary | Individual sub-tabs (accent underline = active) */
+.responses-subtabs {
+    display: flex;
+    gap: 18px;
+    margin-top: 4px;
+}
+
+.responses-subtab {
+    position: relative;
+    border: none;
+    background: transparent;
+    padding: 6px 2px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
     color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.responses-subtab::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background 0.15s ease;
+}
+
+.responses-subtab:hover {
+    color: var(--text-primary);
+}
+
+.responses-subtab.active {
+    color: var(--accent-color);
+}
+
+.responses-subtab.active::after {
+    background: var(--accent-color);
 }
 
 .responses-header-actions {
     display: flex;
-    gap: 8px;
+    align-items: center;
+    gap: 6px;
 }
 
-/* Ghost-danger variant: quiet until hover, then unmistakably destructive */
-.btn-danger-ghost {
-    color: var(--danger);
-    border-color: transparent;
+/* Round icon buttons: Sheets link, refresh, ⋮ */
+.responses-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
     background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
 }
 
-.btn-danger-ghost:hover {
+.responses-icon-btn:hover {
+    background: var(--accent-light);
+    color: var(--accent-color);
+}
+
+.responses-icon-btn .sheets-icon {
+    display: block;
+}
+
+/* Linked state: the button keeps a green wash (the icon is always the
+   green Sheets glyph) */
+.responses-icon-btn.linked {
+    background: rgba(24, 128, 56, 0.12);
+}
+
+.responses-icon-btn.linked:hover {
+    background: rgba(24, 128, 56, 0.2);
+}
+
+/* ---------- Responses ⋮ menu ---------- */
+
+.responses-more {
+    position: relative;
+}
+
+.responses-more-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 250px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 8px 24px var(--shadow-color);
+    padding: 6px;
+    display: none;
+    z-index: 60;
+}
+
+.responses-more-menu.active {
+    display: block;
+}
+
+.responses-more-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+}
+
+.responses-more-item:hover {
+    background: var(--accent-light);
+}
+
+.responses-more-item .item-icon {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+}
+
+.responses-more-item:hover .item-icon {
+    color: var(--accent-color);
+}
+
+.responses-more-item.danger {
+    color: var(--danger);
+}
+
+.responses-more-item.danger .item-icon,
+.responses-more-item.danger:hover .item-icon {
+    color: var(--danger);
+}
+
+.responses-more-item.danger:hover {
     background: var(--danger-light);
-    border-color: var(--danger);
+}
+
+.responses-more-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 6px 4px;
+}
+
+/* Accent-filled button variant (Link-to-Sheets modal) */
+.btn-primary {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: default;
 }
 
 .responses-state {
@@ -1345,6 +1556,164 @@ body {
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);
+}
+
+/* ---------- Choice pie (single-choice questions) ----------
+   Solid SVG slices; the 2px stroke is drawn by responses.js in
+   --bg-secondary (the card surface) so slices read as separated.
+   Every slice's value also appears in the legend as text. */
+
+.responses-pie {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    flex-wrap: wrap;
+}
+
+.responses-pie-chart {
+    flex-shrink: 0;
+}
+
+.responses-pie-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 180px;
+    flex: 1;
+}
+
+.responses-pie-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.responses-pie-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.responses-pie-legend-label {
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+
+/* "count (pct%)" — aligns down the column like the bar counts */
+.responses-pie-legend-value {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ---------- Individual response view ---------- */
+
+.responses-individual {
+    max-width: 860px;
+    margin: 0 auto;
+}
+
+.responses-individual-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+}
+
+.responses-individual-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.responses-individual-position {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.responses-individual-arrows {
+    display: flex;
+    gap: 6px;
+}
+
+.responses-arrow-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.responses-arrow-btn:hover:not(:disabled) {
+    background: var(--accent-light);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.responses-arrow-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.responses-individual-timestamp {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.responses-individual-list {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.responses-individual-question {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.responses-individual-question:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.responses-individual-question-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.responses-individual-answer {
+    font-size: 14px;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+/* Google-Forms muted placeholder for skipped questions */
+.responses-individual-answer.is-empty {
+    color: var(--text-secondary);
+    font-style: italic;
 }
 
 /* ---------- Shared small states ---------- */

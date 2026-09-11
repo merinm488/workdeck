@@ -209,7 +209,7 @@ class FormsStorage {
      * Goes through PUT /api/forms { hash, action: 'getResponses', data }.
      *
      * @param {string} formId
-     * @returns {Promise<{responses: Array, form: object}|null>}
+     * @returns {Promise<{responses: Array, form: object, linkedSheet: object|null}|null>}
      */
     async getResponses(formId) {
         const hash = getFormsUserHash();
@@ -230,7 +230,11 @@ class FormsStorage {
             const result = await response.json();
 
             return result.success
-                ? { responses: result.responses || [], form: result.form }
+                ? {
+                    responses: result.responses || [],
+                    form: result.form,
+                    linkedSheet: result.linkedSheet || null
+                }
                 : null;
 
         } catch (error) {
@@ -315,10 +319,83 @@ class FormsStorage {
                 })
             });
             const result = await response.json();
-            
+
             return result.success;
         } catch(error){
             console.error('[STORAGE] Delete responses error:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Link the form to a spreadsheet in the Sheets app (Google-Forms-style
+     * "Link to Sheets"). The server creates "<Form> (Responses)", backfills
+     * existing responses, and records the link on the form record.
+     * @param {string} formId
+     * @returns {Promise<{sheetId, sheetUrl, alreadyLinked}|null>}
+     */
+    async linkSheet(formId) {
+        const hash = getFormsUserHash();
+        if(!hash){
+            console.error('[STORAGE] No user hash found');
+            return null;
+        }
+        try{
+            const response = await fetch(this.apiEndpoint,{
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    hash,
+                    action: 'linkSheet',
+                    data :{
+                        formId:formId
+                    }
+                })
+            });
+            const result = await response.json();
+            if(!result.success){
+                console.error('[STORAGE] Failed to link sheet:', result.error);
+                return null;
+            }
+            return {
+                sheetId: result.sheetId,
+                sheetUrl: result.sheetUrl,
+                alreadyLinked: result.alreadyLinked
+            };
+        }catch(error){
+            console.error('[STORAGE] Link sheet error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Drop the form's spreadsheet link. The spreadsheet and its rows are
+     * kept — only future responses stop syncing.
+     * @param {string} formId
+     * @returns {Promise<boolean>}
+     */
+    async unlinkSheet(formId) {
+        const hash = getFormsUserHash();
+        if(!hash){
+            console.error('[STORAGE] No user hash found');
+            return false;
+        }
+        try{
+            const response = await fetch(this.apiEndpoint,{
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    hash,
+                    action: 'unlinkSheet',
+                    data :{
+                        formId:formId
+                    }
+                })
+            });
+            const result = await response.json();
+            return result.success;
+        }catch(error){
+            console.error('[STORAGE] Unlink sheet error:', error);
             return false;
         }
     }
