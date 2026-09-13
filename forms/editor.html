@@ -405,14 +405,7 @@
             </div>
             <div class="key-modal-body">
                 <p>
-                    Responses to <strong id="linkSheetFormName">this form</strong> will be
-                    copied into a spreadsheet named
-                    <strong id="linkSheetSheetName">Untitled Form (Responses)</strong>
-                    in your Sheets app.
-                </p>
-                <p>
-                    Existing responses are imported, and new responses are added as
-                    rows whenever you open the Responses tab.
+                    Link this form responses to Sheets?
                 </p>
                 <div class="modal-actions">
                     <button id="cancelLinkSheet" class="btn">Cancel</button>
@@ -433,14 +426,30 @@
             <div class="key-modal-body">
                 <p>
                     This form will stop sending responses to its spreadsheet.
-                    The spreadsheet and the rows already copied stay untouched
-                    in your Sheets app.
                 </p>
                 <div class="modal-actions">
                     <button id="cancelUnlinkSheet" class="btn">Cancel</button>
                     <button id="confirmUnlinkSheet" class="btn btn-danger">Unlink</button>
                 </div>
                 <p id="unlinkSheetError" class="responses-clear-error hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Reminder Modal (explicit save of a still-untitled form) -->
+    <div id="renamePromptModal" class="key-modal">
+        <div class="key-modal-content">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title">Add a name?</h3>
+                <button class="key-modal-close" id="renamePromptClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <input type="text" id="renamePromptInput" class="rename-prompt-input" placeholder="Form name..."
+                    maxlength="100" autocomplete="off" />
+                <div class="rename-prompt-actions">
+                    <button id="renamePromptLater" class="rename-prompt-btn rename-prompt-btn-secondary">Later</button>
+                    <button id="renamePromptConfirm" class="rename-prompt-btn rename-prompt-btn-primary">Rename</button>
+                </div>
             </div>
         </div>
     </div>

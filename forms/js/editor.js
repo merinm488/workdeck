@@ -58,6 +58,8 @@ class FormsEditorApp {
         this.formRecord = null;      // { id, name, components, sharedId, ... }
         this.builderInstance = null; // form-js editor handle
         this.hasUnsavedChanges = false;
+        // Rename reminder: dismissed once per form (either button)
+        this.renamePromptDismissed = false;
         this.autoSaveInterval = null;
         this.titleElementReplaced = false;
         // The Responses view (js/responses.js). Created during init once the
@@ -457,12 +459,24 @@ class FormsEditorApp {
     // Saving
     // ================================================
 
-    /** 
+    /**
+     * On explicit saves, if the form has never been named, show a rename
+     * reminder first (Rename = name it then save; Later = save as
+     * 'Untitled Form'). Auto-save bypasses the reminder.
      *
      * @param {object} [options] - { explicit: true } default; autosave passes false
      * @returns {Promise<boolean>}
      */
     async save(options = {}) {
+        const { explicit = true } = options;
+
+        // Rename reminder: only on user-initiated saves, only while the
+        // name is still the default, and only until dismissed once.
+        if (explicit && !this.renamePromptDismissed && this.isUntitledForm()) {
+            this.openRenamePrompt();
+            return false; // Actual save happens after Rename/Later is chosen
+        }
+
         const formData = this.getBuilderSchema();
         if(!formData) {
             this.showError('Nothing to save');
@@ -495,6 +509,109 @@ class FormsEditorApp {
     /** Mark dirty (called from the builder 'change' hook). */
     markAsChanged() {
         this.hasUnsavedChanges = true;
+    }
+
+    // ================================================
+    // Rename reminder (untitled explicit saves)
+    // Mirrors Sheets/Docs: before the first real save of a form still
+    // called 'Untitled Form', ask for a name. Rename applies it and
+    // continues the interrupted save; Later saves as-is and stops nagging
+    // for this session. Auto-save paths never see the modal.
+    // ================================================
+
+    /**
+     * Check whether the form still has its default name. Covers the
+     * variants in circulation: the editor and the Workdeck API seed
+     * 'Untitled Form'; older/looser naming uses 'Untitled'.
+     * @returns {boolean} True if the name is empty or a default untitled name
+     */
+    isUntitledForm() {
+        const currentName = (this.formRecord?.name || this.currentTitle() || '').trim().toLowerCase();
+        return !currentName || currentName === 'untitled' || currentName === 'untitled form';
+    }
+
+    /** Wire up rename reminder modal event handlers */
+    setupRenamePrompt() {
+        const confirmBtn = document.getElementById('renamePromptConfirm');
+        const laterBtn = document.getElementById('renamePromptLater');
+        const closeBtn = document.getElementById('renamePromptClose');
+        const modal = document.getElementById('renamePromptModal');
+        const input = document.getElementById('renamePromptInput');
+
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => this.closeRenamePrompt(true));
+        }
+        if (laterBtn) {
+            laterBtn.addEventListener('click', () => this.closeRenamePrompt(false));
+        }
+        // The X and backdrop count as "Later" - the save must still go through
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.closeRenamePrompt(false));
+        }
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closeRenamePrompt(false);
+                }
+            });
+        }
+        // Enter = Rename, Escape = Later
+        if (input) {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.closeRenamePrompt(true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    this.closeRenamePrompt(false);
+                }
+            });
+        }
+    }
+
+    /** Open the rename reminder modal */
+    openRenamePrompt() {
+        const modal = document.getElementById('renamePromptModal');
+        const input = document.getElementById('renamePromptInput');
+        if (!modal) {
+            // Modal missing (e.g. stale markup) - never block saving
+            this.renamePromptDismissed = true;
+            return;
+        }
+        if (input) input.value = '';
+        modal.classList.add('active');
+        setTimeout(() => input && input.focus(), 100);
+    }
+
+    /**
+     * Close the rename reminder modal
+     * @param {boolean} renamed - True if the user chose Rename with a name
+     */
+    closeRenamePrompt(renamed) {
+        const modal = document.getElementById('renamePromptModal');
+        if (modal) modal.classList.remove('active');
+
+        // Don't nag again for this form after either choice
+        this.renamePromptDismissed = true;
+
+        const input = document.getElementById('renamePromptInput');
+        const newName = (input ? input.value : '').trim();
+
+        const proceed = () => {
+            if (renamed && newName) {
+                // Apply the new name, then continue the interrupted save
+                this.formRecord.name = newName;
+                this.updateFormTitle(newName);
+            }
+            this.save({ explicit: false });
+        };
+
+        if (renamed && newName) {
+            // Input still visible for a frame - close first, then act
+            setTimeout(proceed, 50);
+        } else {
+            proceed();
+        }
     }
 
     // ================================================
@@ -710,6 +827,9 @@ class FormsEditorApp {
         if (saveBtn) {
             saveBtn.addEventListener('click', () => this.save());
         }
+
+        // Rename reminder modal (untitled explicit saves)
+        this.setupRenamePrompt();
 
         // --- Settings dropdown ---
         const settingsBtn = document.getElementById('settingsBtn');
