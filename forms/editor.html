@@ -28,7 +28,17 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@bpmn-io/form-js@1.25.0/dist/assets/form-js-editor.css">
     <script src="https://cdn.jsdelivr.net/npm/@bpmn-io/form-js@1.25.0/dist/form-editor.umd.js"></script>
 
-    <!-- Custom CSS -->
+    <!-- Chart.js (MIT, UMD) — draws the Responses tab summary charts.
+         Tabulator (MIT, UMD) — the Responses "Table" sub-tab grid + CSV export.
+         Tabulator ships two theme stylesheets; themes.js enables the one
+         matching <html data-theme> (formsThemeManager.applyTheme). The dark
+         sheet starts disabled so the light theme applies until init() runs. -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.5.0/dist/css/tabulator.min.css" id="tabulatorCssLight">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.5.0/dist/css/tabulator_midnight.min.css" id="tabulatorCssDark" disabled>
+    <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.5.0/dist/js/tabulator.min.js"></script>
+
+    <!-- Custom CSS (after the vendor sheets so app styles win the cascade) -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -192,6 +202,10 @@
                             aria-selected="false" aria-controls="responsesIndividual">
                         Individual
                     </button>
+                    <button id="responsesSubtabTable" class="responses-subtab" role="tab"
+                            aria-selected="false" aria-controls="responsesTable">
+                        Table
+                    </button>
                 </div>
             </div>
 
@@ -320,6 +334,13 @@
                 <p id="individualTimestamp" class="responses-individual-timestamp"></p>
                 <div id="individualQuestionList" class="responses-individual-list"></div>
             </div>
+        </div>
+
+        <!-- Table sub-tab: every response as a sortable, filterable grid
+             (Tabulator, built by responses.js). Tabulator's built-in
+             download also powers the ⋮ "Download responses (.csv)" item. -->
+        <div id="responsesTable" class="responses-table-panel hidden">
+            <div id="responsesTableGrid"></div>
         </div>
     </div>
 

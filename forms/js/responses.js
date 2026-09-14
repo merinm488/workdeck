@@ -3,10 +3,11 @@
  * FORMS - Responses (editor.html "Responses" tab)
  * ================================================
  * Google-Forms-style responses for the OWNER of a form: a Summary view
- * (one chart card per question) and an Individual view (one submission at
- * a time), plus CSV export and the spreadsheet-link state. Lives on the
- * editor page, next to the builder. Header buttons and modals are wired
- * by editor.js; this file owns the rendering + view state.
+ * (one chart card per question), an Individual view (one submission at
+ * a time) and a Table view (every submission as a sortable grid), plus
+ * CSV export and the spreadsheet-link state. Lives on the editor page,
+ * next to the builder. Header buttons and modals are wired by editor.js;
+ * this file owns the rendering + view state.
  *
  * DATA SOURCE
  *   formsStorage.getResponses(formId) -> { responses, form, linkedSheet }
@@ -23,10 +24,22 @@
  *     when the form is linked to a Sheets spreadsheet. The server mirrors
  *     new responses into that spreadsheet every time this view loads.
  *
+ * RENDERING LIBRARIES (both MIT, pinned CDN <script> tags in editor.html;
+ * this file only prepares data and reads the result — no hand-drawn SVG):
+ *   - Chart.js 4 draws the Summary charts. The tallying is ours
+ *     (tallyChoice); Chart.js does the drawing. Colors are resolved from
+ *     the --viz-* CSS custom properties on #responsesTabPanel EVERY TIME
+ *     a chart is built, because canvas can't follow CSS variables — the
+ *     'formsthemechange' event (dispatched by themes.js on any theme
+ *     change) triggers a rebuild of the open view.
+ *   - Tabulator 6 renders the Table sub-tab and powers CSV export
+ *     (table.download: RFC-4180 escaping + the UTF-8 BOM Excel wants,
+ *     both built in).
+ *
  * SUMMARY RENDERERS, PER QUESTION TYPE
- *   Single choice (radio, select)        -> pie chart (Google-Forms-style)
- *   Multi choice (checklist, taglist)    -> per-option bar meter
- *   Checkbox (boolean)                   -> Yes/No bar meter
+ *   Single choice (radio, select)        -> Chart.js pie (Google-Forms-style)
+ *   Multi choice (checklist, taglist)    -> Chart.js horizontal bars, biggest first
+ *   Checkbox (boolean)                   -> Yes/No Chart.js bars
  *   Text-like (textfield, textarea, datetime) -> latest answers as chips
  *   Number                               -> Low / Average / High
  *
@@ -35,9 +48,11 @@
  *   every question with the respondent's answer (or "No answer").
  *   Read-only by design — deletion is bulk-only (the ⋮ menu).
  *
- * CSV EXPORT
- *   Timestamp + one column per question (the same columns the linked
- *   spreadsheet uses). RFC-4180 escaped, built and downloaded client-side.
+ * TABLE VIEW + CSV EXPORT
+ *   Tabulator grid over the same submissions: sortable columns, a text
+ *   filter per question, pagination, and ⋮ "Download responses (.csv)"
+ *   — Timestamp + one column per question (the same columns the linked
+ *   spreadsheet gets).
  *
  * =====================================================
  * DATVIZ NOTES (why the UI looks the way it does)
@@ -48,7 +63,7 @@
  *   mimicry choice (the generic part-to-whole recommendation is a stacked
  *   bar). Guardrails that keep the pie honest:
  *     * every slice's value is in the legend as TEXT (label · count · %) —
- *       nothing is gated behind hover;
+ *       tooltips ADD detail, nothing is gated behind hover;
  *     * at most 6 real slices — a longer tail folds into a neutral "Other";
  *     * colors come from a CVD-validated categorical palette (the dataviz
  *       reference palette, slots 1-6, as --viz-1..--viz-6), assigned by
@@ -59,10 +74,11 @@
  * - Multi-select bars keep the single-hue meter: the row label carries
  *   identity, bar length carries magnitude — same-hue for nominal
  *   categories. Bars are thin (10px), 4px rounded data-end, square at the
- *   baseline, on a track tinted with --accent-light. Every value is
- *   visible in TEXT next to its bar — nothing is gated behind hover.
- * - DOM building: createElement + textContent only (SVG via
- *   createElementNS). Question labels are typed by the form owner and
+ *   baseline. Every count is printed in TEXT at its bar end.
+ * - Values/labels wear text tokens (--text-primary), never series color.
+ * - The Table view doubles as the plain-data accessibility fallback.
+ * - DOM building: createElement + textContent only; Tabulator cells use a
+ *   textContent formatter. Question labels are typed by the form owner and
  *   answer text is typed by strangers — never innerHTML for either.
  * =====================================================
  */
@@ -85,9 +101,23 @@ class FormsResponsesView {
         this.responses = [];      // submissions, oldest first (as stored)
         this.linkedSheet = null;  // { sheetId, ... } when linked to Sheets
         this.isLoading = false;
-        // Which sub-tab is open: 'summary' | 'individual'
+        // Which sub-tab is open: 'summary' | 'individual' | 'table'
         this.view = 'summary';
         this.individualIndex = 0; // which response the Individual tab shows
+        // Live Chart.js instances. A removed canvas must not leave its
+        // Chart object alive behind it, so every Summary rebuild destroys
+        // these first.
+        this.charts = [];
+        // The Table sub-tab's Tabulator instance. Built lazily on first
+        // open; also serves the ⋮ CSV download. tableToken invalidates
+        // an in-flight async build when the view is rebuilt mid-await.
+        this.table = null;
+        this.tableToken = null;
+        // Canvas charts can't follow CSS custom properties, so a theme
+        // change rebuilds the open view with the newly-resolved palette
+        // (themes.js dispatches 'formsthemechange' on every applyTheme).
+        this.onThemeChange = () => this.rerenderForTheme();
+        document.addEventListener('formsthemechange', this.onThemeChange);
     }
 
     // ================================================
@@ -113,9 +143,12 @@ class FormsResponsesView {
             return false;
         }
 
-        // 3. Set this.isLoading = true, show the loading state, then fetch.
+        // 3. Set this.isLoading = true, show the loading state, drop any
+        //    stale views, then fetch.
         this.isLoading = true;
         this.showState('loading');
+        this.destroyCharts();
+        this.destroyTable();
         const result = await formsStorage.getResponses(this.formId);
 
         // 4. Failure: result === null -> surface the error through the
@@ -133,10 +166,12 @@ class FormsResponsesView {
         this.linkedSheet = result.linkedSheet || null;
         this.isLoading = false;
 
-        // Header count ("N responses"), summary cards, link-state UI.
+        // Header count ("N responses") + link-state UI. The active
+        // sub-tab's view is rendered by showState -> applyView below —
+        // charts build while their panel is VISIBLE so Chart.js measures
+        // real pixel sizes.
         this.renderHeaderCount();
         this.updateSheetsUI();
-        this.renderSummary();
         // With zero responses the summary cards would all read "0 of 0
         // answered" — the dedicated empty state says something useful
         // instead (and showState itself picks the right wording based on
@@ -152,8 +187,8 @@ class FormsResponsesView {
     }
 
     /**
-     * Swap the Summary / Individual sub-tab (called by editor.js).
-     * @param {'summary'|'individual'} view
+     * Swap the Summary / Individual / Table sub-tab (called by editor.js).
+     * @param {'summary'|'individual'|'table'} view
      */
     switchView(view) {
         if (this.view === view) return;
@@ -181,52 +216,44 @@ class FormsResponsesView {
     /**
      * Download every response as CSV (the ⋮ menu item). Timestamp + one
      * column per question — the same columns the linked spreadsheet gets.
+     * Delegated to Tabulator's download: RFC-4180 escaping and the UTF-8
+     * BOM Excel wants are handled by the library.
      */
-    downloadCsv() {
+    async downloadCsv() {
         if (this.responses.length === 0) {
             window.formsEditorApp?.showError('No responses to download');
             return;
         }
-
-        const questions = this.flattenComponents(this.formRecord?.components || [])
-            .filter(c => c.type && c.key && !NON_QUESTION_TYPES.has(c.type));
-
-        // RFC-4180: quote a cell when it contains a comma, quote or
-        // newline, doubling any embedded quotes.
-        const escape = (value) => {
-            const text = value === null || value === undefined ? '' : String(value);
-            return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-        };
-
-        const lines = [
-            ['Timestamp', ...questions.map(q => q.label || q.key)].map(escape).join(',')
-        ];
-        for (const response of this.responses) {
-            const cells = [(response && response.submittedAt) || ''];
-            for (const question of questions) {
-                const answer = response && response.data
-                    ? response.data[question.key]
-                    : undefined;
-                cells.push(this.answerTextFor(question, answer) ?? '');
-            }
-            lines.push(cells.map(escape).join(','));
+        if (typeof Tabulator === 'undefined') {
+            window.formsEditorApp?.showError('Table library failed to load');
+            return;
         }
 
-        // A UTF-8 BOM keeps Excel reading accented characters correctly.
-        const blob = new Blob(['\ufeff' + lines.join('\r\n')], {
-            type: 'text/csv;charset=utf-8;'
-        });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
         const safeName = (this.formRecord?.name || 'Untitled Form')
             .replace(/[\\/:*?"<>|]+/g, ' ')
             .trim() || 'form';
-        link.download = `${safeName} - responses.csv`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
+        const filename = `${safeName} - responses.csv`;
+
+        // Always export through a throw-away offscreen instance (built
+        // offscreen because display:none would hand Tabulator a
+        // zero-width container to measure columns against). Using the
+        // visible grid instead could leak its active header filters or
+        // pagination state into the export — the ⋮ CSV must always
+        // contain EVERY response.
+        const holder = document.createElement('div');
+        holder.style.cssText =
+            'position:fixed;left:-10000px;top:0;width:1200px;';
+        document.body.appendChild(holder);
+        const temp = new Tabulator(holder, this.tableConfig());
+        // Tabulator 6.5.0 crashes if setData() lands before its renderer
+        // finishes initializing (headers build first; rows go through
+        // _wipeElements -> adjustTableSize with a null renderer) — wait
+        // for the tableBuilt event first. Same guard in renderTable().
+        await new Promise(resolve => temp.on('tableBuilt', resolve));
+        await temp.setData(this.tableRows());
+        temp.download('csv', filename);
+        temp.destroy();
+        holder.remove();
 
         window.formsEditorApp?.showNotification('Responses downloaded', 'success');
     }
@@ -248,7 +275,7 @@ class FormsResponsesView {
         const map = {
             loading: ['responsesLoading'],
             empty:   ['responsesEmpty'],
-            summary: ['responsesSummary', 'responsesIndividual'],
+            summary: ['responsesSummary', 'responsesIndividual', 'responsesTable'],
             error:   ['responsesError']
         };
 
@@ -283,34 +310,45 @@ class FormsResponsesView {
     }
 
     /**
-     * Sync the sub-tab buttons + panels with this.view (and build the
-     * Individual card when that sub-tab is open).
+     * Sync the sub-tab buttons + panels with this.view, then build the
+     * freshly opened view (charts build while visible so Chart.js
+     * measures real sizes; the table re-uses its instance across visits).
      */
     applyView() {
-        const summaryEl = document.getElementById('responsesSummary');
-        const individualEl = document.getElementById('responsesIndividual');
-        if (summaryEl) {
-            summaryEl.classList.toggle('hidden', this.view !== 'summary');
-        }
-        if (individualEl) {
-            individualEl.classList.toggle('hidden', this.view !== 'individual');
-        }
-
-        const summaryTab = document.getElementById('responsesSubtabSummary');
-        const individualTab = document.getElementById('responsesSubtabIndividual');
-        if (summaryTab) {
-            summaryTab.classList.toggle('active', this.view === 'summary');
-            summaryTab.setAttribute('aria-selected',
-                this.view === 'summary' ? 'true' : 'false');
-        }
-        if (individualTab) {
-            individualTab.classList.toggle('active', this.view === 'individual');
-            individualTab.setAttribute('aria-selected',
-                this.view === 'individual' ? 'true' : 'false');
+        const panels = {
+            summary: 'responsesSummary',
+            individual: 'responsesIndividual',
+            table: 'responsesTable'
+        };
+        for (const [viewName, elementId] of Object.entries(panels)) {
+            const el = document.getElementById(elementId);
+            if (el) {
+                el.classList.toggle('hidden', this.view !== viewName);
+            }
         }
 
+        const tabs = {
+            summary: 'responsesSubtabSummary',
+            individual: 'responsesSubtabIndividual',
+            table: 'responsesSubtabTable'
+        };
+        for (const [viewName, elementId] of Object.entries(tabs)) {
+            const tab = document.getElementById(elementId);
+            if (tab) {
+                tab.classList.toggle('active', this.view === viewName);
+                tab.setAttribute('aria-selected',
+                    this.view === viewName ? 'true' : 'false');
+            }
+        }
+
+        if (this.view === 'summary') {
+            this.renderSummary();
+        }
         if (this.view === 'individual') {
             this.renderIndividual();
+        }
+        if (this.view === 'table') {
+            this.renderTable();
         }
     }
 
@@ -366,6 +404,7 @@ class FormsResponsesView {
      */
     renderSummary() {
         this.renderStatTiles();
+        this.destroyCharts();   // removed canvases must not leave Charts alive
 
         const questions = this.flattenComponents(
             this.formRecord?.components || []
@@ -687,12 +726,89 @@ class FormsResponsesView {
         return { counts };
     }
 
+    // ================================================
+    // Chart.js plumbing (palette + canvas containers)
+    // ================================================
+
+    /**
+     * Theme-aware colors for Chart.js, resolved fresh on every build:
+     * canvas can't follow CSS custom properties, so the --viz-*,
+     * text and surface variables on #responsesTabPanel are read into concrete
+     * values here. A theme change re-runs this via 'formsthemechange'.
+     * @returns {{palette: string[], other: string, surface: string,
+     *            text: string, muted: string, accent: string,
+     *            font: {family: string, size: number}}}
+     */
+    chartTheme() {
+        const panel = document.getElementById('responsesTabPanel');
+        const styles = panel
+            ? getComputedStyle(panel)
+            : getComputedStyle(document.documentElement);
+        const v = (name) => styles.getPropertyValue(name).trim();
+        return {
+            palette: ['--viz-1', '--viz-2', '--viz-3',
+                      '--viz-4', '--viz-5', '--viz-6'].map(v),
+            other: v('--viz-other'),
+            surface: v('--bg-secondary'),
+            text: v('--text-primary'),
+            muted: v('--text-secondary'),
+            accent: v('--accent-color'),
+            font: { family: "'Inter', sans-serif", size: 12 }
+        };
+    }
+
+    /**
+     * Fixed-height container for one chart. The card body is fluid
+     * width; Chart.js fills the container (responsive: true +
+     * maintainAspectRatio: false) and follows resizes itself.
+     * @param {string} className
+     * @param {number} heightPx
+     * @returns {HTMLElement}
+     */
+    chartContainer(className, heightPx) {
+        const wrap = document.createElement('div');
+        wrap.className = className;
+        wrap.style.height = `${heightPx}px`;
+        return wrap;
+    }
+
+    /** Destroy every live Chart (before any Summary rebuild). */
+    destroyCharts() {
+        for (const chart of this.charts) {
+            chart.destroy();
+        }
+        this.charts = [];
+    }
+
+    /** Destroy the Table grid (before every load/rebuild). */
+    destroyTable() {
+        if (this.table) {
+            this.table.destroy();
+            this.table = null;
+        }
+        this.tableToken = null;   // invalidate any in-flight buildTable
+    }
+
+    /**
+     * Re-render the open view after a theme flip. Charts must rebuild
+     * (new palette values); Individual has no canvas; the Table
+     * restyles through its swapped Tabulator stylesheet, no rebuild.
+     */
+    rerenderForTheme() {
+        if (!this.formId || this.isLoading) {
+            return;
+        }
+        if (this.view === 'summary') {
+            this.renderSummary();
+        }
+    }
+
     // ---- Renderer 1: pie (single choice) ------------------------
 
     /**
-     * Google-Forms-style pie for single-choice questions: solid SVG
-     * slices starting at 12 o'clock, clockwise, in option order, with a
-     * legend that states every count + percentage in text.
+     * Google-Forms-style pie for single-choice questions, drawn by
+     * Chart.js: solid slices in option order with a legend that states
+     * every count + percentage in text.
      * @param {object} question
      * @returns {HTMLElement}
      */
@@ -719,98 +835,87 @@ class FormsResponsesView {
             return empty;
         }
 
+        if (typeof Chart === 'undefined') {
+            const msg = document.createElement('div');
+            msg.className = 'responses-no-data';
+            msg.textContent =
+                'Chart library failed to load — check your connection and refresh.';
+            return msg;
+        }
+
         // Palette slot per entry (option order); the folded "Other" wears
-        // neutral gray. CSS custom properties so dark mode re-colors free.
-        const colorFor = (label, index) =>
+        // neutral gray. Values re-read from CSS vars on every build, so a
+        // theme change recolors through rerenderForTheme().
+        const theme = this.chartTheme();
+        const colors = entries.map(([label], index) =>
             folded && label === 'Other' && index === entries.length - 1
-                ? 'var(--viz-other)'
-                : `var(--viz-${(index % PIE_MAX_SLICES) + 1})`;
+                ? theme.other
+                : theme.palette[index % PIE_MAX_SLICES]);
 
-        const wrap = document.createElement('div');
-        wrap.className = 'responses-pie';
-
-        // --- The pie itself ---
-        const SIZE = 160;
-        const RADIUS = 72;
-        const CENTER = SIZE / 2;
-        const NS = 'http://www.w3.org/2000/svg';
-
-        const svg = document.createElementNS(NS, 'svg');
-        svg.setAttribute('viewBox', `0 0 ${SIZE} ${SIZE}`);
-        svg.setAttribute('width', SIZE);
-        svg.setAttribute('height', SIZE);
-        svg.setAttribute('role', 'img');
-        svg.setAttribute('class', 'responses-pie-chart');
-        svg.setAttribute('aria-label',
+        const wrap = this.chartContainer(
+            'responses-chart responses-chart-square', 220);
+        const canvas = document.createElement('canvas');
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label',
             `Answer distribution for ${question.label || question.key}`);
+        wrap.appendChild(canvas);
 
-        let angle = -Math.PI / 2;   // start at 12 o'clock
-        entries.forEach(([label, count], index) => {
-            const fill = colorFor(label, index);
-            const fraction = count / grandTotal;
-
-            // A 360° arc is geometrically impossible — a full pie is a circle.
-            if (fraction >= 0.9999) {
-                const circle = document.createElementNS(NS, 'circle');
-                circle.setAttribute('cx', CENTER);
-                circle.setAttribute('cy', CENTER);
-                circle.setAttribute('r', RADIUS);
-                circle.style.fill = fill;
-                svg.appendChild(circle);
-                return;
+        const chart = new Chart(canvas, {
+            type: 'pie',
+            data: {
+                labels: entries.map(([label]) => label),
+                datasets: [{
+                    data: entries.map(([, count]) => count),
+                    backgroundColor: colors,
+                    // The stroke IS the gap: a 2px ring in the card
+                    // surface color separates adjacent slices.
+                    borderColor: theme.surface,
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 400 },
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: theme.text,
+                            font: theme.font,
+                            boxWidth: 12,
+                            boxHeight: 12,
+                            // Legend text carries every value: label ·
+                            // count · % — nothing gated behind hover.
+                            generateLabels: () => entries.map(([label, count], i) => ({
+                                text: `${label} — ${count} (${Math.round((count / grandTotal) * 100)}%)`,
+                                fillStyle: colors[i],
+                                strokeStyle: theme.surface,
+                                lineWidth: 1,
+                                index: i
+                            }))
+                        },
+                        // Click a legend entry to hide/show that slice —
+                        // explicit because our generated items use
+                        // index-based visibility.
+                        onClick: (e, legendItem, legend) => {
+                            legend.chart.toggleDataVisibility(legendItem.index);
+                            legend.chart.update();
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const count = ctx.parsed;
+                                const percent = Math.round((count / grandTotal) * 100);
+                                return ` ${count} (${percent}%)`;
+                            }
+                        }
+                    }
+                }
             }
-
-            const end = angle + fraction * 2 * Math.PI;
-            const x1 = CENTER + RADIUS * Math.cos(angle);
-            const y1 = CENTER + RADIUS * Math.sin(angle);
-            const x2 = CENTER + RADIUS * Math.cos(end);
-            const y2 = CENTER + RADIUS * Math.sin(end);
-            const largeArc = fraction > 0.5 ? 1 : 0;
-
-            const slice = document.createElementNS(NS, 'path');
-            slice.setAttribute('d',
-                `M ${CENTER} ${CENTER} L ${x1.toFixed(3)} ${y1.toFixed(3)} ` +
-                `A ${RADIUS} ${RADIUS} 0 ${largeArc} 1 ` +
-                `${x2.toFixed(3)} ${y2.toFixed(3)} Z`);
-            slice.style.fill = fill;
-            // The stroke IS the gap: a 2px ring in the card surface color
-            // separates adjacent slices without borders on the marks.
-            slice.setAttribute('stroke', 'var(--bg-secondary)');
-            slice.setAttribute('stroke-width', '2');
-            svg.appendChild(slice);
-
-            angle = end;
         });
-
-        // --- The legend (every value in text — nothing hover-gated) ---
-        const legend = document.createElement('div');
-        legend.className = 'responses-pie-legend';
-
-        entries.forEach(([label, count], index) => {
-            const row = document.createElement('div');
-            row.className = 'responses-pie-legend-row';
-
-            const swatch = document.createElement('span');
-            swatch.className = 'responses-pie-swatch';
-            swatch.style.background = colorFor(label, index);
-
-            const labelEl = document.createElement('span');
-            labelEl.className = 'responses-pie-legend-label';
-            labelEl.textContent = label;
-
-            const valueEl = document.createElement('span');
-            valueEl.className = 'responses-pie-legend-value';
-            const percent = Math.round((count / grandTotal) * 100);
-            valueEl.textContent = `${count} (${percent}%)`;
-
-            row.appendChild(swatch);
-            row.appendChild(labelEl);
-            row.appendChild(valueEl);
-            legend.appendChild(row);
-        });
-
-        wrap.appendChild(svg);
-        wrap.appendChild(legend);
+        this.charts.push(chart);
         return wrap;
     }
 
@@ -835,7 +940,7 @@ class FormsResponsesView {
             // undefined/null (never answered) counts toward neither bar
         }
 
-        return this.buildBarMeter([['Yes', yes], ['No', no]]);
+        return this.renderBarChart([['Yes', yes], ['No', no]]);
     }
 
     // ---- Renderer 1c: multi-choice bars ------------------------
@@ -849,52 +954,92 @@ class FormsResponsesView {
     renderChoiceBars(question) {
         const { counts } = this.tallyChoice(question);
         const pairs = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-        return this.buildBarMeter(pairs);
+        return this.renderBarChart(pairs);
     }
 
     /**
-     * The shared bar-meter DOM: one thin accent bar per [label, count],
-     * scaled against the biggest count, value printed beside the bar.
+     * Shared Chart.js horizontal bars for count-per-option data (the
+     * multi-choice tally and the Yes/No checkbox tally). Single hue —
+     * the row label carries identity, bar length carries magnitude —
+     * with each count printed at its bar end so no value lives only in
+     * a tooltip.
      * @param {Array<[string, number]>} pairs
      * @returns {HTMLElement}
      */
-    buildBarMeter(pairs) {
-        const wrap = document.createElement('div');
-        wrap.className = 'responses-choice';
-
-        const maxCount = pairs.length > 0 ? pairs[0][1] : 0;
-
-        for (const [label, count] of pairs) {
-            const row = document.createElement('div');
-            row.className = 'responses-choice-row';
-
-            const labelEl = document.createElement('span');
-            labelEl.className = 'responses-choice-label';
-            labelEl.textContent = label;
-
-            const barLine = document.createElement('div');
-            barLine.className = 'responses-choice-bar-line';
-
-            const meter = document.createElement('div');
-            meter.className = 'responses-meter';
-
-            const fill = document.createElement('div');
-            fill.className = 'responses-meter-fill';
-            const width = maxCount === 0 ? 0 : (count / maxCount) * 100;
-            fill.style.width = `${width}%`;
-
-            const countEl = document.createElement('span');
-            countEl.className = 'responses-choice-count';
-            countEl.textContent = count;
-
-            meter.appendChild(fill);
-            barLine.appendChild(meter);
-            barLine.appendChild(countEl);
-            row.appendChild(labelEl);
-            row.appendChild(barLine);
-            wrap.appendChild(row);
+    renderBarChart(pairs) {
+        if (typeof Chart === 'undefined') {
+            const msg = document.createElement('div');
+            msg.className = 'responses-no-data';
+            msg.textContent =
+                'Chart library failed to load — check your connection and refresh.';
+            return msg;
         }
 
+        const theme = this.chartTheme();
+        const maxCount = pairs.reduce((m, [, count]) => Math.max(m, count), 0);
+
+        const wrap = this.chartContainer(
+            'responses-chart', pairs.length * 34 + 16);
+        const canvas = document.createElement('canvas');
+        wrap.appendChild(canvas);
+
+        // Prints each bar's count just past its end. Values are text, so
+        // they wear the text token — never the series color.
+        const countLabels = {
+            id: 'responsesCountLabels',
+            afterDatasetsDraw(chart) {
+                const meta = chart.getDatasetMeta(0);
+                const ctx = chart.ctx;
+                ctx.save();
+                ctx.fillStyle = theme.text;
+                ctx.font = `600 ${theme.font.size}px 'Inter', sans-serif`;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                meta.data.forEach((bar, i) => {
+                    ctx.fillText(String(pairs[i][1]), bar.x + 6, bar.y);
+                });
+                ctx.restore();
+            }
+        };
+
+        const chart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: pairs.map(([label]) => label),
+                datasets: [{
+                    data: pairs.map(([, count]) => count),
+                    backgroundColor: theme.accent,
+                    barThickness: 10,
+                    borderRadius: 4,
+                    borderSkipped: 'start'   // square baseline, rounded data-end
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: { padding: { right: 34 } },  // room for the counts
+                scales: {
+                    x: { display: false, max: maxCount || 1 },
+                    y: {
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: { color: theme.text, font: theme.font }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) =>
+                                ` ${ctx.parsed.x} ${ctx.parsed.x === 1 ? 'response' : 'responses'}`
+                        }
+                    }
+                }
+            },
+            plugins: [countLabels]
+        });
+        this.charts.push(chart);
         return wrap;
     }
 
@@ -1018,6 +1163,146 @@ class FormsResponsesView {
         }
 
         return wrap;
+    }
+
+    // ================================================
+    // Table view (Tabulator)
+    // Every response as a sortable, filterable grid — and the same
+    // instance powers the ⋮ CSV download.
+    // ================================================
+
+    /**
+     * Flat rows for Tabulator: one object per response, each answer
+     * keyed directly by its question key (Tabulator columns read
+     * top-level fields; Timestamp is the only reserved column).
+     * @returns {Array<object>}
+     */
+    tableRows() {
+        return this.responses.map(r => ({
+            id: r && r.id,
+            submittedAt: (r && r.submittedAt) || '',
+            ...((r && r.data) || {})
+        }));
+    }
+
+    /**
+     * Columns: Timestamp first, then one per answerable question of the
+     * SHARED snapshot — the same columns the CSV export and the linked
+     * spreadsheet use. Display goes through textContent (a DOM formatter
+     * or answerTextFor) — answer text is typed by strangers. Downloads
+     * go through accessorDownload, so the CSV gets the same human values
+     * the old hand-rolled exporter (and the linked spreadsheet) wrote:
+     * option LABELS, Yes/No, comma-joined multi-selects.
+     * @returns {Array<object>} Tabulator column definitions
+     */
+    tableColumns() {
+        const timestamp = {
+            title: 'Timestamp',
+            field: 'submittedAt',
+            width: 190,
+            sorter: 'string',   // ISO strings sort chronologically
+            formatter: (cell) => {
+                const when = new Date(cell.getValue());
+                const el = document.createElement('span');
+                el.textContent = isNaN(when.getTime())
+                    ? '' : when.toLocaleString();
+                return el;
+            },
+            accessorDownload: (value) => value ?? ''
+        };
+
+        const questions = this.flattenComponents(
+            this.formRecord?.components || []
+        )
+            .filter(c => c.type && c.key && !NON_QUESTION_TYPES.has(c.type))
+            .map(q => ({
+                title: q.label || q.key,
+                field: q.key,
+                headerFilter: 'input',
+                maxWidth: 360,
+                // answerTextFor renders arrays/booleans/options readably
+                // and returns null for "no answer" — printed as ''.
+                formatter: (cell) => {
+                    const el = document.createElement('span');
+                    el.textContent =
+                        this.answerTextFor(q, cell.getValue()) ?? '';
+                    return el;
+                },
+                accessorDownload: (value) =>
+                    this.answerTextFor(q, value) ?? '',
+                // Explicit sorter REQUIRED: without one, Tabulator's
+                // findSorter() inspects only the FIRST row's raw value
+                // and calls .match() on it — an array (checklist answer)
+                // crashes every sort click. Sorting the display text
+                // also keeps the order consistent with what's shown.
+                sorter: (a, b) => {
+                    const left = (this.answerTextFor(q, a) ?? '').toLowerCase();
+                    const right = (this.answerTextFor(q, b) ?? '').toLowerCase();
+                    return left === right ? 0 : (left < right ? -1 : 1);
+                }
+            }));
+
+        return [timestamp, ...questions];
+    }
+
+    /**
+     * Shared Tabulator config for the visible grid and the offscreen
+     * CSV-export table. Rows are set via setData() by both call sites,
+     * so the config carries none.
+     * @returns {object} Tabulator constructor options
+     */
+    tableConfig() {
+        return {
+            index: 'id',
+            layout: 'fitDataFill',
+            pagination: true,
+            paginationSize: 25,
+            paginationSizeSelector: [10, 25, 50, 100],
+            maxHeight: '70vh',
+            placeholder: 'No responses',
+            columns: this.tableColumns()
+        };
+    }
+
+    /**
+     * Build the Table sub-tab's grid. Destroyed and rebuilt on every
+     * load(), so the columns always match the current shared snapshot.
+     */
+    async renderTable() {
+        const mount = document.getElementById('responsesTableGrid');
+        if (!mount) {
+            return;
+        }
+
+        if (typeof Tabulator === 'undefined') {
+            mount.replaceChildren();
+            const msg = document.createElement('div');
+            msg.className = 'responses-no-data';
+            msg.textContent =
+                'Table library failed to load — check your connection and refresh.';
+            mount.appendChild(msg);
+            return;
+        }
+
+        this.destroyTable();
+        const token = {};       // identity of THIS build attempt
+        this.tableToken = token;
+        const table = new Tabulator(mount, this.tableConfig());
+
+        // Tabulator 6.5.0 crashes if setData() lands before its renderer
+        // finishes initializing (headers build first; rows go through
+        // _wipeElements -> adjustTableSize with a null renderer) — wait
+        // for the tableBuilt event first. Same guard in downloadCsv().
+        await new Promise(resolve => table.on('tableBuilt', resolve));
+        await table.setData(this.tableRows());
+
+        // A refresh or another build may have superseded this instance
+        // while we waited — don't leave the zombie behind.
+        if (this.tableToken !== token) {
+            table.destroy();
+            return;
+        }
+        this.table = table;
     }
 
     // ================================================

@@ -1752,6 +1752,55 @@ body {
     text-align: center;
 }
 
+/* ---------- Chart.js containers (Summary charts) ---------- */
+
+/* Chart.js absolutely positions the canvas inside; the height itself is
+   set inline by responses.js (fixed square-ish for pies, per-row for
+   bars) and the library handles resizes from there. */
+.responses-chart {
+    position: relative;
+}
+
+/* ---------- Table sub-tab (Tabulator) ---------- */
+
+.responses-table-panel {
+    max-width: 860px;
+    margin: 0 auto;
+}
+
+/* Blend the grid into the app: card surface + radius, app font and
+   text tokens, accent-tinted row hover. The light/midnight Tabulator
+   theme sheets still supply the widget's internal detail colors. */
+.responses-table-panel .tabulator {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--bg-secondary);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+}
+
+.responses-table-panel .tabulator .tabulator-cell {
+    color: var(--text-primary);
+}
+
+.responses-table-panel .tabulator .tabulator-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.responses-table-panel .tabulator .tabulator-header .tabulator-col {
+    color: var(--text-secondary);
+}
+
+.responses-table-panel .tabulator .tabulator-row {
+    background: transparent;
+}
+
+.responses-table-panel .tabulator .tabulator-row:hover {
+    background: var(--accent-light);
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 640px) {

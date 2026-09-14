@@ -82,6 +82,21 @@ class FormsThemeManager {
     applyTheme(name) {
         document.documentElement.setAttribute('data-theme', name);
         this.currentTheme = name;
+
+        // Tabulator ships two theme stylesheets (editor.html) — keep the
+        // one matching the resolved theme enabled.
+        const lightCss = document.getElementById('tabulatorCssLight');
+        const darkCss = document.getElementById('tabulatorCssDark');
+        if (lightCss) {
+            lightCss.disabled = name === 'dark';
+        }
+        if (darkCss) {
+            darkCss.disabled = name !== 'dark';
+        }
+
+        // Canvas charts can't follow CSS variables — listeners
+        // (responses.js) rebuild the open view with the new palette.
+        document.dispatchEvent(new CustomEvent('formsthemechange'));
     }
 
     /**

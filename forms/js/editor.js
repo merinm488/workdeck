@@ -746,6 +746,12 @@ class FormsEditorApp {
                 () => this.responsesView?.switchView('individual'));
         }
 
+        const responsesSubtabTable = document.getElementById('responsesSubtabTable');
+        if (responsesSubtabTable) {
+            responsesSubtabTable.addEventListener('click',
+                () => this.responsesView?.switchView('table'));
+        }
+
         // Individual response navigation (‹ ›)
         const individualPrevBtn = document.getElementById('individualPrevBtn');
         if (individualPrevBtn) {
