@@ -1,0 +1,125 @@
+{
+  "templateName": "Report",
+  "templateDescription": "Title slide plus a content slide with a stat callout",
+  "formatVersion": 1,
+  "width": 960,
+  "height": 540,
+  "slides": [
+    {
+      "id": "s1",
+      "name": "Title",
+      "background": "#ffffff",
+      "objects": [
+        {
+          "type": "Rect",
+          "left": 0,
+          "top": 0,
+          "width": 960,
+          "height": 12,
+          "rx": 0,
+          "ry": 0,
+          "fill": "#4f46e5",
+          "stroke": null,
+          "strokeWidth": 0
+        },
+        {
+          "type": "Textbox",
+          "left": 80,
+          "top": 196,
+          "width": 780,
+          "text": "Quarterly Report",
+          "fontSize": 52,
+          "fontWeight": "700",
+          "fontFamily": "Inter",
+          "fill": "#1a1a1a",
+          "textAlign": "left",
+          "lineHeight": 1.15
+        },
+        {
+          "type": "Textbox",
+          "left": 80,
+          "top": 286,
+          "width": 620,
+          "text": "Q3 2026  ·  Team or department name",
+          "fontSize": 20,
+          "fontWeight": "400",
+          "fontFamily": "Inter",
+          "fill": "#737373",
+          "textAlign": "left",
+          "lineHeight": 1.4
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "name": "Highlights",
+      "background": "#fafafa",
+      "objects": [
+        {
+          "type": "Textbox",
+          "left": 80,
+          "top": 76,
+          "width": 780,
+          "text": "Highlights",
+          "fontSize": 36,
+          "fontWeight": "700",
+          "fontFamily": "Inter",
+          "fill": "#1a1a1a",
+          "textAlign": "left",
+          "lineHeight": 1.2
+        },
+        {
+          "type": "Textbox",
+          "left": 80,
+          "top": 168,
+          "width": 480,
+          "text": "Shipped the main milestone ahead of plan\nTwo experiments concluded, one adopted\nSupport load down after the onboarding rework",
+          "fontSize": 22,
+          "fontWeight": "400",
+          "fontFamily": "Inter",
+          "fill": "#404040",
+          "textAlign": "left",
+          "lineHeight": 1.8
+        },
+        {
+          "type": "Rect",
+          "left": 620,
+          "top": 168,
+          "width": 260,
+          "height": 200,
+          "rx": 12,
+          "ry": 12,
+          "fill": "#eef2ff",
+          "stroke": null,
+          "strokeWidth": 0
+        },
+        {
+          "type": "Textbox",
+          "left": 620,
+          "top": 208,
+          "width": 260,
+          "text": "38%",
+          "fontSize": 56,
+          "fontWeight": "700",
+          "fontFamily": "Inter",
+          "fill": "#4f46e5",
+          "textAlign": "center",
+          "lineHeight": 1.1
+        },
+        {
+          "type": "Textbox",
+          "left": 640,
+          "top": 296,
+          "width": 220,
+          "text": "growth in the headline metric",
+          "fontSize": 15,
+          "fontWeight": "500",
+          "fontFamily": "Inter",
+          "fill": "#4f46e5",
+          "textAlign": "center",
+          "lineHeight": 1.4
+        }
+      ]
+    }
+  ]
+}

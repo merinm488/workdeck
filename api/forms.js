@@ -3,10 +3,6 @@
  * FORMS - Unified User API (Workdeck version)
  * ================================================
  *
- * Port of the Sheets API (api/users.js) for the Forms app, with one extra
- * capability: form RESPONSES. Anyone with the share link can fill out and
- * submit a form — responders never need an account.
- *
  * Storage (via api/_lib/store.js):
  *   development -> local JSON files under db/
  *   production  -> textdb.dev documents
@@ -71,7 +67,7 @@ async function saveFormsSections(hash, userData) {
 }
 
 // ================================================
-// Linked spreadsheet (Google-Forms-style "Link to Sheets")
+// Linked spreadsheet
 // A form can be linked to one spreadsheet in the user's `sheets[]`. The
 // link state lives ONLY on the private form record — never in the public
 // shared doc, which anyone with the share link can read (the user hash IS
@@ -440,7 +436,7 @@ export default async function handler(req, res) {
         });
       }
 
-      // --- AUTH (identical contract to Sheets) ---
+      // --- AUTH ---
       if (!key || typeof key !== 'string') {
         return res.status(400).json({
           success: false,

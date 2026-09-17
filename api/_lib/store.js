@@ -17,6 +17,7 @@
  *     tags:        [ ...tags... ],
  *     sheets:       [ ...sheets... ],
  *     forms:        [ ...forms... ],
+ *     slides:       [ ...slide decks... ],
  *     settings:     { theme, viewMode, lastOpened, createdAt, ... }
  *   }
  *
@@ -153,7 +154,7 @@ async function postTextdbDoc(id, value) {
 // User documents
 // ================================================
 
-const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'settings'];
+const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'slides', 'settings'];
 
 /** A stored doc counts as an existing account if it has any known section. */
 export function isValidUserDoc(doc) {
@@ -184,6 +185,7 @@ export async function getUserDoc(hash) {
   if (!Array.isArray(doc.tags)) doc.tags = [];
   if (!Array.isArray(doc.sheets)) doc.sheets = [];
   if (!Array.isArray(doc.forms)) doc.forms = [];
+  if (!Array.isArray(doc.slides)) doc.slides = [];
   if (!doc.settings || typeof doc.settings !== 'object') doc.settings = {};
 
   return doc;
@@ -209,7 +211,7 @@ export async function overwriteDoc(hash, doc) {
  * without clobbering each other.
  *
  * @param {string} hash
- * @param {{docs?:Array, tags?:Array, sheets?:Array, forms?:Array, settings?:Object}} owned
+ * @param {{docs?:Array, tags?:Array, sheets?:Array, forms?:Array, slides?:Array, settings?:Object}} owned
  * @returns {Promise<boolean>}
  */
 export async function saveOwnedSections(hash, owned) {
@@ -222,7 +224,7 @@ export async function saveOwnedSections(hash, owned) {
 
   const next = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : {};
 
-  for (const key of ['docs', 'tags', 'sheets', 'forms']) {
+  for (const key of ['docs', 'tags', 'sheets', 'forms', 'slides']) {
     if (owned[key] !== undefined) next[key] = owned[key];
   }
 
@@ -243,6 +245,7 @@ export async function createUserDoc(hash, defaults = {}) {
     tags: [],
     sheets: [],
     forms: [],
+    slides: [],
     settings: {
       theme: 'dark',
       viewMode: 'grid',

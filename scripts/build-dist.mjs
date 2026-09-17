@@ -7,6 +7,7 @@
  *   dist/            <- public/            (Workdeck landing page at /)
  *   dist/sheets/     <- sheets/            (Sheets app at /sheets/)
  *   dist/forms/      <- forms/             (Forms app at /forms/)
+ *   dist/slides/     <- slides/            (Slides app at /slides/)
  *   dist/docs/       <- docs-src/dist/     (Docs vite build, base '/docs/')
  *
  * The api/ directory is NOT copied — Vercel picks it up from the repo root
@@ -26,6 +27,7 @@ mkdirSync(DIST, { recursive: true });
 cpSync(path.join(ROOT, 'public'), DIST, { recursive: true });
 cpSync(path.join(ROOT, 'sheets'), path.join(DIST, 'sheets'), { recursive: true });
 cpSync(path.join(ROOT, 'forms'), path.join(DIST, 'forms'), { recursive: true });
+cpSync(path.join(ROOT, 'slides'), path.join(DIST, 'slides'), { recursive: true });
 cpSync(path.join(ROOT, 'docs-src', 'dist'), path.join(DIST, 'docs'), { recursive: true });
 
-console.log('[build-dist] Assembled dist/ (public -> /, sheets -> /sheets/, forms -> /forms/, docs -> /docs/)');
+console.log('[build-dist] Assembled dist/ (public -> /, sheets -> /sheets/, forms -> /forms/, slides -> /slides/, docs -> /docs/)');

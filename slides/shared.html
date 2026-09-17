@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Slides - Shared Deck</title>
+    <meta name="description" content="View a shared slide deck. Part of Workdeck.">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#ea580c">
+
+    <link rel="icon" type="image/svg+xml" href="/slides/icons/slides_icon.svg">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Fabric.js — shared.js renders each slide's JSON onto a plain
+         fabric.StaticCanvas here (read-only, no editing). -->
+    <script src="https://cdn.jsdelivr.net/npm/fabric@6/dist/index.min.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Public header: no session needed — anyone with the link can view -->
+    <nav class="top-nav">
+        <div class="top-nav-left">
+            <img src="/slides/icons/slides_icon.svg" alt="" width="26" height="26"
+                 style="border-radius: 6px;">
+            <span id="sharedDeckName" class="shared-deck-name">Shared Deck</span>
+        </div>
+        <div class="top-nav-right">
+            <!-- shared.js: fullscreen playback of the shared snapshot -->
+            <button id="sharedPresentBtn" class="present-btn" title="Present">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="6 3 20 12 6 21 6 3" fill="currentColor" stroke="none"></polygon>
+                </svg>
+                <span>Present</span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="shared-shell">
+        <!-- Loading / error states (shared.js toggles .hidden) -->
+        <div id="sharedLoading" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>Loading deck...</p>
+        </div>
+        <div id="sharedError" class="shared-state hidden">
+            <h2>Deck not found</h2>
+            <p>This share link is invalid or the deck is no longer shared.</p>
+        </div>
+
+        <!-- Read-only viewer: shared.js renders slide N onto #sharedCanvas
+             and keeps the .slide-surface sized to fit the window -->
+        <div id="sharedStage" class="viewer-stage hidden">
+            <div id="sharedSurface" class="slide-surface">
+                <canvas id="sharedCanvas"></canvas>
+            </div>
+        </div>
+
+        <div id="viewerControls" class="viewer-controls hidden">
+            <button id="viewerPrevBtn" class="viewer-ctrl-btn" aria-label="Previous slide">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
+            <span id="viewerCounter" class="viewer-counter">1 / 1</span>
+            <button id="viewerNextBtn" class="viewer-ctrl-btn" aria-label="Next slide">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </button>
+        </div>
+    </main>
+
+    <!-- Notification toast (shared.js showNotification writes here) -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Load order: config -> shared (public page — no auth/storage needed) -->
+    <script src="config/config.js"></script>
+    <script src="js/shared.js"></script>
+</body>
+</html>

@@ -54,6 +54,14 @@ workdeck/
 │   ├── styles.css
 │   ├── config/config.js
 │   └── js/                 # auth.js (complete) + storage/themes/editor/shared skeletons
+├── slides/                 # Slides app (vanilla + Fabric.js canvas editor)
+│   ├── editor.html         # deck editor (owner, needs Workdeck session)
+│   ├── shared.html         # public read-only deck viewer (?shared=<id>)
+│   ├── styles.css
+│   ├── config/config.js
+│   ├── templates/          # starter decks (JSON, fabric v6 objects) + index.json
+│   └── js/                 # skeleton modules: auth/storage/themes/editor/shared
+│                           #   (config.js is complete — it is the contract)
 ├── server/dev-server.js    # one Express server mirroring the prod layout
 ├── vercel.json             # routing for production
 ├── .env                    # PEPPER_SECRET for local dev
@@ -71,6 +79,7 @@ document per hash in production):
   "tags": [ ... ],
   "sheets": [ ... ],
   "forms": [ ... ],
+  "slides": [ ... ],
   "settings": {
     "theme": "dark",
     "viewMode": "grid",
@@ -81,8 +90,9 @@ document per hash in production):
 
 All four APIs share `api/_lib/store.js` and save **section-merged**: Docs
 only writes docs/tags, Sheets only writes sheets, Forms only writes
-forms, Workdeck writes docs/tags/sheets/forms/settings etc — so no app
-can wipe another's data.
+forms, Slides only writes slides, Workdeck writes
+docs/tags/sheets/forms/slides/settings etc — so no app can wipe another's
+data.
 
 ### Authentication flow
 
@@ -114,6 +124,8 @@ document id. One account, one document, consistent recents everywhere.
 - `/sheets/shared.html?shared=<id>`, `/docs/?shared=<id>` — public share views.
 - `/forms/shared.html?shared=<id>` — public fill-out view for a shared form
   (recipients can answer; responses are stored with the shared form).
+- `/slides/editor.html?id=<id>` — opens a specific deck in the editor.
+- `/slides/shared.html?shared=<id>` — public read-only view of a shared deck.
 
 ## 📄 License
 

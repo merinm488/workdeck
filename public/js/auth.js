@@ -3,13 +3,13 @@
  * WORKDECK - Authentication Module
  * ================================================
  *
- * Same strategy as the Docs app:
+ *
  *   1. POST { key, action: 'login' }
  *   2. 404 "User not found"  ->  POST { key, action: 'create' }  (auto-create)
  *
  * The hash is computed server-side (sha256(key + pepper)), so the raw key
  * never determines storage. On success, sessionStorage gets the Workdeck
- * session PLUS mirrors for every child app, so Docs, Sheets and Forms are
+ * session PLUS mirrors for every child app, so apps are
  * already logged in when the user navigates to them:
  *
  *   wd_hash / wd_key           -> Workdeck session
@@ -28,7 +28,9 @@ const WD_AUTH_CONFIG = {
         sheetsHash: 'sheets_user_hash',
         sheetsKey: 'sheets_user_key',
         formsHash: 'forms_user_hash',
-        formsKey: 'forms_user_key'
+        formsKey: 'forms_user_key',
+        slidesHash: 'slides_user_hash',
+        slidesKey: 'slides_user_key'
     }
 };
 
@@ -130,6 +132,8 @@ class WdAuthManager {
         sessionStorage.setItem(s.sheetsKey, key);
         sessionStorage.setItem(s.formsHash, hash);
         sessionStorage.setItem(s.formsKey, key);
+        sessionStorage.setItem(s.slidesHash, hash);
+        sessionStorage.setItem(s.slidesKey, key);
 
         this.userHash = hash;
         this.userKey = key;

@@ -1,0 +1,15 @@
+{
+  "templateName": "Blank",
+  "templateDescription": "Start from an empty white slide",
+  "formatVersion": 1,
+  "width": 960,
+  "height": 540,
+  "slides": [
+    {
+      "id": "s1",
+      "name": "Slide 1",
+      "background": "#ffffff",
+      "objects": []
+    }
+  ]
+}

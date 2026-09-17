@@ -1,0 +1,44 @@
+{
+  "templates": [
+    {
+      "id": "blank",
+      "name": "Blank",
+      "description": "Start from an empty white slide",
+      "file": "blank.json",
+      "swatch": "#ffffff",
+      "slides": 1
+    },
+    {
+      "id": "pitch",
+      "name": "Startup Pitch",
+      "description": "Title, problem and solution slides with an orange accent",
+      "file": "pitch.json",
+      "swatch": "#ea580c",
+      "slides": 3
+    },
+    {
+      "id": "report",
+      "name": "Report",
+      "description": "Title slide plus a content slide with a stat callout",
+      "file": "report.json",
+      "swatch": "#4f46e5",
+      "slides": 2
+    },
+    {
+      "id": "two-column",
+      "name": "Two Columns",
+      "description": "A comparison slide with two headed columns",
+      "file": "two-column.json",
+      "swatch": "#e5e5e0",
+      "slides": 1
+    },
+    {
+      "id": "quote",
+      "name": "Quote",
+      "description": "A dark, centered slide for one strong statement",
+      "file": "quote.json",
+      "swatch": "#1a1a1a",
+      "slides": 1
+    }
+  ]
+}

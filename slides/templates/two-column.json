@@ -1,0 +1,93 @@
+{
+  "templateName": "Two Columns",
+  "templateDescription": "A comparison slide with two headed columns",
+  "formatVersion": 1,
+  "width": 960,
+  "height": 540,
+  "slides": [
+    {
+      "id": "s1",
+      "name": "Two columns",
+      "background": "#ffffff",
+      "objects": [
+        {
+          "type": "Textbox",
+          "left": 80,
+          "top": 64,
+          "width": 780,
+          "text": "Before and after",
+          "fontSize": 36,
+          "fontWeight": "700",
+          "fontFamily": "Inter",
+          "fill": "#1a1a1a",
+          "textAlign": "left",
+          "lineHeight": 1.2
+        },
+        {
+          "type": "Rect",
+          "left": 479,
+          "top": 160,
+          "width": 2,
+          "height": 300,
+          "rx": 1,
+          "ry": 1,
+          "fill": "#e5e5e0",
+          "stroke": null,
+          "strokeWidth": 0
+        },
+        {
+          "type": "Textbox",
+          "left": 80,
+          "top": 168,
+          "width": 360,
+          "text": "BEFORE",
+          "fontSize": 16,
+          "fontWeight": "700",
+          "fontFamily": "Inter",
+          "fill": "#737373",
+          "textAlign": "left",
+          "lineHeight": 1.2
+        },
+        {
+          "type": "Textbox",
+          "left": 80,
+          "top": 208,
+          "width": 360,
+          "text": "Describe the current state\nPoint out the friction\nKeep it honest",
+          "fontSize": 21,
+          "fontWeight": "400",
+          "fontFamily": "Inter",
+          "fill": "#404040",
+          "textAlign": "left",
+          "lineHeight": 1.8
+        },
+        {
+          "type": "Textbox",
+          "left": 520,
+          "top": 168,
+          "width": 360,
+          "text": "AFTER",
+          "fontSize": 16,
+          "fontWeight": "700",
+          "fontFamily": "Inter",
+          "fill": "#ea580c",
+          "textAlign": "left",
+          "lineHeight": 1.2
+        },
+        {
+          "type": "Textbox",
+          "left": 520,
+          "top": 208,
+          "width": 360,
+          "text": "Describe the new state\nShow the improvement\nMake it concrete",
+          "fontSize": 21,
+          "fontWeight": "400",
+          "fontFamily": "Inter",
+          "fill": "#404040",
+          "textAlign": "left",
+          "lineHeight": 1.8
+        }
+      ]
+    }
+  ]
+}

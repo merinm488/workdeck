@@ -10,8 +10,7 @@
  *
  * The hash is sha256(key.trim() + PEPPER_SECRET) - so one key resolves to the same account/document in all the apps.
  *
- * Data actions (PUT) operate on the unified document:
- *   { docs, tags, sheets, settings }
+ * Data actions (PUT) operate on the unified document
  * and only touch their own sections (see api/_lib/store.js).
  */
 
@@ -31,6 +30,7 @@ import {
 const DEFAULT_SHEET_NAME = 'Untitled Sheet';
 const DEFAULT_DOC_TITLE = 'Untitled';
 const DEFAULT_FORM_TITLE = 'Untitled Form';
+const DEFAULT_DECK_NAME = 'Untitled';
 
 /**
  * Build a fresh Univer workbook snapshot (matches what sheets/js/home.js
@@ -75,11 +75,19 @@ function createDefaultSheet(id) {
   };
 }
 
-/**
- * Build a fresh form record (matches what forms/js/storage.js creates, so
- * the editor loads it without any migration). `components` is the Form.io
- * builder schema — an empty array means "blank form".
- */
+function createDefaultDeck(id){
+    return {id,                                    // passed in
+    name: DEFAULT_DECK_NAME,
+    formatVersion: 1,                      // schema version — lets migrate old decks
+    width: 960,                            // the logical slide size every deck uses
+    height: 540,
+    slides: [{ id: 's1', name: 'Slide 1', background: '#ffffff', objects: [] }],
+    sharedId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    }
+}
+
 function createDefaultForm(id) {
   return {
     id,
@@ -219,12 +227,21 @@ export default async function handler(req, res) {
           break;
         }
 
-        // ---- Create a form (empty Form.io schema, named via data.name) ----
+        // ---- Create a form  ----
         case 'createForm': {
           const id = data?.id || generateId();
           const form = createDefaultForm(id);
           if (data?.name) form.name = data.name;
           userData.forms.unshift(form);
+          break;
+        }
+
+        // Create empty deck
+        case 'createDeck': {
+          const id = data?.id || generateId();
+          const deck = createDefaultDeck(id);
+          if (data?.name) deck.name = data.name;
+          userData.slides.unshift(deck);
           break;
         }
 
@@ -238,6 +255,8 @@ export default async function handler(req, res) {
             ? userData.sheets.find(s => s.id === fileId)
             : app === 'forms'
               ? userData.forms.find(f => f.id === fileId)
+              : app === 'slides'
+              ? userData.slides.find(d => d.id === fileId)
               : userData.docs.find(n => n.id === fileId);
 
           if (!target) {
@@ -259,7 +278,8 @@ export default async function handler(req, res) {
           // Docs keep their name in `title`, sheets & forms in `name`
           const isSheet = app === "sheets";
           const isForm = app === "forms";
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : userData.docs;
+          const isDeck = app === "slides";
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -269,6 +289,8 @@ export default async function handler(req, res) {
             target.name = cleanName;
             if (target.data) target.data.name = cleanName;
           } else if (isForm) {
+            target.name = cleanName;
+          } else if (isDeck){
             target.name = cleanName;
           } else {
             target.title = cleanName;
@@ -296,6 +318,12 @@ export default async function handler(req, res) {
               await deleteSharedDoc(form.sharedId);
             }
             userData.forms = userData.forms.filter(f => f.id !== fileId);
+          } else if (app === 'slides') {
+            const deck = userData.slides.find(f => f.id === fileId);
+            if (deck?.sharedId) {
+              await deleteSharedDoc(deck.sharedId);
+            }
+            userData.slides = userData.slides.filter(d => d.id !== fileId);
           } else {
             const doc = userData.docs.find(n => n.id === fileId);
             if (doc?.sharedId) {
@@ -328,6 +356,7 @@ export default async function handler(req, res) {
         tags: userData.tags,
         sheets: userData.sheets,
         forms: userData.forms,
+        slides: userData.slides,
         settings: userData.settings
       });
 

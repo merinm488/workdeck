@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Slides app icon: orange rounded tile + white presentation screen -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#ea580c"/>
+  <!-- screen -->
+  <rect x="14" y="16" width="36" height="24" rx="3" fill="#ffffff"/>
+  <!-- title bar on the slide -->
+  <rect x="19" y="22" width="16" height="4" rx="2" fill="#ea580c"/>
+  <rect x="19" y="30" width="26" height="3" rx="1.5" fill="#fed7aa"/>
+  <rect x="19" y="35" width="20" height="3" rx="1.5" fill="#fed7aa"/>
+  <!-- easel stand -->
+  <line x1="32" y1="40" x2="32" y2="48" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="32" y1="48" x2="24" y2="54" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="32" y1="48" x2="40" y2="54" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+</svg>

@@ -22,6 +22,8 @@
     --sheet-accent-soft: rgba(34, 197, 94, 0.15);
     --form-accent: #7248b9;       /* Forms purple */
     --form-accent-soft: rgba(114, 72, 185, 0.18);
+    --slide-accent: #ea580c;      /* Slides orange */
+    --slide-accent-soft: rgba(234, 88, 12, 0.15);
     --danger: #ef4444;
     --danger-soft: rgba(239, 68, 68, 0.12);
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
@@ -611,7 +613,7 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
     color: var(--doc-accent);
 }
 
-.wd-app-icon-grid {
+.wd-app-icon-sheet {
     background: var(--sheet-accent-soft);
     color: var(--sheet-accent);
 }
@@ -619,6 +621,11 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
 .wd-app-icon-form {
     background: var(--form-accent-soft);
     color: var(--form-accent);
+}
+
+.wd-app-icon-slide {
+    background: var(--slide-accent-soft);
+    color: var(--slide-accent);
 }
 
 .wd-dropdown-item-text {
@@ -879,7 +886,7 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
     color: var(--doc-accent);
 }
 
-.wd-file-icon-grid {
+.wd-file-icon-sheet {
     background: var(--sheet-accent-soft);
     color: var(--sheet-accent);
 }
@@ -887,6 +894,11 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
 .wd-file-icon-form {
     background: var(--form-accent-soft);
     color: var(--form-accent);
+}
+
+.wd-file-icon-slide {
+    background: var(--slide-accent-soft);
+    color: var(--slide-accent);
 }
 
 .wd-file-actions {
@@ -954,7 +966,7 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
     color: var(--doc-accent);
 }
 
-.wd-file-app-badge.grid {
+.wd-file-app-badge.sheet {
     background: var(--sheet-accent-soft);
     color: var(--sheet-accent);
 }
@@ -962,6 +974,11 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
 .wd-file-app-badge.form {
     background: var(--form-accent-soft);
     color: var(--form-accent);
+}
+
+.wd-file-app-badge.slide {
+    background: var(--slide-accent-soft);
+    color: var(--slide-accent);
 }
 
 /* ---------- Files list view ---------- */

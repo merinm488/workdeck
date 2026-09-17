@@ -1,0 +1,56 @@
+{
+  "templateName": "Quote",
+  "templateDescription": "A dark, centered slide for one strong statement",
+  "formatVersion": 1,
+  "width": 960,
+  "height": 540,
+  "slides": [
+    {
+      "id": "s1",
+      "name": "Quote",
+      "background": "#1a1a1a",
+      "objects": [
+        {
+          "type": "Textbox",
+          "left": 380,
+          "top": 78,
+          "width": 200,
+          "text": "“",
+          "fontSize": 110,
+          "fontWeight": "700",
+          "fontFamily": "Georgia",
+          "fill": "#ea580c",
+          "textAlign": "center",
+          "lineHeight": 1
+        },
+        {
+          "type": "Textbox",
+          "left": 120,
+          "top": 200,
+          "width": 720,
+          "text": "Simplicity is the ultimate sophistication.",
+          "fontSize": 38,
+          "fontWeight": "500",
+          "fontStyle": "italic",
+          "fontFamily": "Inter",
+          "fill": "#f5f5f5",
+          "textAlign": "center",
+          "lineHeight": 1.45
+        },
+        {
+          "type": "Textbox",
+          "left": 230,
+          "top": 360,
+          "width": 500,
+          "text": "ATTRIBUTION GOES HERE",
+          "fontSize": 15,
+          "fontWeight": "600",
+          "fontFamily": "Inter",
+          "fill": "#a3a3a3",
+          "textAlign": "center",
+          "lineHeight": 1.4
+        }
+      ]
+    }
+  ]
+}

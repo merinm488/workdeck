@@ -6,8 +6,6 @@
  * - Recent files across all apps (sorted by lastOpened, then updatedAt)
  * - + New dropdowns (header + empty state) with redirect into the app
  * - App filter (All files / per-app) via the filter chooser
- * - Unified search (titles + doc content)
- * - Grid / List view toggle (persisted server-side)
  * - Theme via wdThemeManager, settings via the unified account document
  */
 
@@ -38,6 +36,12 @@ const FORM_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" s
     + '<line x1="9" y1="12" x2="15" y2="12"></line>'
     + '<line x1="9" y1="16" x2="13" y2="16"></line>'
     + '</svg>';
+
+const SLIDE_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<rect x="3" y="4" width="18" height="13" rx="2"></rect>'
+      + '<line x1="12" y1="17" x2="12" y2="21"></line>'
+      + '<line x1="8" y1="21" x2="16" y2="21"></line>'
+      + '</svg>';
 
 /**
  * App registry — the single source of truth for every Workdeck app.
@@ -94,6 +98,22 @@ const WD_APPS = [
             pickNewest: function (data) { return data.forms && data.forms[0]; }
         },
         contentSearch: false
+    },
+    {
+      id: 'slides',
+        name: 'Slides',
+        label: 'Slide',
+        accent: 'slide',
+        icon: SLIDE_ICON,
+        route: '/slides/editor.html',
+        editorParam: 'id',
+        create: {
+            action: 'createDeck',
+            payload: {},
+            // The API unshifts, so the newest slide is first.
+            pickNewest: function (data) { return data.slides && data.slides[0]; }
+        },
+        contentSearch: false  
     }
 ];
 
@@ -111,6 +131,7 @@ const state = {
     docs: [],
     sheets: [],
     forms: [],
+    slides: [],
     settings: {},
     searchQuery: '',
     filter: 'all',       // 'all' | app id from WD_APPS
@@ -198,7 +219,18 @@ function getAllFiles() {
         };
     });
 
-    return docs.concat(sheetFiles).concat(formFiles).sort(function (a, b) {
+    const slideFiles = state.slides.map(function (f) {
+        return {
+            id: f.id,
+            app: 'slides',
+            name: f.name || 'Untitled',
+            updatedAt: f.updatedAt,
+            lastOpened: lastOpened[f.id] || null,
+            content: ''
+        };
+    });
+
+    return docs.concat(sheetFiles).concat(formFiles).concat(slideFiles).sort(function (a, b) {
         const aTime = a.lastOpened || a.updatedAt || '';
         const bTime = b.lastOpened || b.updatedAt || '';
         return bTime.localeCompare(aTime);
@@ -262,6 +294,7 @@ function applyUserData(data) {
     state.docs = data.docs || [];
     state.sheets = data.sheets || [];
     state.forms = data.forms || [];
+    state.slides = data.slides || [];
     state.settings = data.settings || {};
     render();
 }
@@ -691,6 +724,8 @@ async function confirmDelete() {
         state.sheets = state.sheets.filter(function (s) { return s.id !== file.id; });
     } else if (file.app === "forms") {
         state.forms = state.forms.filter(function (f) { return f.id !== file.id; });
+    } else if (file.app === 'slides'){
+        state.slides = state.slides.filter(function (d) { return d.id !== file.id});
     } else {
         state.docs = state.docs.filter(function (n) { return n.id !== file.id; });
     }
