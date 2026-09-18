@@ -1,6 +1,6 @@
 /**
  * ================================================
- * FORMS - Unified User API (Workdeck version)
+ * FORMS - Unified User API
  * ================================================
  *
  * Storage (via api/_lib/store.js):
@@ -15,7 +15,7 @@
  *   GET  ?hash=<hash>                       -> whole user document
  *   GET  ?shared=<shareId>                  -> { form, sharedAt }  (PUBLIC:
  *                                              questions only — never responses)
- *   POST { key, action: 'login'|'create' }  -> auth (same as Sheets)
+ *   POST { key, action: 'login'|'create' }  -> auth
  *   POST { shareId, action: 'submitResponse', data: { response } }
  *                                           -> PUBLIC: append a submission
  *   PUT  { hash, action, data }             -> owner operations (below)
@@ -590,7 +590,7 @@ export default async function handler(req, res) {
         });
       }
 
-      // UPDATE SETTINGS (theme, etc.) — same as Sheets
+      // UPDATE SETTINGS (theme, etc.)
       if (action === 'updateSettings') {
         userData.settings = {
           ...userData.settings,

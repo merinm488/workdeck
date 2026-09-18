@@ -1,13 +1,11 @@
 /**
  * ================================================
- * SHEETS - Storage Module (Updated for Unified API)
+ * SHEETS - Storage Module
  * ================================================
  * Handles data persistence using the unified /api/users endpoint:
  * - All storage operations go through the user API
  * - Uses user hash from sessionStorage for identification
  * - Spreadsheet data is stored within user data structure
- *
- * Matches the Docs project approach
  */
 
 // ================================================

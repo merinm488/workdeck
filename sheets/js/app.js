@@ -101,8 +101,8 @@ class SheetsApp {
                 }
             }
 
-            // Clean the address bar like Docs does: the deep link (?id=...)
-            // has been consumed, so show the bare /sheets/ URL.
+            // Clean the address bar: the deep link (?id=...) has been
+            // consumed, so show the bare /sheets/ URL.
             this.cleanURL();
 
             this.isInitialized = true;
@@ -1107,7 +1107,7 @@ class SheetsApp {
 
     /**
      * Strip the query string from the URL once the deep link has been
-     * consumed (like the Docs app does), leaving the bare editor URL.
+     * consumed, leaving the bare editor URL.
      * @returns {void}
      */
     cleanURL() {

@@ -2,64 +2,6 @@
  * ================================================
  * SLIDES - Deck Editor  
  * ================================================
- *
- * ARCHITECTURE MAP
- * ────────────────
- * One fabric.Canvas ("the stage") shows ONE slide at a time. The deck is a
- * plain JSON record (schema documented in js/storage.js); slides never live
- * anywhere but `state.deck.slides[]`, and the canvas is just their viewport:
- *
- *   canvas  ->  slide        (save)   syncCurrentSlideFromCanvas():
- *                                       slide.objects   = canvas.toObject().objects
- *                                       slide.background = canvas.backgroundColor
- *   slide   ->  canvas       (load)   loadSlide(index):
- *                                       canvas.loadFromJSON({ objects: [...] })
- *                                       canvas.backgroundColor = slide.background
- *
- * On top of that core loop:
- *   - thumbnails: re-render a slide offscreen at ~0.2 scale -> dataURL <img>
- *   - undo/redo : a stack of JSON.stringify(slide.objects) snapshots
- *   - autosave  : markDirty() flag -> interval -> saveDeck()
- *   - present   : render each slide's JSON onto #presentCanvas, fullscreen
- *   - export    : PNG (toDataURL) / PDF (jsPDF) / PPTX (PptxGenJS)
- *
- * ELEMENT IDs — every element this file touches already exists in
- * editor.html:
- *   nav      #homeBtn #deckTitle #saveState #presentBtn #exportBtn
- *            #exportDropdown #exportPngBtn #exportPdfBtn #exportPptxBtn
- *            #saveBtn #settingsBtn #settingsDropdown #themeToggleBtn
- *            #themeSubmenu #viewKeyBtn #shareBtn #deleteAccountBtn #logoutBtn
- *            .theme-option[data-theme]
- *   panel    #addSlideBtn #slideThumbs
- *   toolbar  #toolSelectBtn #toolTextBtn #toolDrawBtn #imageBtn #imageFileInput
- *            #toolShapeBtn #shapeIconHolder #shapeDropdown (items data-tool:
- *            rect/ellipse/triangle/line)
- *            #fontFamilySelect #fontSizeInput #charSpacingInput #textBoldBtn
- *            #textItalicBtn #textUnderlineBtn #textStrikeBtn
- *            #textAlignBtn #alignIconHolder #alignDropdown (items data-align)
- *            #fillColorInput #strokeColorInput #strokeWidthInput #opacityInput
- *            #filtersBtn #filtersDropdown #clearFiltersBtn
- *            #arrangeBtn #arrangeDropdown — holds the arrange items under
- *            their original ids (#bringForwardBtn #sendBackwardBtn #flipXBtn
- *            #flipYBtn #centerHBtn #centerVBtn #groupBtn #ungroupBtn)
- *            #duplicateBtn #deleteBtn #zoomOutBtn #zoomValue #zoomInBtn
- *            #zoomFitBtn
- *   stage    #slideSurface #slideCanvas
- *   present  #presentOverlay #presentCanvas #presentExitBtn #presentPrevBtn
- *            #presentCounter #presentNextBtn
- *   modals   #loadingOverlay #notification #keyModal #keyText #keyCopyBtn
- *            #keyCopyFeedback #keyModalClose #keyModalCloseBtn
- *            #deleteAccountModal #deleteAccountModalClose #cancelDeleteAccount
- *            #confirmDeleteAccount #renameModal #renameModalClose #renameInput
- *            #renameCancelBtn #renameConfirmBtn #renamePromptModal
- *            #renamePromptClose #renamePromptInput #renamePromptLater
- *            #renamePromptConfirm #shareModal #shareModalClose
- *            #shareDeckName #shareUrlInput #copyShareUrlBtn #copyButtonText
- *            #shareModalCloseBtn
- *
- * LOAD ORDER (editor.html): config.js -> auth.js -> storage.js -> themes.js
- * -> editor.js. Everything runs after DOMContentLoaded.
- * ================================================
  */
 
 // ================================================
@@ -81,7 +23,6 @@ const editorState = {
     isRestoring: false,     // true while undo/redo reloads the canvas (don't re-record)
     autoSaveTimer: null,
     presentIndex: 0,
-    thumbCanvas: null,
     presentCanvas: null
 };
 
@@ -122,14 +63,14 @@ async function init() {
 
     $('deckTitle').textContent = editorState.deck.name;
 
-    // skipSync: the canvas was JUST created and is empty — syncing it into
-    // slide 0 would wipe the persisted first slide before it's ever loaded
+    // skipSync: the canvas was JUST created and is empty 
     loadSlide(0, true);
     buildThumbs();
     zoomToFit();
 
     bindToolbar();
     bindSlidePanel();
+    bindStageNav();
     bindTopNav();
     bindModals();
     bindKeyboard();
@@ -150,9 +91,7 @@ function initCanvas() {
     editorState.canvas = new fabric.Canvas('slideCanvas', {
         width: APP_CONFIG.slide.width,       // logical size; CSS zoom is separate
         height: APP_CONFIG.slide.height,
-        backgroundColor: '#ffffff',          // live property is still backgroundColor in
-                                             // fabric v6 — 'background' is only the
-                                             // serialized-JSON key (loadFromJSON/toObject)
+        backgroundColor: '#ffffff',          
         selection: true,                     // rubber-band multi-select
         preserveObjectStacking: true         // keep z-order on select
       });
@@ -192,6 +131,7 @@ function loadSlide(index, skipSync = false) {
     if (!slide) return;
 
     editorState.currentSlideIndex = index;
+    $('stageCounter').textContent = `${index + 1} / ${editorState.deck.slides.length}`;
     editorState.undoStack = [];
     editorState.redoStack = [];
     clearTimeout(undoSnapshotTimer);
@@ -219,13 +159,26 @@ function syncCurrentSlideFromCanvas() {
     slide.background = editorState.canvas.backgroundColor || APP_CONFIG.slide.defaultBackground;
 }
 
+
+function goToSlide(index) {
+    const clamped = Math.max(0, Math.min(editorState.deck.slides.length - 1, index));
+    if (clamped !== editorState.currentSlideIndex) {
+        loadSlide(clamped);
+    }
+}
+
 // ================================================
 // Slide management (sorter panel)
 // ================================================
 
-/** #addSlideBtn -> addSlide() (panel header plus button). */
 function bindSlidePanel() {
     $('addSlideBtn').addEventListener('click', addSlide);
+    bindThumbDragDrop();
+}
+
+function bindStageNav() {
+    $('stagePrevBtn').addEventListener('click', () => goToSlide(editorState.currentSlideIndex - 1));
+    $('stageNextBtn').addEventListener('click', () => goToSlide(editorState.currentSlideIndex + 1));
 }
 
 /**
@@ -285,6 +238,93 @@ function deleteSlide(index) {
 
 }
 
+// ================================================
+// Slide reordering (drag & drop in the sorter)
+// ================================================
+
+let dragSlideId = null;
+
+function bindThumbDragDrop() {
+    const list = $('slideThumbs');
+
+    list.addEventListener('dragstart', (e) => {
+        const card = e.target.closest('.thumb-card');
+        if (!card) return;
+        dragSlideId = card.dataset.slideId;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        // setData is what makes Firefox start the drag at all
+        e.dataTransfer.setData('text/plain', dragSlideId);
+    });
+
+    list.addEventListener('dragover', (e) => {
+        if (!dragSlideId) return;
+        e.preventDefault();               // required for the drop to fire
+        e.dataTransfer.dropEffect = 'move';
+        paintDropIndicator(getDropIndex(e.clientY));
+    });
+
+    list.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!dragSlideId) return;
+        const dropIndex = getDropIndex(e.clientY); // measure BEFORE rebuild
+        const movedId = dragSlideId;
+        dragSlideId = null;
+        reorderSlides(movedId, dropIndex);
+    });
+
+    list.addEventListener('dragend', () => {
+        // fires after drop AND after a cancelled drag (dropped outside)
+        dragSlideId = null;
+        clearDropIndicator();
+        document.querySelectorAll('.thumb-card.dragging')
+            .forEach((card) => card.classList.remove('dragging'));
+    });
+}
+
+
+function getDropIndex(y) {
+    const cards = [...document.querySelectorAll('.thumb-card:not(.dragging)')];
+    for (let i = 0; i < cards.length; i++) {
+        const box = cards[i].getBoundingClientRect();
+        if (y < box.top + box.height / 2) return i;
+    }
+    return cards.length;
+}
+
+
+function paintDropIndicator(dropIndex) {
+    clearDropIndicator();
+    const cards = [...document.querySelectorAll('.thumb-card:not(.dragging)')];
+    const after = cards[dropIndex];      // insert before this card...
+    const before = cards[dropIndex - 1]; // ...or after this one (end of list)
+    if (before) before.classList.add('drop-below');
+    else if (after) after.classList.add('drop-above');
+}
+
+function clearDropIndicator() {
+    document.querySelectorAll('.thumb-card.drop-above, .thumb-card.drop-below')
+        .forEach((card) => card.classList.remove('drop-above', 'drop-below'));
+}
+
+
+function reorderSlides(fromId, dropIndex) {
+    const slides = editorState.deck.slides;
+    const fromIndex = slides.findIndex((s) => s.id === fromId);
+    if (fromIndex === -1 || dropIndex === fromIndex) return;
+
+    syncCurrentSlideFromCanvas(); // unsaved canvas edits travel with their slide
+
+    const currentId = slides[editorState.currentSlideIndex].id;
+    const [moved] = slides.splice(fromIndex, 1);
+    slides.splice(dropIndex, 0, moved);
+
+    editorState.currentSlideIndex = slides.findIndex((s) => s.id === currentId);
+    $('stageCounter').textContent = `${editorState.currentSlideIndex + 1} / ${slides.length}`;
+    buildThumbs();
+    markDirty();
+}
+
 /**
  * Render the sorter
  */
@@ -295,8 +335,8 @@ const DELETE_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
 
 function buildThumbs() {
     $('slideThumbs').innerHTML = editorState.deck.slides.map((slide, i) => `
-          <li class="thumb-card${i === editorState.currentSlideIndex ? ' active' : ''}" data-slide-id="${slide.id}">
-              <img class="thumb-img" alt="">
+          <li class="thumb-card${i === editorState.currentSlideIndex ? ' active' : ''}" data-slide-id="${slide.id}" draggable="true">
+              <img class="thumb-img" alt="" draggable="false">
               <span class="thumb-num">${i + 1}</span>
               <div class="thumb-actions">
                   <button class="thumb-act-btn" data-action="duplicate" title="Duplicate slide">${DUPLICATE_ICON}</button>
@@ -327,38 +367,30 @@ function buildThumbs() {
 }
 
 /**
- * Re-render ONE thumbnail (after edits on the current slide).
+ * Re-render ONE thumbnail 
  */
-function renderThumb(index) {
+async function renderThumb(index) {
     const slide = editorState.deck.slides[index];
     if (!slide) return;
 
-    if (!editorState.thumbCanvas){
-        editorState.thumbCanvas = new fabric.StaticCanvas(undefined, {
-            width: APP_CONFIG.slide.width,
-            height: APP_CONFIG.slide.height
-        });
+    const dataUrl = await renderSlideToPng(slide, 0.2);
+    const card = document.querySelector(`.thumb-card[data-slide-id="${slide.id}"]`);
+    if (card) {
+        card.querySelector('.thumb-img').src = dataUrl;
     }
-    const thumbCanvas = editorState.thumbCanvas;
-    thumbCanvas.loadFromJSON({objects: slide.objects || []}).then(() => {
-        thumbCanvas.backgroundColor = slide.background || APP_CONFIG.slide.defaultBackground;
-        thumbCanvas.renderAll();
-
-        const dataUrl = thumbCanvas.toDataURL({ format: 'png', multiplier: 0.2 });
-        const card = document.querySelector(`.thumb-card[data-slide-id="${slide.id}"]`);
-          if (card) {
-              card.querySelector('.thumb-img').src = dataUrl;
-          }
-    });
 }
 
-/** Toggle .active on the thumb matching currentSlideIndex. */
 function updateThumbsActiveState() {
     const currentSlide = editorState.deck.slides[editorState.currentSlideIndex];
     if (!currentSlide) return;
 
     document.querySelectorAll('.thumb-card').forEach((card) => {
-        card.classList.toggle('active', card.dataset.slideId === currentSlide.id);
+        const isActive = card.dataset.slideId === currentSlide.id;
+        card.classList.toggle('active', isActive);
+        if (isActive) {
+            // keep the sorter following along when paging with keys/buttons
+            card.scrollIntoView({ block: 'nearest' });
+        }
     });
 }
 
@@ -458,8 +490,6 @@ function bindToolbar() {
     bindFiltersMenu();
     bindZoomControls();
 
-    // the menus are viewport-anchored (fixed), so a toolbar scroll or window
-    // resize would leave them stranded — just close them
     document.querySelector('.toolbar').addEventListener('scroll', () => closeAllToolbarDropdowns());
     window.addEventListener('resize', () => closeAllToolbarDropdowns());
 }
@@ -492,8 +522,6 @@ function setActiveTool(tool) {
         $(TOOL_BUTTON_IDS[name]).classList.toggle('active', name === tool);
     });
 
-    // the Shapes button stands in for the rect/ellipse/triangle/line tools —
-    // mirror the armed shape's icon and light the button while it's active
     const isShape = SHAPE_TOOLS.includes(tool);
     $('toolShapeBtn').classList.toggle('active', isShape);
     if (isShape) {
@@ -826,8 +854,6 @@ function ungroupSelection() {
     const group = editorState.canvas.getActiveObject();
     if (!group || !group.isType('group')) return;
 
-    // removeAll() detaches the children; re-add them to the canvas as
-    // independent objects, then drop the now-empty group
     const objects = group.removeAll();
 
     editorState.canvas.remove(group);
@@ -882,10 +908,6 @@ function bindEditButtons() {
 // Image filters (fabric.filters — applies to images only)
 // ================================================
 
-/**
- * One-tap filters for the selected image(s). Blur/Pixelate get explicit
- * strengths — their raw defaults (blur 0 / 1px blocks) would be invisible.
- */
 const FILTER_FACTORIES = {
     Grayscale: () => new fabric.filters.Grayscale(),
     Sepia: () => new fabric.filters.Sepia(),
@@ -898,10 +920,7 @@ function getSelectedImages() {
     return editorState.canvas.getActiveObjects().filter((obj) => obj.isType('image'));
 }
 
-/**
- * applyFilters() fires NO canvas event, so this does the sync/undo/thumb
- * bookkeeping that object:modified would normally do.
- */
+
 function afterFilterChange() {
     editorState.canvas.requestRenderAll();
     syncCurrentSlideFromCanvas();
@@ -1018,8 +1037,11 @@ function bindZoomControls() {
 
 function zoomToFit() {
     const stage = document.querySelector('.canvas-stage');
-    const availableWidth = stage.clientWidth - 56;   // .canvas-stage has 28px padding each side
-    const availableHeight = stage.clientHeight - 56;
+    const stageStyle = getComputedStyle(stage);
+    const padX = parseFloat(stageStyle.paddingLeft) + parseFloat(stageStyle.paddingRight);
+    const padY = parseFloat(stageStyle.paddingTop) + parseFloat(stageStyle.paddingBottom);
+    const availableWidth = stage.clientWidth - padX;
+    const availableHeight = stage.clientHeight - padY;
 
     if (availableWidth <= 0 || availableHeight <= 0) return;
 
@@ -1088,9 +1110,14 @@ function redo() {
 // ================================================
 
 
+/**
+ * Nudge the active object with the arrow keys.
+ * @returns {boolean} false when there was no selection (or the key isn't a
+ *   nudge key) — lets the caller fall back to slide paging.
+ */
 function nudgeSelection(e) {
     const activeObject = editorState.canvas.getActiveObject();
-    if (!activeObject) return;
+    if (!activeObject) return false;
 
     const moves = {
         arrowleft: ['left', -1],
@@ -1099,7 +1126,7 @@ function nudgeSelection(e) {
         arrowdown: ['top', 1]
     };
     const move = moves[e.key.toLowerCase()];
-    if (!move) return;
+    if (!move) return false;
 
     e.preventDefault();
 
@@ -1109,6 +1136,7 @@ function nudgeSelection(e) {
     editorState.canvas.requestRenderAll();
     syncCurrentSlideFromCanvas();
     markDirty();
+    return true;
 }
 
 function bindKeyboard() {
@@ -1165,7 +1193,15 @@ function bindKeyboard() {
             e.preventDefault();
             toggleUnderline();
         } else if (!mod && e.key.startsWith('Arrow')) {
-            nudgeSelection(e);
+            // arrows nudge the selected object; with nothing selected they
+            // page between slides — same keys as present mode
+            if (!nudgeSelection(e)) {
+                if (e.key === 'ArrowRight') {
+                    goToSlide(editorState.currentSlideIndex + 1);
+                } else if (e.key === 'ArrowLeft') {
+                    goToSlide(editorState.currentSlideIndex - 1);
+                }
+            }
         } else if (!mod && 'vtrolp'.includes(key)) {
             const toolFor = { v: 'select', t: 'text', r: 'rect', o: 'ellipse', l: 'line', p: 'draw' };
             setActiveTool(toolFor[key]);
@@ -1191,10 +1227,6 @@ function markDirty() {
 }
 
 /**
- * The save path (Ctrl+S, autosave, and beforeunload best-effort).
- * Explicit saves (save button, Ctrl+S) of a still-untitled deck first
- * raise the rename reminder (closeRenamePrompt continues the save);
- * autosave and best-effort callers pass { explicit: false }.
  *
  * @param {object} [options]
  * @param {boolean} [options.explicit=true] - false for auto-save paths
@@ -1203,8 +1235,6 @@ function markDirty() {
 async function saveDeck(options = {}) {
     const { explicit = true } = options;
 
-    // Rename reminder: only on user-initiated saves, only while the
-    // name is still the default, and only until dismissed once.
     if (explicit && !editorState.renamePromptDismissed && isUntitledDeck()) {
         openRenamePrompt();
         return false;
@@ -1334,6 +1364,12 @@ function bindPresentControls() {
     $('presentNextBtn').addEventListener('click', presentNext);
     $('presentPrevBtn').addEventListener('click', presentPrev);
 
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement && !$('presentOverlay').classList.contains('hidden')) {
+            exitPresentMode();
+        }
+    });
+
     // re-letterbox while presenting when the window changes size
     window.addEventListener('resize', debounce(() => {
         if (!$('presentOverlay').classList.contains('hidden')) {
@@ -1385,8 +1421,7 @@ function deckFileName() {
     return editorState.deck.name || 'deck';
 }
 
-// Offscreen-render any slide to a PNG data URL (the renderThumb technique
-// at an arbitrary multiplier). Async — loadFromJSON is promise-based.
+
 async function renderSlideToPng(slide, multiplier) {
     const offscreen = new fabric.StaticCanvas(undefined, {
         width: APP_CONFIG.slide.width,
@@ -1467,11 +1502,8 @@ async function exportPptx() {
     pptx.defineLayout({ name: 'DECK', width: 10, height: 5.625 });
     pptx.layout = 'DECK';
 
-    // deck pixels (960 wide) -> inches (10 wide)
     const S = 10 / APP_CONFIG.slide.width;
 
-    // text + basic shapes + images map directly; anything else (groups,
-    // lines, ...) falls back to a whole-slide PNG for that slide
     const DIRECT_TYPES = ['textbox', 'rect', 'ellipse', 'triangle', 'image'];
 
     for (const slide of editorState.deck.slides) {
@@ -1566,13 +1598,6 @@ function openRenameModal() {
 }
 
 
-// ================================================
-// Rename reminder (untitled explicit saves)
-// Mirrors Forms/Sheets: before the first real save of a deck still on
-// its default name, ask for one. Rename applies it and continues the
-// interrupted save; Later saves as-is and stops nagging for this
-// session. Auto-save paths never see the modal.
-// ================================================
 
 /** Wire up rename reminder modal event handlers. */
 function setupRenamePrompt() {
@@ -1716,7 +1741,6 @@ function closeModal(el) {
 }
 
 function bindModals() {
-    // --- rename reminder (untitled explicit saves) ---
     setupRenamePrompt();
 
     // --- rename ---
@@ -1855,8 +1879,6 @@ async function offerTemplatesForNewDeck() {
 
                 closeModal($('templateModal'));
 
-                // skipSync: the canvas still shows the old blank slide — it must
-                // NOT overwrite the template's first slide
                 await loadSlide(0, true);
                 buildThumbs();
                 zoomToFit();

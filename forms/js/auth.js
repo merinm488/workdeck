@@ -61,7 +61,7 @@ class FormsAuthManager {
     /**
      * Log out of the unified account: clear Workdeck's session plus every
      * app's mirrors, then return to Workdeck — which now shows its login
-     * page (same as logging out of Workdeck/Docs).
+     * page.
      */
     logout() {
         clearUnifiedSession();

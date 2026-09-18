@@ -620,11 +620,23 @@ function buildListRow(file) {
 // ================================================
 
 /**
- * Open an app URL in a new tab so Workdeck stays available. Falls
- * back to navigating this tab when the browser blocks the popup (this
+ * Open an app URL in a new tab so Workdeck stays available — except on
+ * phones and tablets, which navigate this tab instead: Safari doesn't
+ * copy sessionStorage into a newly opened tab, so the editors' session
+ * guards bounce every new-tab open straight back to '/'. Same-tab
+ * navigation carries the session (and skips tab litter). The recents
+ * "recordOpen" ping in openFile() may be dropped when the page unloads
+ * mid-flight; ordering self-corrects on later opens.
+ * Falls back to navigating this tab when the browser blocks the popup (this
  * can happen after an async wait), matching the old behavior.
  */
 function openInNewTab(url) {
+    // (pointer: coarse) and (hover: none) — touch-first devices (phones,
+    // tablets) but NOT touch-screen laptops, which keep new-tab behavior.
+    if (window.matchMedia('(pointer: coarse) and (hover: none)').matches) {
+        window.location.href = url;
+        return false;
+    }
     const tab = window.open(url, '_blank');
     if (tab) {
         tab.opener = null;  // don"'t expose the Workdeck window to the app tab

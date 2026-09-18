@@ -1,14 +1,10 @@
 /**
  * ================================================
- * SHEETS - Unified User API (Workdeck version)
+ * SHEETS - Unified User API
  * ================================================
  *
- * Port of the original Sheets app's api/users.js with the same two changes as
- * api/docs.js: shared storage (local files in dev, textdb.dev in prod) and
+ * Shared storage (local files in dev, textdb.dev in prod) and
  * section-merged saves so sheet writes never wipe docs.
- *
- * Request/response shapes are identical to the original, so the existing
- * Sheets frontend (js/storage.js, js/auth.js) works unchanged.
  */
 
 import {

@@ -1,16 +1,12 @@
 /**
  * ================================================
- * DOCS (Docs) - API (workdeck version)
+ * DOCS - API
  * ================================================
  *
- * Port of the original Docs app's api/docs.js with two changes:
  *  1. Storage goes through the shared store module so the SAME document works
  *     with local JSON files in development and textdb.dev in production.
  *  2. Saves are section-merged (saveOwnedSections), so writing docs/tags can
  *     never wipe the user's sheets or Workdeck settings.
- *
- * Request/response shapes are identical to the original, so the existing Docs
- * frontend (src/lib/db.js) works unchanged.
  */
 
 import {
@@ -129,7 +125,7 @@ export async function POST(request) {
 }
 
 /**
- * PUT /api/docs — doc/tag mutations (same actions as the original).
+ * PUT /api/docs — doc/tag mutations.
  */
 export async function PUT(request) {
   try {

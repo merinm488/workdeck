@@ -44,9 +44,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
-        // Delete every cache that isn't the current version's — including
-        // leftovers from the old 'workspace-v1' worker, which this filter
-        // previously let survive and kept serving stale assets.
+        // Delete every cache that isn't the current version's, including
+        // leftovers from workers of previous versions.
         keys
           .filter((key) => key !== STATIC_CACHE && key !== RUNTIME_CACHE)
           .map((key) => caches.delete(key))

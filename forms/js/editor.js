@@ -513,10 +513,10 @@ class FormsEditorApp {
 
     // ================================================
     // Rename reminder (untitled explicit saves)
-    // Mirrors Sheets/Docs: before the first real save of a form still
-    // called 'Untitled Form', ask for a name. Rename applies it and
-    // continues the interrupted save; Later saves as-is and stops nagging
-    // for this session. Auto-save paths never see the modal.
+    // Before the first real save of a form still called 'Untitled Form',
+    // ask for a name. Rename applies it and continues the interrupted
+    // save; Later saves as-is and stops nagging for this session.
+    // Auto-save paths never see the modal.
     // ================================================
 
     /**
@@ -1488,7 +1488,7 @@ class FormsEditorApp {
 
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // Wait for the form-js CDN bundle (up to 10s), like Sheets waits for Univer.
+        // Wait for the form-js CDN bundle (up to 10s)
         let attempts = 0;
         while (typeof FormEditor === 'undefined' && attempts < 100) {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -1512,7 +1512,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // init() only returns false when it redirected away; nothing to show.
         }
 
-        window.formsEditorApp = app;   // debugging handle, like Sheets
+        window.formsEditorApp = app;   // debugging handle
     } catch (error) {
         console.error('[FORMS EDITOR] Boot error:', error);
     }

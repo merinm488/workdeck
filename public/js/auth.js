@@ -135,17 +135,32 @@ class WdAuthManager {
         sessionStorage.setItem(s.slidesHash, hash);
         sessionStorage.setItem(s.slidesKey, key);
 
+        // Slides seed: Safari doesn't copy sessionStorage into a newly
+        // opened tab, so a fresh-tab Slides editor used to find no session
+        // and bounce back to '/'. The localStorage mirror lets it recover;
+        // clearSession() removes it so logout still sticks.
+        try {
+            localStorage.setItem(s.slidesHash, hash);
+            localStorage.setItem(s.slidesKey, key);
+        } catch (err) {
+            console.warn('[AUTH] localStorage seed failed (private mode?):', err);
+        }
+
         this.userHash = hash;
         this.userKey = key;
         this.userData = userData;
     }
 
     /**
-     * Remove all apps' keys from sessionStorage.
+     * Remove all apps' keys from sessionStorage (plus the Slides
+     * localStorage seed written by storeSession).
      */
     clearSession() {
         const s = WD_AUTH_CONFIG.storageKeys;
-        Object.values(s).forEach(name => sessionStorage.removeItem(name));
+        Object.values(s).forEach(name => {
+            sessionStorage.removeItem(name);
+            localStorage.removeItem(name);
+        });
     }
 
     /**

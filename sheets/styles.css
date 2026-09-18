@@ -688,7 +688,9 @@ input[type="text"] {
         color: #22c55e !important;
     }
 
-color: #e5e5e5 !important;
+[data-theme="dark"] .theme-option {
+        background-color: #1a1a1a !important;
+        color: #e5e5e5 !important;
     }
 
 [data-theme="light"] .theme-option {

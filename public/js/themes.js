@@ -3,9 +3,9 @@
  * WORKDECK - Theme Management
  * ================================================
  * Light / Dark / System themes for the Workdeck landing page.
- * Same pattern as sheets/js/themes.js: data-theme attribute + localStorage.
- * Theme preference is also persisted server-side in the user document
- * (settings.theme) by workdeck.js, so it follows the account across devices.
+ * Applied via the data-theme attribute + localStorage; the preference is
+ * also persisted server-side in the user document (settings.theme) by
+ * workdeck.js, so it follows the account across devices.
  */
 
 class WdThemeManager {

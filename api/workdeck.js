@@ -161,7 +161,7 @@ export default async function handler(req, res) {
 
       const hash = generateHash(normalizedKey);
 
-      // LOGIN — mirrors Docs: 404 lets the client fall back to auto-create.
+      // LOGIN — 404 lets the client fall back to auto-create.
       if (action === 'login') {
         const userData = await getUserDoc(hash);
         if (!userData) {

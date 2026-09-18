@@ -3,7 +3,7 @@
  * FORMS - Configuration File
  * ================================================
  * App-wide constants and small session helpers.
- * Mirrors sheets/config/config.js. No editor logic lives here.
+ * No editor logic lives here.
  */
 
 const APP_CONFIG = {
@@ -11,7 +11,7 @@ const APP_CONFIG = {
     version: '1.0.0',
     description: 'Form builder and response collection for Workdeck',
 
-    // Environment detection (same rule as Sheets)
+    // Environment detection
     isProduction: window.location.hostname !== 'localhost' &&
                   window.location.hostname !== '127.0.0.1' &&
                   !window.location.hostname.startsWith('192.168.'),
@@ -65,7 +65,7 @@ function getFormsUserKey() {
 /**
  * Clear the Forms session keys only (entry-guard use).
  * Logout must use clearUnifiedSession() instead — logging out of one app
- * logs out of the whole unified account (same as Workdeck/Docs).
+ * logs out of the whole unified account.
  */
 function clearFormsSession() {
     sessionStorage.removeItem(APP_CONFIG.sessionKeys.userHash);

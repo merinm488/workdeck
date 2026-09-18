@@ -25,7 +25,7 @@
  * at the section level (settings merge at the key level) so that, for
  * example, a doc save from Docs never wipes a user's sheets or forms.
  *
- * Environment detection mirrors the original projects:
+ * Environment detection:
  * - NODE_ENV === 'development' -> local files
  * - otherwise                  -> textdb.dev
  */
@@ -62,8 +62,7 @@ const COMPRESSED_FLAG = '__wdz';
 // ================================================
 
 /**
- * Generate SHA-256 hash with pepper (same scheme as the original Docs & Sheets
- * projects: sha256(key.trim() + PEPPER_SECRET) as hex).
+ * Generate SHA-256 hash with pepper: sha256(key.trim() + PEPPER_SECRET) as hex.
  */
 export function generateHash(input) {
   const normalized = input ? String(input).trim() : '';
@@ -71,7 +70,7 @@ export function generateHash(input) {
 }
 
 /**
- * Generate unique ID (same format the original projects use).
+ * Generate unique ID.
  */
 export function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);

@@ -1,22 +1,3 @@
-/**
- * ================================================
- * SLIDES - Authentication Module
- * ================================================
- *
- * Slides has NO login page. Workdeck performs the single login
- * (POST /api/workdeck { key, action: 'login' | 'create' }) and mirrors the
- * session into sessionStorage for every child app:
- *
- *   slides_user_hash / slides_user_key
- *
- * This module only reads that mirror (config.js already provides the
- * helpers). 
- *
- * Workdeck side:
- *   public/js/auth.js  -> storageKeys.slidesHash / slidesKey + 2 setItem()
- *                         lines in storeSession()
- */
-
 // ================================================
 // Slides Authentication Manager
 // ================================================
@@ -31,8 +12,9 @@ class SlidesAuthManager {
      * @returns {{hash: string, key: string}|null} Session or null
      */
     getSession() {
-        const hash = sessionStorage.getItem(APP_CONFIG.sessionKeys.userHash);
-        const key = sessionStorage.getItem(APP_CONFIG.sessionKeys.userKey);
+        // config.js helpers: sessionStorage first, localStorage seed second
+        const hash = getSlidesUserHash();
+        const key = getSlidesUserKey();
 
         if(hash && key){
             this.userHash = hash;
@@ -65,7 +47,7 @@ class SlidesAuthManager {
     /**
      * Log out of the unified account: clear Workdeck's session plus every
      * app's mirrors, then return to Workdeck — which now shows its login
-     * page (same as logging out of Workdeck/Docs).
+     * page.
      */
     logout() {
         clearUnifiedSession();

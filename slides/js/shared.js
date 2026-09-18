@@ -75,8 +75,13 @@ function sizeSharedCanvas() {
     const deckWidth = deck.width || APP_CONFIG.slide.width;
     const deckHeight = deck.height || APP_CONFIG.slide.height;
 
-    const availableWidth = stage.clientWidth - 48;    // .viewer-stage has 24px padding each side
-    const availableHeight = stage.clientHeight - 48;
+    // .viewer-stage's padding varies by breakpoint (24px desktop, 12px
+    // <=640px) — read it instead of hardcoding
+    const stageStyle = getComputedStyle(stage);
+    const availableWidth = stage.clientWidth -
+        (parseFloat(stageStyle.paddingLeft) + parseFloat(stageStyle.paddingRight));
+    const availableHeight = stage.clientHeight -
+        (parseFloat(stageStyle.paddingTop) + parseFloat(stageStyle.paddingBottom));
 
     if (availableWidth <= 0 || availableHeight <= 0) return;
 
@@ -155,7 +160,7 @@ function $(id) {
     return document.getElementById(id);
 }
 
-/** Toast helper — same pattern as editor.js showNotification (#notification). */
+/** Toast helper (#notification). */
 function showNotification(message, isError = false) {
     const el = $('notification');
     el.textContent = message;

@@ -49,7 +49,7 @@ class AuthenticationManager {
      * Loads existing session from sessionStorage
      */
     async initialize() {
-        // Load existing session from sessionStorage (like Docs)
+        // Load existing session from sessionStorage
         const storedHash = sessionStorage.getItem(AUTH_CONFIG.storageKeys.userHash);
         const storedKey = sessionStorage.getItem(AUTH_CONFIG.storageKeys.userKey);
 
@@ -99,7 +99,7 @@ class AuthenticationManager {
     /**
      * Authenticate user with access key
      * - Logs in if key exists
-     * - Creates account if key doesn't exist (auto-create like Docs)
+     * - Creates account if key doesn't exist (auto-create)
      *
      * @param {string} rawKey - Raw access key from user
      * @returns {Promise<Object>} Authentication result
@@ -153,7 +153,7 @@ class AuthenticationManager {
             const data = await response.json();
 
             if (data.success) {
-                // Store hash and key in sessionStorage (like Docs)
+                // Store hash and key in sessionStorage
                 sessionStorage.setItem(AUTH_CONFIG.storageKeys.userHash, data.hash);
                 sessionStorage.setItem(AUTH_CONFIG.storageKeys.userKey, normalizedKey);
 
@@ -234,7 +234,7 @@ class AuthenticationManager {
      */
     async logout() {
         try {
-            // Clear sessionStorage (like Docs)
+            // Clear sessionStorage
             this.clearSession();
 
             // Reset current user
@@ -341,7 +341,7 @@ class AuthenticationManager {
     }
 
     /**
-     * Get user key (for display purposes only, like Docs)
+     * Get user key (for display purposes only)
      * @returns {string|null} Normalized user key
      */
     getUserKey() {

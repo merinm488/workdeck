@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
 
     <title>Slides - Deck Editor</title>
     <meta name="description" content="Build slide decks with text, shapes and images, present them full-screen, and export to PNG, PDF or PowerPoint. Part of Workdeck.">
@@ -37,7 +37,7 @@
 </head>
 <body>
     <!-- ============================================================
-         Top Navigation Bar — same chrome as Forms' editor
+         Top Navigation Bar
          ============================================================ -->
     <nav class="top-nav">
         <div class="top-nav-left">
@@ -62,8 +62,7 @@
                     <span>Present</span>
                 </button>
 
-                <!-- Export menu: editor.js wires each item; heavy export
-                     libraries are commented out in <head> until enabled -->
+                <!-- Export menu: editor.js wires each item -->
                 <div class="export-menu">
                     <button id="exportBtn" class="top-nav-btn top-nav-btn-wide" aria-haspopup="true" aria-expanded="false" title="Export">
                         <svg class="top-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -480,6 +479,23 @@
                     <canvas id="slideCanvas"></canvas>
                 </div>
             </div>
+
+            <!-- Stage slide nav — the present-mode pill, anchored to the
+                 editor stage. editor.js bindStageNav() pages between slides;
+                 the arrow keys do the same while nothing is selected. -->
+            <div class="stage-nav">
+                <button id="stagePrevBtn" class="present-ctrl-btn" aria-label="Previous slide" title="Previous slide (←)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+                <span id="stageCounter" class="present-counter">1 / 1</span>
+                <button id="stageNextBtn" class="present-ctrl-btn" aria-label="Next slide" title="Next slide (→)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            </div>
         </section>
     </div>
 
@@ -659,13 +675,24 @@
         </div>
     </div>
 
-    <!-- Authentication Check — Slides has NO login page of its own (same as
-         Forms): Workdeck's login wrote the session mirrors. No session or no
-         deck id -> back to Workdeck. -->
+    <!-- Authentication Check — Slides has NO login page of its own:
+         Workdeck's login wrote the session mirrors. No session or no
+         deck id -> back to Workdeck. localStorage is checked as a fallback:
+         Safari doesn't copy sessionStorage into new tabs, so a fresh tab
+         would otherwise bounce straight back to '/' (mobile bug).
+         config.js's helpers repeat this fallback once scripts load. -->
     <script>
         (function() {
-            const userHash = sessionStorage.getItem('slides_user_hash');
-            const userKey = sessionStorage.getItem('slides_user_key');
+            function readSession(name) {
+                try {
+                    return sessionStorage.getItem(name) || localStorage.getItem(name) || null;
+                } catch (err) {
+                    return null;   // storage blocked -> treat as logged out
+                }
+            }
+
+            const userHash = readSession('slides_user_hash');
+            const userKey = readSession('slides_user_key');
             const deckId = new URLSearchParams(window.location.search).get('id');
 
             if (!userHash || !userKey) {
@@ -677,7 +704,7 @@
         })();
     </script>
 
-    <!-- Custom JavaScript (plain script tags, no modules — same as Forms).
+    <!-- Custom JavaScript (plain script tags, no modules).
          Load order matters: config -> auth -> storage -> themes -> editor. -->
     <script src="config/config.js"></script>
     <script src="js/auth.js"></script>

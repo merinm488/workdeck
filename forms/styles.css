@@ -1,7 +1,6 @@
 /* ============================================================
    Forms — Editor & shared-view styles
    Light (default) & Dark themes via [data-theme]
-   Purple accent, mirrors Sheets' structure
    ============================================================ */
 
 /* ---------- Theme variables ---------- */
@@ -269,7 +268,7 @@ body {
 .fjs-container {
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-    /* Light theme (default) — mirrors the Workdeck palette */
+    /* Light theme (default) */
     --cds-text-primary: var(--text-primary);
     --cds-text-secondary: var(--text-secondary);
     --cds-text-placeholder: var(--text-secondary);
@@ -554,18 +553,6 @@ body {
     .builder-backdrop {
         display: none !important;
     }
-}
-
-/* ============================================================
-   Loading overlay / notification / modals
-   ============================================================ */
-    cursor: pointer;
-    user-select: none;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    transition: background 0.15s ease, color 0.15s ease;
 }
 
 .btn:hover { background: var(--accent-light); }
