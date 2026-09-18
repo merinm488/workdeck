@@ -15,7 +15,7 @@
  *                                 first would pin stale files after a deploy
  */
 
-const VERSION = 'workdeck-v3';
+const VERSION = 'workdeck-v4';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -69,16 +69,23 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/docs/') || url.pathname.startsWith('/sheets/')) return;
 
   // Navigation requests: network first so logins land on the fresh page,
-  // falling back to the cached shell when offline.
+  // falling back to the cached shell when offline. respondWith must NEVER
+  // resolve with undefined (a cache miss resolves to undefined, which the
+  // browser reports as "TypeError: Failed to convert value to 'Response'")
+  // — hence the final 503 fallback.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
           const responseToCache = response.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put('/', responseToCache));
+          event.waitUntil(caches.open(RUNTIME_CACHE).then((cache) => cache.put('/', responseToCache)));
           return response;
         })
-        .catch(() => caches.match('/'))
+        .catch(() =>
+          caches.match(request, { ignoreSearch: true })
+            .then((cached) => cached || caches.match('/'))
+            .then((cached) => cached || new Response('You are offline', { status: 503, statusText: 'Offline' }))
+        )
     );
     return;
   }
@@ -91,10 +98,13 @@ self.addEventListener('fetch', (event) => {
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, responseToCache));
+          event.waitUntil(caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, responseToCache)));
         }
         return networkResponse;
       })
-      .catch(() => caches.match(request))
+      .catch(() =>
+        caches.match(request)
+          .then((cached) => cached || new Response('You are offline', { status: 503, statusText: 'Offline' }))
+      )
   );
 });
