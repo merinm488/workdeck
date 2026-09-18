@@ -122,7 +122,9 @@ async function init() {
 
     $('deckTitle').textContent = editorState.deck.name;
 
-    loadSlide(0);
+    // skipSync: the canvas was JUST created and is empty — syncing it into
+    // slide 0 would wipe the persisted first slide before it's ever loaded
+    loadSlide(0, true);
     buildThumbs();
     zoomToFit();
 
