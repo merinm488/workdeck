@@ -192,24 +192,38 @@
                             <line x1="12" y1="4" x2="12" y2="20"></line>
                         </svg>
                     </button>
-                    <button id="toolRectBtn" class="tool-btn" title="Rectangle (R)" aria-label="Rectangle tool">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="4" y="5" width="16" height="14" rx="2"></rect>
-                        </svg>
-                    </button>
-                    <button id="toolEllipseBtn" class="tool-btn" title="Ellipse (O)" aria-label="Ellipse tool">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <ellipse cx="12" cy="12" rx="8" ry="6.5"></ellipse>
-                        </svg>
-                    </button>
-                    <button id="toolTriangleBtn" class="tool-btn" title="Triangle" aria-label="Triangle tool">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
-                            <path d="M12 4l9 16H3z"></path>
-                        </svg>
-                    </button>
-                    <button id="toolLineBtn" class="tool-btn" title="Line (L)" aria-label="Line tool">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                            <line x1="4" y1="20" x2="20" y2="4"></line>
+                    <!-- Shapes dropdown: picks the insert tool (rect/ellipse/
+                         triangle/line). editor.js mirrors the chosen icon onto
+                         #shapeIconHolder and lights the button while armed. -->
+                    <div class="tool-dropdown-menu">
+                        <button id="toolShapeBtn" class="tool-btn" title="Shapes" aria-label="Shapes">
+                            <span id="shapeIconHolder" class="tool-btn-icon"></span>
+                        </button>
+                        <div id="shapeDropdown" class="tool-dropdown">
+                            <button class="tool-dropdown-item" data-tool="rect" title="Rectangle (R)">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="14" rx="2"></rect></svg>
+                                Rectangle <kbd>R</kbd>
+                            </button>
+                            <button class="tool-dropdown-item" data-tool="ellipse" title="Ellipse (O)">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="8" ry="6.5"></ellipse></svg>
+                                Ellipse <kbd>O</kbd>
+                            </button>
+                            <button class="tool-dropdown-item" data-tool="triangle" title="Triangle">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 4l9 16H3z"></path></svg>
+                                Triangle
+                            </button>
+                            <button class="tool-dropdown-item" data-tool="line" title="Line (L)">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="20" y2="4"></line></svg>
+                                Line <kbd>L</kbd>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Freehand: fabric isDrawingMode + PencilBrush (editor.js
+                         configureFreehandBrush). Strokes become Path objects. -->
+                    <button id="toolDrawBtn" class="tool-btn" title="Draw (P)" aria-label="Freehand draw tool">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                            <path d="m15 5 4 4"></path>
                         </svg>
                     </button>
                     <!-- editor.js: click -> imageFileInput.click(); on change,
@@ -241,24 +255,38 @@
                     </select>
                     <input type="number" id="fontSizeInput" class="tool-input tool-input-num"
                            min="8" max="200" value="24" title="Font size" aria-label="Font size">
+                    <input type="number" id="charSpacingInput" class="tool-input tool-input-spacing"
+                           min="-100" max="800" step="10" value="0" title="Letter spacing" aria-label="Letter spacing">
                     <button id="textBoldBtn" class="tool-btn tool-btn-text" title="Bold (Ctrl+B)" aria-label="Bold"><strong>B</strong></button>
                     <button id="textItalicBtn" class="tool-btn tool-btn-text tool-btn-italic" title="Italic (Ctrl+I)" aria-label="Italic"><em>I</em></button>
                     <button id="textUnderlineBtn" class="tool-btn tool-btn-text tool-btn-underline" title="Underline (Ctrl+U)" aria-label="Underline"><u>U</u></button>
-                    <button id="alignLeftBtn" class="tool-btn" title="Align left" aria-label="Align text left">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                            <line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                    <button id="alignCenterBtn" class="tool-btn" title="Align center" aria-label="Align text center">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                            <line x1="3" y1="6" x2="21" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line>
-                        </svg>
-                    </button>
-                    <button id="alignRightBtn" class="tool-btn" title="Align right" aria-label="Align text right">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                            <line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line>
-                        </svg>
-                    </button>
+                    <button id="textStrikeBtn" class="tool-btn tool-btn-text tool-btn-strike" title="Strikethrough (Ctrl+Shift+S)" aria-label="Strikethrough"><s>S</s></button>
+                    <!-- Alignment dropdown: editor.js applies textAlign to the
+                         selection and mirrors the current value onto
+                         #alignIconHolder -->
+                    <div class="tool-dropdown-menu">
+                        <button id="textAlignBtn" class="tool-btn" title="Text alignment" aria-label="Text alignment">
+                            <span id="alignIconHolder" class="tool-btn-icon"></span>
+                        </button>
+                        <div id="alignDropdown" class="tool-dropdown">
+                            <button class="tool-dropdown-item" data-align="left">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="18" y2="18"></line></svg>
+                                Left
+                            </button>
+                            <button class="tool-dropdown-item" data-align="center">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
+                                Center
+                            </button>
+                            <button class="tool-dropdown-item" data-align="right">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="9" y1="12" x2="21" y2="12"></line><line x1="6" y1="18" x2="21" y2="18"></line></svg>
+                                Right
+                            </button>
+                            <button class="tool-dropdown-item" data-align="justify">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="5" x2="21" y2="5"></line><line x1="3" y1="9.7" x2="21" y2="9.7"></line><line x1="3" y1="14.3" x2="21" y2="14.3"></line><line x1="3" y1="19" x2="21" y2="19"></line></svg>
+                                Justify
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <span class="toolbar-sep"></span>
@@ -273,32 +301,101 @@
                     </label>
                     <input type="number" id="strokeWidthInput" class="tool-input tool-input-num"
                            min="0" max="40" value="0" title="Border width" aria-label="Border width">
+                    <input type="range" id="opacityInput" class="tool-range"
+                           min="0" max="100" step="1" value="100" title="Opacity" aria-label="Opacity">
                 </div>
 
                 <span class="toolbar-sep"></span>
 
-                <!-- Arrange: z-order, grouping, duplicate, delete -->
+                <!-- Image filters (enabled when an image is selected).
+                     fabric.filters.* applied via img.applyFilters() in editor.js -->
+                <div class="tool-group filters-menu">
+                    <button id="filtersBtn" class="tool-btn" title="Image filters" aria-label="Image filters">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <line x1="21" y1="6" x2="15" y2="6"></line><line x1="9" y1="6" x2="3" y2="6"></line><circle cx="12" cy="6" r="2"></circle>
+                            <line x1="21" y1="12" x2="11" y2="12"></line><line x1="7" y1="12" x2="3" y2="12"></line><circle cx="9" cy="12" r="2"></circle>
+                            <line x1="21" y1="18" x2="17" y2="18"></line><line x1="13" y1="18" x2="3" y2="18"></line><circle cx="15" cy="18" r="2"></circle>
+                        </svg>
+                    </button>
+                    <div id="filtersDropdown" class="filters-dropdown">
+                        <button class="filters-dropdown-item" data-filter="Grayscale">Grayscale</button>
+                        <button class="filters-dropdown-item" data-filter="Sepia">Sepia</button>
+                        <button class="filters-dropdown-item" data-filter="Invert">Invert</button>
+                        <button class="filters-dropdown-item" data-filter="Blur">Blur</button>
+                        <button class="filters-dropdown-item" data-filter="Pixelate">Pixelate</button>
+                        <div class="filters-dropdown-divider"></div>
+                        <button id="clearFiltersBtn" class="filters-dropdown-item filters-dropdown-danger">Remove all</button>
+                    </div>
+                </div>
+
+                <span class="toolbar-sep"></span>
+
+                <!-- Arrange: dropdown (transform, z-order, grouping — keeps the
+                     original element ids, editor.js binds them by id) +
+                     duplicate/delete as flat buttons. The whole group disables
+                     with no selection via deleteBtn.closest('.tool-group'). -->
                 <div class="tool-group">
-                    <button id="bringForwardBtn" class="tool-btn" title="Bring forward" aria-label="Bring forward">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M4 16V6a2 2 0 0 1 2-2h10"></path>
-                        </svg>
-                    </button>
-                    <button id="sendBackwardBtn" class="tool-btn" title="Send backward" aria-label="Send backward">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="4" y="4" width="12" height="12" rx="2"></rect><path d="M20 8v10a2 2 0 0 1-2 2H8"></path>
-                        </svg>
-                    </button>
-                    <button id="groupBtn" class="tool-btn" title="Group (Ctrl+G)" aria-label="Group objects">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><path d="M10 6.5h7.5V14M14 17.5H6.5V10"></path>
-                        </svg>
-                    </button>
-                    <button id="ungroupBtn" class="tool-btn" title="Ungroup (Ctrl+Shift+G)" aria-label="Ungroup objects">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="7" height="7" rx="1" stroke-dasharray="2 2"></rect><rect x="14" y="14" width="7" height="7" rx="1" stroke-dasharray="2 2"></rect><path d="M10 6.5h4M6.5 10v4M14 17.5h-4M17.5 14v-4"></path>
-                        </svg>
-                    </button>
+                    <div class="tool-dropdown-menu">
+                        <button id="arrangeBtn" class="tool-btn" title="Arrange" aria-label="Arrange objects">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M8 20V7M8 7 5 10M8 7l3 3"></path>
+                                <path d="m16 4v13m0 0 3-3m-3 3-3-3"></path>
+                            </svg>
+                        </button>
+                        <div id="arrangeDropdown" class="tool-dropdown">
+                            <button id="bringForwardBtn" class="tool-dropdown-item">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M4 16V6a2 2 0 0 1 2-2h10"></path>
+                                </svg>
+                                Bring forward
+                            </button>
+                            <button id="sendBackwardBtn" class="tool-dropdown-item">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="4" y="4" width="12" height="12" rx="2"></rect><path d="M20 8v10a2 2 0 0 1-2 2H8"></path>
+                                </svg>
+                                Send backward
+                            </button>
+                            <div class="tool-dropdown-divider"></div>
+                            <button id="flipXBtn" class="tool-dropdown-item">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 3v18"></path><path d="M8 7 3 12l5 5V7Z"></path><path d="m16 7 5 5-5 5V7Z"></path>
+                                </svg>
+                                Flip horizontal
+                            </button>
+                            <button id="flipYBtn" class="tool-dropdown-item">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12h18"></path><path d="M7 8l5-5 5 5H7Z"></path><path d="M7 16h10l-5 5-5-5Z"></path>
+                                </svg>
+                                Flip vertical
+                            </button>
+                            <div class="tool-dropdown-divider"></div>
+                            <button id="centerHBtn" class="tool-dropdown-item">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                    <path d="M12 2v20"></path><rect x="7" y="8" width="10" height="8" rx="1"></rect>
+                                </svg>
+                                Center on slide (horizontal)
+                            </button>
+                            <button id="centerVBtn" class="tool-dropdown-item">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                    <path d="M2 12h20"></path><rect x="8" y="7" width="8" height="10" rx="1"></rect>
+                                </svg>
+                                Center on slide (vertical)
+                            </button>
+                            <div class="tool-dropdown-divider"></div>
+                            <button id="groupBtn" class="tool-dropdown-item">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><path d="M10 6.5h7.5V14M14 17.5H6.5V10"></path>
+                                </svg>
+                                Group <kbd>Ctrl+G</kbd>
+                            </button>
+                            <button id="ungroupBtn" class="tool-dropdown-item">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="7" height="7" rx="1" stroke-dasharray="2 2"></rect><rect x="14" y="14" width="7" height="7" rx="1" stroke-dasharray="2 2"></rect><path d="M10 6.5h4M6.5 10v4M14 17.5h-4M17.5 14v-4"></path>
+                                </svg>
+                                Ungroup <kbd>Ctrl+Shift+G</kbd>
+                            </button>
+                        </div>
+                    </div>
                     <button id="duplicateBtn" class="tool-btn" title="Duplicate (Ctrl+D)" aria-label="Duplicate">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
                             <rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>

@@ -31,12 +31,17 @@
  *            #themeSubmenu #viewKeyBtn #shareBtn #deleteAccountBtn #logoutBtn
  *            .theme-option[data-theme]
  *   panel    #addSlideBtn #slideThumbs
- *   toolbar  #toolSelectBtn #toolTextBtn #toolRectBtn #toolEllipseBtn
- *            #toolTriangleBtn #toolLineBtn #imageBtn #imageFileInput
- *            #fontFamilySelect #fontSizeInput #textBoldBtn #textItalicBtn
- *            #textUnderlineBtn #alignLeftBtn #alignCenterBtn #alignRightBtn
- *            #fillColorInput #strokeColorInput #strokeWidthInput
- *            #bringForwardBtn #sendBackwardBtn #groupBtn #ungroupBtn
+ *   toolbar  #toolSelectBtn #toolTextBtn #toolDrawBtn #imageBtn #imageFileInput
+ *            #toolShapeBtn #shapeIconHolder #shapeDropdown (items data-tool:
+ *            rect/ellipse/triangle/line)
+ *            #fontFamilySelect #fontSizeInput #charSpacingInput #textBoldBtn
+ *            #textItalicBtn #textUnderlineBtn #textStrikeBtn
+ *            #textAlignBtn #alignIconHolder #alignDropdown (items data-align)
+ *            #fillColorInput #strokeColorInput #strokeWidthInput #opacityInput
+ *            #filtersBtn #filtersDropdown #clearFiltersBtn
+ *            #arrangeBtn #arrangeDropdown — holds the arrange items under
+ *            their original ids (#bringForwardBtn #sendBackwardBtn #flipXBtn
+ *            #flipYBtn #centerHBtn #centerVBtn #groupBtn #ungroupBtn)
  *            #duplicateBtn #deleteBtn #zoomOutBtn #zoomValue #zoomInBtn
  *            #zoomFitBtn
  *   stage    #slideSurface #slideCanvas
@@ -64,7 +69,7 @@ const editorState = {
     deckId: null,           // from ?id= (the inline auth check guarantees it)
     currentSlideIndex: 0,
     canvas: null,           // the fabric.Canvas instance
-    activeTool: 'select',   // 'select' | 'text' | 'rect' | 'ellipse' | 'triangle' | 'line'
+    activeTool: 'select',   // 'select' | 'text' | 'rect' | 'ellipse' | 'triangle' | 'line' | 'draw'
     zoom: 1,
     isDirty: false,
     isSaving: false,
@@ -160,7 +165,8 @@ function initCanvas() {
     editorState.canvas.on('selection:cleared', syncToolbarFromSelection);
 
     editorState.canvas.on('mouse:down', (opt) => {
-        if (editorState.activeTool !== 'select') {
+        // 'draw' is handled by isDrawingMode/PencilBrush, not insert-at-pointer
+        if (editorState.activeTool !== 'select' && editorState.activeTool !== 'draw') {
             insertObjectAtPointer(opt);
         }
     });
@@ -371,6 +377,13 @@ function toggleUnderline() {
     applyToSelection('underline', !isUnderlined);
 }
 
+function toggleStrikethrough() {
+    const obj = editorState.canvas.getActiveObjects()[0];
+    if (!obj) return;
+
+    applyToSelection('linethrough', !obj.linethrough);
+}
+
 function bindTextControls() {
     $('fontFamilySelect').addEventListener('change', () => {
         applyToSelection('fontFamily', $('fontFamilySelect').value);
@@ -383,10 +396,13 @@ function bindTextControls() {
     $('textBoldBtn').addEventListener('click', toggleBold);
     $('textItalicBtn').addEventListener('click', toggleItalic);
     $('textUnderlineBtn').addEventListener('click', toggleUnderline);
+    $('textStrikeBtn').addEventListener('click', toggleStrikethrough);
 
-    $('alignLeftBtn').addEventListener('click', () => applyToSelection('textAlign', 'left'));
-    $('alignCenterBtn').addEventListener('click', () => applyToSelection('textAlign', 'center'));
-    $('alignRightBtn').addEventListener('click', () => applyToSelection('textAlign', 'right'));
+    // text alignment lives in the Align dropdown (bindAlignDropdown)
+
+    $('charSpacingInput').addEventListener('change', () => {
+        applyToSelection('charSpacing', Number($('charSpacingInput').value));
+    });
 }
 
 function bindStyleControls() {
@@ -396,22 +412,43 @@ function bindStyleControls() {
 
     $('strokeColorInput').addEventListener('input', () => {
         applyToSelection('stroke', $('strokeColorInput').value);
+        // the pencil brush draws with the border color too
+        if (editorState.canvas.isDrawingMode) {
+            editorState.canvas.freeDrawingBrush.color = $('strokeColorInput').value;
+        }
     });
 
     $('strokeWidthInput').addEventListener('change', () => {
         applyToSelection('strokeWidth', Number($('strokeWidthInput').value));
+        if (editorState.canvas.isDrawingMode) {
+            editorState.canvas.freeDrawingBrush.width =
+                Math.max(1, Number($('strokeWidthInput').value) || 2);
+        }
+    });
+
+    $('opacityInput').addEventListener('input', () => {
+        applyToSelection('opacity', Number($('opacityInput').value) / 100);
     });
 }
 
 function bindToolbar() {
     bindToolModeButtons();
+    bindShapeDropdown();
     bindImageInsert();
     bindTextControls();
+    bindAlignDropdown();
     bindStyleControls();
     bindArrangeControls();
+    bindTransformControls();
     bindGroupControls();
     bindEditButtons();
+    bindFiltersMenu();
     bindZoomControls();
+
+    // the menus are viewport-anchored (fixed), so a toolbar scroll or window
+    // resize would leave them stranded — just close them
+    document.querySelector('.toolbar').addEventListener('scroll', () => closeAllToolbarDropdowns());
+    window.addEventListener('resize', () => closeAllToolbarDropdowns());
 }
 
 function bindToolModeButtons() {
@@ -429,21 +466,130 @@ function bindToolModeButtons() {
 const TOOL_BUTTON_IDS = {
     select: 'toolSelectBtn',
     text: 'toolTextBtn',
-    rect: 'toolRectBtn',
-    ellipse: 'toolEllipseBtn',
-    triangle: 'toolTriangleBtn',
-    line: 'toolLineBtn'
-  };
+    draw: 'toolDrawBtn'
+};
 
-  function setActiveTool(tool) {
+// insert tools that live inside the Shapes dropdown
+const SHAPE_TOOLS = ['rect', 'ellipse', 'triangle', 'line'];
+
+function setActiveTool(tool) {
     editorState.activeTool = tool;
 
     Object.keys(TOOL_BUTTON_IDS).forEach((name) => {
         $(TOOL_BUTTON_IDS[name]).classList.toggle('active', name === tool);
     });
 
+    // the Shapes button stands in for the rect/ellipse/triangle/line tools —
+    // mirror the armed shape's icon and light the button while it's active
+    const isShape = SHAPE_TOOLS.includes(tool);
+    $('toolShapeBtn').classList.toggle('active', isShape);
+    if (isShape) {
+        setShapeIcon(tool);
+    }
+
+    // 'draw' hands the pointer to fabric's freehand engine; every other
+    // tool runs with isDrawingMode off
+    const isDraw = tool === 'draw';
+    editorState.canvas.isDrawingMode = isDraw;
+    if (isDraw) {
+        configureFreehandBrush();
+    }
+
     editorState.canvas.defaultCursor = tool === 'select' ? 'default' : 'crosshair';
-  }
+}
+
+/**
+ * Build the freehand brush from the current border color/width inputs.
+ * Called on entering draw mode and when those inputs change mid-mode.
+ */
+function configureFreehandBrush() {
+    const brush = new fabric.PencilBrush(editorState.canvas);
+    brush.color = $('strokeColorInput').value;
+    brush.width = Math.max(1, Number($('strokeWidthInput').value) || 2);
+    brush.decimate = 2;
+    editorState.canvas.freeDrawingBrush = brush;
+}
+
+// ================================================
+// Toolbar dropdowns (Shapes, Alignment)
+// ================================================
+
+/** Copy a dropdown item's svg onto a dropdown button's icon holder. */
+function mirrorDropdownIcon(dropdownId, selector, holderId) {
+    const item = document.querySelector(`#${dropdownId} ${selector}`);
+    if (item && item.querySelector('svg')) {
+        $(holderId).innerHTML = item.querySelector('svg').outerHTML;
+    }
+}
+
+function setShapeIcon(tool) {
+    mirrorDropdownIcon('shapeDropdown', `[data-tool="${tool}"]`, 'shapeIconHolder');
+}
+
+function setAlignIcon(align) {
+    mirrorDropdownIcon('alignDropdown', `[data-align="${align}"]`, 'alignIconHolder');
+}
+
+/** Anchor a toolbar dropdown below its trigger. The menus are position:fixed
+ * because the toolbar's overflow-x scroll would clip absolute children. */
+function positionToolbarDropdown(button, dropdown) {
+    const r = button.getBoundingClientRect();
+    dropdown.style.top = `${r.bottom + 6}px`;
+    dropdown.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - dropdown.offsetWidth - 8))}px`;
+}
+
+/** Toggle one toolbar dropdown; outside clicks close everything. */
+function bindDropdownToggle(buttonId, dropdownId) {
+    const button = $(buttonId);
+    const dropdown = $(dropdownId);
+    button.addEventListener('click', () => {
+        closeAllToolbarDropdowns(dropdownId);
+        if (dropdown.classList.toggle('open')) {
+            positionToolbarDropdown(button, dropdown);
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.tool-dropdown-menu')) {
+            $(dropdownId).classList.remove('open');
+        }
+    });
+}
+
+function closeAllToolbarDropdowns(exceptId) {
+    document.querySelectorAll('.tool-dropdown.open, #filtersDropdown.open').forEach((menu) => {
+        if (menu.id !== exceptId) {
+            menu.classList.remove('open');
+        }
+    });
+}
+
+function bindShapeDropdown() {
+    bindDropdownToggle('toolShapeBtn', 'shapeDropdown');
+
+    document.querySelectorAll('#shapeDropdown [data-tool]').forEach((item) => {
+        item.addEventListener('click', () => {
+            setActiveTool(item.dataset.tool);
+            closeAllToolbarDropdowns();
+        });
+    });
+
+    setShapeIcon('rect');   // default face for the Shapes button
+}
+
+function bindAlignDropdown() {
+    bindDropdownToggle('textAlignBtn', 'alignDropdown');
+
+    document.querySelectorAll('#alignDropdown [data-align]').forEach((item) => {
+        item.addEventListener('click', () => {
+            applyToSelection('textAlign', item.dataset.align);
+            setAlignIcon(item.dataset.align);
+            closeAllToolbarDropdowns();
+        });
+    });
+
+    setAlignIcon('left');
+}
 
 function insertObjectAtPointer(opt) {
    const p = opt.scenePoint;
@@ -538,6 +684,7 @@ function syncToolbarFromSelection() {
 
     setToolGroupDisabled($('fontFamilySelect').closest('.tool-group'), !hasSelection);
     setToolGroupDisabled($('deleteBtn').closest('.tool-group'), !hasSelection);
+    syncFiltersMenu();
 
     if (!hasSelection) return;
 
@@ -546,15 +693,19 @@ function syncToolbarFromSelection() {
     if (obj.isType('textbox')) {
         $('fontFamilySelect').value = obj.fontFamily;
         $('fontSizeInput').value = obj.fontSize;
+        $('charSpacingInput').value = obj.charSpacing || 0;
+        setAlignIcon(obj.textAlign || 'left');
 
         $('textBoldBtn').classList.toggle('active', obj.fontWeight === 700 || obj.fontWeight === '700');
         $('textItalicBtn').classList.toggle('active', obj.fontStyle === 'italic');
         $('textUnderlineBtn').classList.toggle('active', obj.underline === true);
+        $('textStrikeBtn').classList.toggle('active', obj.linethrough === true);
     }
 
     $('fillColorInput').value = toHexOrNull(obj.fill) || '#1a1a1a';
     $('strokeColorInput').value = toHexOrNull(obj.stroke) || '#000000';
     $('strokeWidthInput').value = obj.strokeWidth || 0;
+    $('opacityInput').value = Math.round((obj.opacity ?? 1) * 100);
 }
 
 /**
@@ -573,6 +724,9 @@ function applyToSelection(prop, value) {
 }
 
 function bindArrangeControls() {
+    // the Arrange dropdown button itself (items below keep their own bindings)
+    bindDropdownToggle('arrangeBtn', 'arrangeDropdown');
+
     $('bringForwardBtn').addEventListener('click', () => {
         const obj = editorState.canvas.getActiveObject();
         if (!obj) return;
@@ -592,6 +746,51 @@ function bindArrangeControls() {
         renderThumb(editorState.currentSlideIndex);
         markDirty();
     });
+}
+
+
+/**
+ * Flip every active object along an axis. Per-object toggle (not a fixed
+ * value) so mixed selections stay correct.
+ */
+function flipSelection(prop) {
+    const activeObjects = editorState.canvas.getActiveObjects();
+    if (activeObjects.length === 0) return;
+
+    activeObjects.forEach((obj) => obj.set(prop, !obj[prop]));
+
+    editorState.canvas.requestRenderAll();
+    syncCurrentSlideFromCanvas();
+    renderThumb(editorState.currentSlideIndex);
+    markDirty();
+}
+
+/**
+ * Center the active object (single or multi-select) on the slide.
+ * axis: 'h' | 'v'
+ */
+function centerSelection(axis) {
+    const obj = editorState.canvas.getActiveObject();
+    if (!obj) return;
+
+    if (axis === 'h') {
+        editorState.canvas.centerObjectH(obj);
+    } else {
+        editorState.canvas.centerObjectV(obj);
+    }
+    obj.setCoords();
+
+    editorState.canvas.requestRenderAll();
+    syncCurrentSlideFromCanvas();
+    renderThumb(editorState.currentSlideIndex);
+    markDirty();
+}
+
+function bindTransformControls() {
+    $('flipXBtn').addEventListener('click', () => flipSelection('flipX'));
+    $('flipYBtn').addEventListener('click', () => flipSelection('flipY'));
+    $('centerHBtn').addEventListener('click', () => centerSelection('h'));
+    $('centerVBtn').addEventListener('click', () => centerSelection('v'));
 }
 
 
@@ -664,6 +863,112 @@ function deleteSelection() {
 function bindEditButtons() {
     $('duplicateBtn').addEventListener('click', duplicateSelection);
     $('deleteBtn').addEventListener('click', deleteSelection);
+}
+
+// ================================================
+// Image filters (fabric.filters — applies to images only)
+// ================================================
+
+/**
+ * One-tap filters for the selected image(s). Blur/Pixelate get explicit
+ * strengths — their raw defaults (blur 0 / 1px blocks) would be invisible.
+ */
+const FILTER_FACTORIES = {
+    Grayscale: () => new fabric.filters.Grayscale(),
+    Sepia: () => new fabric.filters.Sepia(),
+    Invert: () => new fabric.filters.Invert(),
+    Blur: () => new fabric.filters.Blur({ blur: 0.15 }),
+    Pixelate: () => new fabric.filters.Pixelate({ blocksize: 6 })
+};
+
+function getSelectedImages() {
+    return editorState.canvas.getActiveObjects().filter((obj) => obj.isType('image'));
+}
+
+/**
+ * applyFilters() fires NO canvas event, so this does the sync/undo/thumb
+ * bookkeeping that object:modified would normally do.
+ */
+function afterFilterChange() {
+    editorState.canvas.requestRenderAll();
+    syncCurrentSlideFromCanvas();
+    recordUndoSnapshot();
+    renderThumb(editorState.currentSlideIndex);
+    markDirty();
+}
+
+/** Toggle one filter on every selected image, then refresh the menu checks. */
+function toggleFilter(name) {
+    const images = getSelectedImages();
+    if (images.length === 0) return;
+
+    images.forEach((img) => {
+        const existing = img.filters.find((f) => f.type === name);
+        if (existing) {
+            img.filters = img.filters.filter((f) => f !== existing);
+        } else {
+            img.filters.push(FILTER_FACTORIES[name]());
+        }
+        img.applyFilters();
+    });
+
+    afterFilterChange();
+    syncFiltersMenu();
+}
+
+function clearFilters() {
+    const images = getSelectedImages();
+    if (images.length === 0) return;
+
+    images.forEach((img) => {
+        img.filters = [];
+        img.applyFilters();
+    });
+
+    afterFilterChange();
+    syncFiltersMenu();
+}
+
+/**
+ * Reflect the selection in the toolbar: enable/disable the whole group and
+ * mark which filters are active. The menu stays open on filter clicks so
+ * filters can be stacked.
+ */
+function syncFiltersMenu() {
+    const images = getSelectedImages();
+    setToolGroupDisabled($('filtersBtn').closest('.tool-group'), images.length === 0);
+
+    if (images.length === 0) {
+        $('filtersDropdown').classList.remove('open');
+        return;
+    }
+
+    document.querySelectorAll('#filtersDropdown [data-filter]').forEach((item) => {
+        const on = images.some((img) => img.filters.some((f) => f.type === item.dataset.filter));
+        item.classList.toggle('active', on);
+    });
+}
+
+function bindFiltersMenu() {
+    $('filtersBtn').addEventListener('click', () => {
+        closeAllToolbarDropdowns('filtersDropdown');
+        if ($('filtersDropdown').classList.toggle('open')) {
+            positionToolbarDropdown($('filtersBtn'), $('filtersDropdown'));
+        }
+    });
+
+    document.querySelectorAll('#filtersDropdown [data-filter]').forEach((item) => {
+        item.addEventListener('click', () => toggleFilter(item.dataset.filter));
+    });
+
+    $('clearFiltersBtn').addEventListener('click', clearFilters);
+
+    // close the menu when clicking anywhere else (same pattern as the export menu)
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.filters-menu')) {
+            $('filtersDropdown').classList.remove('open');
+        }
+    });
 }
 
 // ================================================
@@ -833,7 +1138,7 @@ function bindKeyboard() {
             redo();
         } else if (mod && key === 's') {
             e.preventDefault();
-            saveDeck();
+            if (e.shiftKey) { toggleStrikethrough(); } else { saveDeck(); }
         } else if (mod && key === 'g') {
             e.preventDefault();
             if (e.shiftKey) { ungroupSelection(); } else { groupSelection(); }
@@ -848,8 +1153,8 @@ function bindKeyboard() {
             toggleUnderline();
         } else if (!mod && e.key.startsWith('Arrow')) {
             nudgeSelection(e);
-        } else if (!mod && 'vtrol'.includes(key)) {
-            const toolFor = { v: 'select', t: 'text', r: 'rect', o: 'ellipse', l: 'line' };
+        } else if (!mod && 'vtrolp'.includes(key)) {
+            const toolFor = { v: 'select', t: 'text', r: 'rect', o: 'ellipse', l: 'line', p: 'draw' };
             setActiveTool(toolFor[key]);
         } else if (key === 'escape') {
             editorState.canvas.discardActiveObject();

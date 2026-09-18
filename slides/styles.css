@@ -593,6 +593,155 @@ body {
     cursor: pointer;
 }
 
+.tool-btn-strike s {
+    text-decoration: line-through;
+}
+
+.tool-input-spacing {
+    width: 64px;
+}
+
+/* Opacity slider (appearance group) */
+.tool-range {
+    width: 72px;
+    accent-color: var(--accent-color);
+    cursor: pointer;
+}
+
+/* ---------- Filters dropdown (mirrors .export-menu) ---------- */
+
+.filters-menu {
+    position: relative;
+}
+
+/* Fixed, not absolute: the toolbar scrolls (overflow-x: auto), which clips
+   overflowing descendants — JS anchors these to the trigger's viewport rect. */
+.filters-dropdown {
+    display: none;
+    position: fixed;
+    min-width: 160px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 8px 24px var(--shadow-color);
+    padding: 6px;
+    z-index: 60;
+}
+
+.filters-dropdown.open {
+    display: block;
+}
+
+.filters-dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.filters-dropdown-item:hover {
+    background: var(--accent-light);
+    color: var(--accent-color);
+}
+
+.filters-dropdown-item.active {
+    background: var(--accent-light);
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.filters-dropdown-item.active::after {
+    content: '\2713';
+}
+
+.filters-dropdown-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 6px 4px;
+}
+
+.filters-dropdown-danger:hover {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+/* ---------- Toolbar dropdowns (Shapes, Alignment, Arrange) ----------
+   Same visual pattern as .filters-dropdown; button faces mirror their
+   active item's icon via editor.js mirrorDropdownIcon(). */
+
+.tool-dropdown-menu {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.tool-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tool-dropdown {
+    display: none;
+    position: fixed;   /* same as .filters-dropdown — see comment above */
+    min-width: 190px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 8px 24px var(--shadow-color);
+    padding: 6px;
+    z-index: 60;
+}
+
+.tool-dropdown.open {
+    display: block;
+}
+
+.tool-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.tool-dropdown-item svg {
+    flex-shrink: 0;
+}
+
+.tool-dropdown-item:hover {
+    background: var(--accent-light);
+    color: var(--accent-color);
+}
+
+.tool-dropdown-item kbd {
+    margin-left: auto;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.tool-dropdown-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 6px 4px;
+}
+
 .zoom-value {
     font-size: 12px;
     color: var(--text-secondary);
