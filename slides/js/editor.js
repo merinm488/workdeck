@@ -11,7 +11,7 @@
  *
  *   canvas  ->  slide        (save)   syncCurrentSlideFromCanvas():
  *                                       slide.objects   = canvas.toObject().objects
- *                                       slide.background = canvas.background
+ *                                       slide.background = canvas.backgroundColor
  *   slide   ->  canvas       (load)   loadSlide(index):
  *                                       canvas.loadFromJSON({ objects: [...] })
  *                                       canvas.backgroundColor = slide.background
@@ -51,7 +51,9 @@
  *            #keyCopyFeedback #keyModalClose #keyModalCloseBtn
  *            #deleteAccountModal #deleteAccountModalClose #cancelDeleteAccount
  *            #confirmDeleteAccount #renameModal #renameModalClose #renameInput
- *            #renameCancelBtn #renameConfirmBtn #shareModal #shareModalClose
+ *            #renameCancelBtn #renameConfirmBtn #renamePromptModal
+ *            #renamePromptClose #renamePromptInput #renamePromptLater
+ *            #renamePromptConfirm #shareModal #shareModalClose
  *            #shareDeckName #shareUrlInput #copyShareUrlBtn #copyButtonText
  *            #shareModalCloseBtn
  *
@@ -73,6 +75,7 @@ const editorState = {
     zoom: 1,
     isDirty: false,
     isSaving: false,
+    renamePromptDismissed: false,  // rename reminder shows at most once per session (either button)
     undoStack: [],          // JSON strings of the CURRENT slide's objects
     redoStack: [],
     isRestoring: false,     // true while undo/redo reloads the canvas (don't re-record)
@@ -124,6 +127,7 @@ async function init() {
     zoomToFit();
 
     bindToolbar();
+    bindSlidePanel();
     bindTopNav();
     bindModals();
     bindKeyboard();
@@ -144,7 +148,9 @@ function initCanvas() {
     editorState.canvas = new fabric.Canvas('slideCanvas', {
         width: APP_CONFIG.slide.width,       // logical size; CSS zoom is separate
         height: APP_CONFIG.slide.height,
-        background: '#ffffff',               // v6 renamed backgroundColor -> background
+        backgroundColor: '#ffffff',          // live property is still backgroundColor in
+                                             // fabric v6 — 'background' is only the
+                                             // serialized-JSON key (loadFromJSON/toObject)
         selection: true,                     // rubber-band multi-select
         preserveObjectStacking: true         // keep z-order on select
       });
@@ -191,7 +197,7 @@ function loadSlide(index, skipSync = false) {
     editorState.isRestoring = true;
 
     return editorState.canvas.loadFromJSON({ objects: slide.objects || [] }).then(() => {
-        editorState.canvas.background = slide.background;
+        editorState.canvas.backgroundColor = slide.background || APP_CONFIG.slide.defaultBackground;
         editorState.canvas.discardActiveObject();
         editorState.canvas.requestRenderAll();
         editorState.isRestoring = false;
@@ -208,12 +214,17 @@ function syncCurrentSlideFromCanvas() {
     if(!slide) return;
 
     slide.objects = editorState.canvas.toObject().objects;
-    slide.background = editorState.canvas.background;
+    slide.background = editorState.canvas.backgroundColor || APP_CONFIG.slide.defaultBackground;
 }
 
 // ================================================
 // Slide management (sorter panel)
 // ================================================
+
+/** #addSlideBtn -> addSlide() (panel header plus button). */
+function bindSlidePanel() {
+    $('addSlideBtn').addEventListener('click', addSlide);
+}
 
 /**
  * Push a blank slide after the current one and switch to it
@@ -328,7 +339,7 @@ function renderThumb(index) {
     }
     const thumbCanvas = editorState.thumbCanvas;
     thumbCanvas.loadFromJSON({objects: slide.objects || []}).then(() => {
-        thumbCanvas.background = slide.background;
+        thumbCanvas.backgroundColor = slide.background || APP_CONFIG.slide.defaultBackground;
         thumbCanvas.renderAll();
 
         const dataUrl = thumbCanvas.toDataURL({ format: 'png', multiplier: 0.2 });
@@ -1178,10 +1189,26 @@ function markDirty() {
 }
 
 /**
- * The save path (Ctrl+S, autosave, and beforeunload best-effort)
+ * The save path (Ctrl+S, autosave, and beforeunload best-effort).
+ * Explicit saves (save button, Ctrl+S) of a still-untitled deck first
+ * raise the rename reminder (closeRenamePrompt continues the save);
+ * autosave and best-effort callers pass { explicit: false }.
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.explicit=true] - false for auto-save paths
+ * @returns {Promise<boolean>} whether a save actually completed
  */
-async function saveDeck() {
-    if (editorState.isSaving || !editorState.isDirty) return;
+async function saveDeck(options = {}) {
+    const { explicit = true } = options;
+
+    // Rename reminder: only on user-initiated saves, only while the
+    // name is still the default, and only until dismissed once.
+    if (explicit && !editorState.renamePromptDismissed && isUntitledDeck()) {
+        openRenamePrompt();
+        return false;
+    }
+
+    if (editorState.isSaving || !editorState.isDirty) return false;
 
     editorState.isSaving = true;
     $('saveState').textContent = 'Saving…';
@@ -1205,12 +1232,24 @@ async function saveDeck() {
     }
 
     editorState.isSaving = false;
+    return ok;
+}
+
+/**
+ * True while the deck still carries a default name. Covers the variants
+ * in circulation: the Workdeck API seeds 'Untitled'; the editor's rename
+ * fallback uses 'Untitled deck'.
+ * @returns {boolean} True if the name is empty or a default untitled name
+ */
+function isUntitledDeck() {
+    const currentName = ((editorState.deck && editorState.deck.name) || '').trim().toLowerCase();
+    return !currentName || currentName === 'untitled' || currentName === 'untitled deck';
 }
 
 function startAutoSave() {
     editorState.autoSaveTimer = setInterval(() => {
         if (editorState.isDirty) {
-            saveDeck();
+            saveDeck({ explicit: false });
         }
     }, APP_CONFIG.autoSave.interval);
 }
@@ -1270,7 +1309,7 @@ function renderPresentSlide() {
     presentCanvas.setZoom(scale);
 
     presentCanvas.loadFromJSON({ objects: slide.objects || [] }).then(() => {
-        presentCanvas.background = slide.background;
+        presentCanvas.backgroundColor = slide.background || APP_CONFIG.slide.defaultBackground;
         presentCanvas.renderAll();
     });
 
@@ -1353,7 +1392,7 @@ async function renderSlideToPng(slide, multiplier) {
     });
 
     await offscreen.loadFromJSON({ objects: slide.objects || [] });
-    offscreen.background = slide.background;
+    offscreen.backgroundColor = slide.background || APP_CONFIG.slide.defaultBackground;
     offscreen.renderAll();
 
     const dataUrl = offscreen.toDataURL({ format: 'png', multiplier });
@@ -1436,7 +1475,7 @@ async function exportPptx() {
     for (const slide of editorState.deck.slides) {
         const objects = slide.objects || [];
         const pptxSlide = pptx.addSlide();
-        pptxSlide.background = { color: hexNoHash(slide.background) };
+        pptxSlide.background = { color: hexNoHash(slide.background || APP_CONFIG.slide.defaultBackground) };
 
         if (!objects.every((obj) => DIRECT_TYPES.includes(obj.type))) {
             const dataUrl = await renderSlideToPng(slide, 2);
@@ -1493,11 +1532,11 @@ async function exportPptx() {
 
 function bindTopNav() {
     $('homeBtn').addEventListener('click', () => {
-        saveDeck();            // best-effort; the beforeunload guard covers the rest
+        saveDeck({ explicit: false });   // best-effort; the reminder must not block navigation
         goToWorkdeck();
     });
 
-    $('saveBtn').addEventListener('click', saveDeck);
+    $('saveBtn').addEventListener('click', () => saveDeck());
     $('deckTitle').addEventListener('click', openRenameModal);
 
     bindExportMenu();
@@ -1522,6 +1561,87 @@ function openRenameModal() {
     openModal($('renameModal'));
     $('renameInput').focus();
     $('renameInput').select();
+}
+
+
+// ================================================
+// Rename reminder (untitled explicit saves)
+// Mirrors Forms/Sheets: before the first real save of a deck still on
+// its default name, ask for one. Rename applies it and continues the
+// interrupted save; Later saves as-is and stops nagging for this
+// session. Auto-save paths never see the modal.
+// ================================================
+
+/** Wire up rename reminder modal event handlers. */
+function setupRenamePrompt() {
+    const modal = $('renamePromptModal');
+    const input = $('renamePromptInput');
+
+    $('renamePromptConfirm').addEventListener('click', () => closeRenamePrompt(true));
+    $('renamePromptLater').addEventListener('click', () => closeRenamePrompt(false));
+    // the X and the backdrop count as "Later" — the save must still go through
+    $('renamePromptClose').addEventListener('click', () => closeRenamePrompt(false));
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeRenamePrompt(false);
+        }
+    });
+
+    // Enter = Rename, Escape = Later
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            closeRenamePrompt(true);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeRenamePrompt(false);
+        }
+    });
+}
+
+/** Open the rename reminder modal. */
+function openRenamePrompt() {
+    const modal = $('renamePromptModal');
+    if (!modal) {
+        // modal missing (e.g. stale markup) — never block saving
+        editorState.renamePromptDismissed = true;
+        return;
+    }
+
+    const input = $('renamePromptInput');
+    input.value = '';
+    openModal(modal);
+    setTimeout(() => input.focus(), 100);
+}
+
+/**
+ * Close the rename reminder modal and continue the interrupted save.
+ * @param {boolean} renamed - true if the user chose Rename with a name
+ */
+function closeRenamePrompt(renamed) {
+    closeModal($('renamePromptModal'));
+
+    // don't nag again for this deck after either choice
+    editorState.renamePromptDismissed = true;
+
+    const newName = $('renamePromptInput').value.trim();
+
+    const proceed = () => {
+        if (renamed && newName) {
+            // apply the name, then continue the interrupted save
+            editorState.deck.name = newName;
+            $('deckTitle').textContent = newName;
+            markDirty();
+        }
+        saveDeck({ explicit: false });
+    };
+
+    if (renamed && newName) {
+        // input still visible for a frame — close first, then act
+        setTimeout(proceed, 50);
+    } else {
+        proceed();
+    }
 }
 
 
@@ -1555,7 +1675,7 @@ function bindSettingsMenu() {
     });
 
     $('logoutBtn').addEventListener('click', () => {
-        saveDeck();            // best-effort
+        saveDeck({ explicit: false });   // best-effort
         slidesAuth.logout();
     });
 
@@ -1594,6 +1714,9 @@ function closeModal(el) {
 }
 
 function bindModals() {
+    // --- rename reminder (untitled explicit saves) ---
+    setupRenamePrompt();
+
     // --- rename ---
     $('renameModalClose').addEventListener('click', () => closeModal($('renameModal')));
     $('renameCancelBtn').addEventListener('click', () => closeModal($('renameModal')));
@@ -1736,7 +1859,7 @@ async function offerTemplatesForNewDeck() {
                 buildThumbs();
                 zoomToFit();
                 markDirty();
-                await saveDeck();
+                await saveDeck({ explicit: false });   // never via the rename reminder
 
                 showNotification(`Applied "${template.name}" template`);
             } catch (err) {

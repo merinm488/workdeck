@@ -256,6 +256,10 @@ body {
     color: var(--accent-color);
 }
 
+.settings-dropdown-item.text-red-600 {
+    color: var(--danger);
+}
+
 .settings-dropdown-item.text-red-600:hover {
     background: var(--danger-light);
     color: var(--danger);
@@ -973,6 +977,7 @@ body {
 
 .key-text {
     flex: 1;
+    text-align: center;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 13px;
     word-break: break-all;
@@ -1072,6 +1077,63 @@ body {
     outline: none;
     border-color: var(--accent-color);
     box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* ---------- Rename reminder (untitled explicit saves) ----------
+   Same styling as the Forms/Sheets editors' reminder. */
+
+.rename-prompt-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    outline: none;
+}
+
+.rename-prompt-input:focus {
+    border-color: var(--accent-color);
+}
+
+.rename-prompt-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.rename-prompt-btn {
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.rename-prompt-btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+.rename-prompt-btn-secondary:hover {
+    background: var(--accent-light);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.rename-prompt-btn-primary {
+    background: var(--accent-color);
+    color: #ffffff;
+}
+
+.rename-prompt-btn-primary:hover {
+    filter: brightness(1.05);
 }
 
 /* ---------- Share modal ---------- */

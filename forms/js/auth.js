@@ -59,12 +59,12 @@ class FormsAuthManager {
     }
 
     /**
-     * Log out: clear Forms' session mirrors and return to Workdeck.
-     * (Workdeck and the other apps keep their own sessions; logging out of
-     * one app only clears that app's keys — same behavior as Sheets.)
+     * Log out of the unified account: clear Workdeck's session plus every
+     * app's mirrors, then return to Workdeck — which now shows its login
+     * page (same as logging out of Workdeck/Docs).
      */
     logout() {
-        clearFormsSession();
+        clearUnifiedSession();
         this.userHash = null;
         this.userKey = null;
         goToWorkdeck();

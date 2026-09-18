@@ -63,13 +63,28 @@ function getFormsUserKey() {
 }
 
 /**
- * Clear the Forms session keys (used by logout / delete-account).
- * Note: this only clears Forms' own mirrors. Workdeck and the other apps
- * manage their own sessionStorage entries.
+ * Clear the Forms session keys only (entry-guard use).
+ * Logout must use clearUnifiedSession() instead — logging out of one app
+ * logs out of the whole unified account (same as Workdeck/Docs).
  */
 function clearFormsSession() {
     sessionStorage.removeItem(APP_CONFIG.sessionKeys.userHash);
     sessionStorage.removeItem(APP_CONFIG.sessionKeys.userKey);
+}
+
+/**
+ * Clear the WHOLE unified session — every key Workdeck writes at login
+ * (public/js/auth.js WD_AUTH_CONFIG.storageKeys). Used by logout, so `/`
+ * lands on Workdeck's login page instead of its home page.
+ */
+function clearUnifiedSession() {
+    [
+        'wd_hash', 'wd_key',
+        'docs_hash', 'docs_key',
+        'sheets_user_hash', 'sheets_user_key',
+        'forms_user_hash', 'forms_user_key',
+        'slides_user_hash', 'slides_user_key'
+    ].forEach(name => sessionStorage.removeItem(name));
 }
 
 /**
@@ -85,5 +100,6 @@ if (typeof window !== 'undefined') {
     window.getFormsUserHash = getFormsUserHash;
     window.getFormsUserKey = getFormsUserKey;
     window.clearFormsSession = clearFormsSession;
+    window.clearUnifiedSession = clearUnifiedSession;
     window.goToWorkdeck = goToWorkdeck;
 }

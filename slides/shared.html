@@ -77,8 +77,9 @@
     <!-- Notification toast (shared.js showNotification writes here) -->
     <div id="notification" class="notification"></div>
 
-    <!-- Load order: config -> shared (public page — no auth/storage needed) -->
+    <!-- Load order: config -> storage (getSharedDeck is public, no auth) -> shared -->
     <script src="config/config.js"></script>
+    <script src="js/storage.js"></script>
     <script src="js/shared.js"></script>
 </body>
 </html>

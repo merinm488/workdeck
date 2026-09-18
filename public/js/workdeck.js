@@ -274,7 +274,17 @@ async function api(action, payload) {
  */
 async function loadUserData() {
     const url = WD_APP.apiEndpoint + '?hash=' + encodeURIComponent(state.userHash) + '&_t=' + Date.now();
-    const response = await fetch(url, { cache: 'no-store' });
+    let response;
+    try {
+        response = await fetch(url, { cache: 'no-store' });
+    } catch (err) {
+        // Server unreachable (offline / dev server not running): keep the
+        // session — this is a connectivity problem, not a deleted account —
+        // and land on the login view instead of crashing init.
+        showNotification('Cannot reach the server. Check your connection and try again.', 'error');
+        showLogin();
+        return false;
+    }
     if (!response.ok) {
         wdAuth.clearSession();
         showLogin();

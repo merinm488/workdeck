@@ -59,7 +59,7 @@ function renderSharedSlide(index) {
     sharedState.index = index;
 
     sharedState.canvas.loadFromJSON({ objects: slide.objects || [] }).then(() => {
-        sharedState.canvas.background = slide.background;
+        sharedState.canvas.backgroundColor = slide.background || APP_CONFIG.slide.defaultBackground;
         sizeSharedCanvas();
         sharedState.canvas.requestRenderAll();
     });
