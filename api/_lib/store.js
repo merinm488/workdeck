@@ -33,6 +33,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -43,6 +44,18 @@ export const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 
 const PEPPER_SECRET = process.env.PEPPER_SECRET || 'dev-pepper-change-in-production-9F2a-5xK8';
 const TEXTDB_API_BASE = 'https://textdb.dev/api/data';
+
+// textdb.dev rejects stored documents over 1MB — that is exactly why deck
+// saves started answering 500 once a deck's JSON (every slide's fabric
+// objects) outgrew the cap. Writes larger than COMPRESS_OVER_BYTES are
+// gzipped and stored as {"__wdz":1,"data":"<base64>"}; parseDocText detects
+// the wrapper and unpacks it on read, so pre-existing plain documents keep
+// working untouched. Base64 inflates by 4/3, so at JSON's typical gzip
+// ratios this lifts the practical ceiling to several MB of raw JSON; a
+// record still too big after compression is refused with a clear log line.
+const TEXTDB_MAX_BYTES = 1024 * 1024;
+const COMPRESS_OVER_BYTES = 256 * 1024;
+const COMPRESSED_FLAG = '__wdz';
 
 // ================================================
 // Hashing / IDs
@@ -72,11 +85,17 @@ function isDefaultTextdbContent(text) {
   return !text || text.trim() === '' || text.includes('hello world from textdb') || text.length < 10;
 }
 
-/** Parse a stored document, handling textdb.dev's double-encoded JSON quirk. */
+/**
+ * Parse a stored document, handling textdb.dev's double-encoded JSON quirk
+ * and the gzip wrapper postTextdbDoc writes for large payloads.
+ */
 function parseDocText(text) {
   let parsed = JSON.parse(text);
-  if (typeof parsed === 'string') {
+  while (typeof parsed === 'string') {
     parsed = JSON.parse(parsed);
+  }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed[COMPRESSED_FLAG]) {
+    parsed = JSON.parse(zlib.gunzipSync(Buffer.from(parsed.data, 'base64')).toString('utf8'));
   }
   return parsed;
 }
@@ -134,13 +153,24 @@ async function getTextdbDoc(id) {
 }
 
 async function postTextdbDoc(id, value) {
+  let body = JSON.stringify(value);
+  if (body.length > COMPRESS_OVER_BYTES) {
+    body = JSON.stringify({
+      [COMPRESSED_FLAG]: 1,
+      data: zlib.gzipSync(Buffer.from(body, 'utf8')).toString('base64')
+    });
+    if (body.length > TEXTDB_MAX_BYTES) {
+      console.error(`[STORE] textdb save failed: ${body.length} bytes even gzipped (textdb.dev limit is ${TEXTDB_MAX_BYTES}). The record must shrink or move to a larger store.`);
+      return false;
+    }
+  }
   const response = await fetch(`${TEXTDB_API_BASE}/${id}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     },
-    body: JSON.stringify(value)
+    body
   });
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
@@ -219,7 +249,12 @@ export async function saveOwnedSections(hash, owned) {
   try {
     existing = IS_DEVELOPMENT ? readLocalDoc(getUserFilePath(hash)) : await getTextdbDoc(hash);
   } catch (error) {
+    // A failed read is NOT the same as "no document yet": merging into {}
+    // would store only this caller's sections and silently wipe the rest of
+    // the user's data (docs, sheets, forms...). Fail the save instead — the
+    // API answers 500 and the client retries.
     console.error('[STORE] Error reading before merge:', error);
+    return false;
   }
 
   const next = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : {};
