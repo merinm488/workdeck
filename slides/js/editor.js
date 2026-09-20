@@ -71,6 +71,7 @@ async function init() {
     bindToolbar();
     bindSlidePanel();
     bindStageNav();
+    bindSwipeNavigation();
     bindTopNav();
     bindModals();
     bindKeyboard();
@@ -174,6 +175,7 @@ function goToSlide(index) {
 function bindSlidePanel() {
     $('addSlideBtn').addEventListener('click', addSlide);
     bindThumbDragDrop();
+    bindThumbTouchReorder();
 }
 
 function bindStageNav() {
@@ -244,6 +246,10 @@ function deleteSlide(index) {
 
 let dragSlideId = null;
 
+// At <=640px the sorter is the horizontal bottom filmstrip (styles.css),
+// so drop position is measured along X, not Y.
+const FILMSTRIP_QUERY = window.matchMedia('(max-width: 640px)');
+
 function bindThumbDragDrop() {
     const list = $('slideThumbs');
 
@@ -261,13 +267,13 @@ function bindThumbDragDrop() {
         if (!dragSlideId) return;
         e.preventDefault();               // required for the drop to fire
         e.dataTransfer.dropEffect = 'move';
-        paintDropIndicator(getDropIndex(e.clientY));
+        paintDropIndicator(getDropIndex(e));
     });
 
     list.addEventListener('drop', (e) => {
         e.preventDefault();
         if (!dragSlideId) return;
-        const dropIndex = getDropIndex(e.clientY); // measure BEFORE rebuild
+        const dropIndex = getDropIndex(e); // measure BEFORE rebuild
         const movedId = dragSlideId;
         dragSlideId = null;
         reorderSlides(movedId, dropIndex);
@@ -283,13 +289,163 @@ function bindThumbDragDrop() {
 }
 
 
-function getDropIndex(y) {
+/**
+ * Index the pointer would insert at, measured along the strip's axis:
+ * clientY against card midpoints for the desktop side panel, clientX for
+ * the mobile filmstrip.
+ */
+function getDropIndex(e) {
+    const horizontal = FILMSTRIP_QUERY.matches;
     const cards = [...document.querySelectorAll('.thumb-card:not(.dragging)')];
     for (let i = 0; i < cards.length; i++) {
         const box = cards[i].getBoundingClientRect();
-        if (y < box.top + box.height / 2) return i;
+        const pos = horizontal ? e.clientX : e.clientY;
+        const mid = horizontal ? box.left + box.width / 2 : box.top + box.height / 2;
+        if (pos < mid) return i;
     }
     return cards.length;
+}
+
+// ================================================
+// Slide reordering (long-press drag, touch)
+// ================================================
+
+const LONG_PRESS_MS = 320;
+const LONG_PRESS_SLOP = 10;     // px of drift before a press becomes a scroll
+const STRIP_EDGE_ZONE = 48;     // px band at the strip edge that auto-scrolls
+
+function bindThumbTouchReorder() {
+    const list = $('slideThumbs');
+    let pressTimer = null;
+    let pending = null;   // touch waiting out the long-press
+    let session = null;   // active drag
+
+    const cancelPending = () => {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+        pending = null;
+    };
+
+    const release = (commit) => {
+        if (!session) return;
+        const { card, id } = session;
+        card.style.transform = '';
+        card.classList.remove('dragging', 'touch-dragging');
+        if (commit) {
+            // the card's DOM slot already IS the requested order
+            const dropIndex = [...list.children].indexOf(card);
+            if (dropIndex !== -1) {
+                reorderSlides(id, dropIndex);
+            }
+        }
+        session = null;
+    };
+
+    list.addEventListener('touchstart', (e) => {
+        cancelPending();
+        release(false);   // a new finger abandons any live drag
+        if (e.touches.length !== 1) return;
+
+        const card = e.target.closest('.thumb-card');
+        // the per-card duplicate/delete buttons stay plain taps
+        if (!card || e.target.closest('.thumb-act-btn')) return;
+
+        const t = e.touches[0];
+        const rect = card.getBoundingClientRect();
+        pending = {
+            card,
+            id: card.dataset.slideId,
+            startX: t.clientX,
+            startY: t.clientY,
+            grabX: t.clientX - rect.left,   // keep the card anchored to
+            grabY: t.clientY - rect.top,    // where the finger landed
+            tx: 0,
+            ty: 0
+        };
+
+        pressTimer = setTimeout(() => {
+            pressTimer = null;
+            session = pending;
+            pending = null;
+            session.card.classList.add('dragging', 'touch-dragging');
+            if (navigator.vibrate) {
+                navigator.vibrate(10);   // subtle "lifted" cue
+            }
+        }, LONG_PRESS_MS);
+    }, { passive: true });
+
+    list.addEventListener('touchmove', (e) => {
+        const t = e.touches[0];
+
+        if (!session) {
+            // drift before the timer fires — it's a strip scroll, not a drag
+            if (pending &&
+                Math.hypot(t.clientX - pending.startX, t.clientY - pending.startY) > LONG_PRESS_SLOP) {
+                cancelPending();
+            }
+            return;
+        }
+
+        e.preventDefault();   // the strip must not scroll mid-drag
+
+        // Float the card with the finger. 
+        const rect = session.card.getBoundingClientRect();
+        session.tx = (t.clientX - session.grabX) - (rect.left - session.tx);
+        session.ty = (t.clientY - session.grabY) - (rect.top - session.ty);
+        session.card.style.transform = `translate(${session.tx}px, ${session.ty}px)`;
+
+        // Live-reorder: keep the card's slot under the pointer (same index
+        // semantics as the mouse path — getDropIndex skips .dragging).
+        const dropIndex = getDropIndex(t);
+        const siblings = [...list.children].filter((c) => c !== session.card);
+        if (dropIndex >= siblings.length) {
+            if (session.card !== list.lastElementChild) {
+                list.appendChild(session.card);
+            }
+        } else if (siblings[dropIndex] !== session.card.nextElementSibling) {
+            list.insertBefore(session.card, siblings[dropIndex]);
+        }
+
+        // Edge auto-scroll keeps decks longer than the strip reachable
+        const box = list.getBoundingClientRect();
+        if (FILMSTRIP_QUERY.matches) {
+            if (t.clientX < box.left + STRIP_EDGE_ZONE) {
+                list.scrollLeft -= 6;
+            } else if (t.clientX > box.right - STRIP_EDGE_ZONE) {
+                list.scrollLeft += 6;
+            }
+        } else {
+            if (t.clientY < box.top + STRIP_EDGE_ZONE) {
+                list.scrollTop -= 6;
+            } else if (t.clientY > box.bottom - STRIP_EDGE_ZONE) {
+                list.scrollTop += 6;
+            }
+        }
+    }, { passive: false });
+
+    list.addEventListener('touchend', (e) => {
+        if (!session) {
+            cancelPending();
+            return;
+        }
+        // suppress the synthetic click so a drag never also switches slides
+        e.preventDefault();
+        release(true);
+    });
+
+    list.addEventListener('touchcancel', () => {
+        cancelPending();
+        release(false);
+    });
+
+    // a long-press must not pop the browser context menu mid-drag
+    list.addEventListener('contextmenu', (e) => {
+        if (session || pressTimer) {
+            e.preventDefault();
+        }
+    });
 }
 
 
@@ -1287,6 +1443,140 @@ function startAutoSave() {
 }
 
 // ================================================
+// Swipe navigation (touch)
+// ================================================
+const SWIPE_MIN_DISTANCE = 60;
+const SWIPE_DIRECTION_RATIO = 2;
+const SWIPE_INTENT_DISTANCE = 10;
+
+/** 1 for a left swipe (next), -1 for right (previous), 0 when not a swipe. */
+function horizontalSwipe(dx, dy) {
+    if (Math.abs(dx) < SWIPE_MIN_DISTANCE ||
+        Math.abs(dx) < Math.abs(dy) * SWIPE_DIRECTION_RATIO) {
+        return 0;
+    }
+    return dx < 0 ? 1 : -1;
+}
+
+function bindStageSwipeNav() {
+    const stage = document.querySelector('.canvas-stage');
+    let startX = 0, startY = 0, tracking = false, horizontal = false;
+
+    const stopTracking = () => {
+        tracking = false;
+        horizontal = false;
+        editorState.canvas.selection = true;   // lasso returns for the next gesture
+    };
+
+    stage.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) {
+            stopTracking();
+            return;
+        }
+        const canvas = editorState.canvas;
+        if (!canvas || canvas.isDrawingMode || editorState.activeTool !== 'select') {
+            return;
+        }
+        // an object under the finger means a drag, not a page swipe
+        if (typeof canvas.findTarget !== 'function') return;
+        let target = null;
+        try {
+            target = canvas.findTarget(e);
+        } catch (err) {
+            return;   // API drift — never break the canvas over a swipe
+        }
+        if (target) return;
+
+        const t = e.touches[0];
+        startX = t.clientX;
+        startY = t.clientY;
+        tracking = true;
+        horizontal = false;
+        canvas.selection = false;   // no lasso while this gesture is a swipe
+    }, { capture: true, passive: true });
+
+    stage.addEventListener('touchmove', (e) => {
+        if (!tracking) return;
+        const t = e.touches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        if (!horizontal && Math.max(Math.abs(dx), Math.abs(dy)) > SWIPE_INTENT_DISTANCE) {
+            horizontal = Math.abs(dx) > Math.abs(dy);
+        }
+        // once the gesture is ours, own it: no stage pan while swiping
+        if (horizontal) {
+            e.preventDefault();
+        }
+    }, { capture: true, passive: false });
+
+    stage.addEventListener('touchend', (e) => {
+        if (!tracking) return;
+        const t = e.changedTouches[0];
+        const dir = horizontal ? horizontalSwipe(t.clientX - startX, t.clientY - startY) : 0;
+        stopTracking();
+        if (dir !== 0) {
+            goToSlide(editorState.currentSlideIndex + dir);
+        }
+    }, { capture: true });
+
+    stage.addEventListener('touchcancel', stopTracking, { capture: true });
+}
+
+/** Same gesture over the present overlay, anywhere except the controls. */
+function bindPresentSwipeNav() {
+    const overlay = $('presentOverlay');
+    let startX = 0, startY = 0, tracking = false, horizontal = false;
+
+    overlay.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) {
+            tracking = false;
+            return;
+        }
+        if (e.target.closest('.present-controls')) return;   // real buttons
+        const t = e.touches[0];
+        startX = t.clientX;
+        startY = t.clientY;
+        tracking = true;
+        horizontal = false;
+    }, { passive: true });
+
+    overlay.addEventListener('touchmove', (e) => {
+        if (!tracking) return;
+        const t = e.touches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        if (!horizontal && Math.max(Math.abs(dx), Math.abs(dy)) > SWIPE_INTENT_DISTANCE) {
+            horizontal = Math.abs(dx) > Math.abs(dy);
+        }
+        if (horizontal) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    overlay.addEventListener('touchend', (e) => {
+        if (!tracking) return;
+        tracking = false;
+        if (!horizontal) return;
+        const t = e.changedTouches[0];
+        const dir = horizontalSwipe(t.clientX - startX, t.clientY - startY);
+        if (dir === 1) {
+            presentNext();
+        } else if (dir === -1) {
+            presentPrev();
+        }
+    });
+
+    overlay.addEventListener('touchcancel', () => {
+        tracking = false;
+    });
+}
+
+function bindSwipeNavigation() {
+    bindStageSwipeNav();
+    bindPresentSwipeNav();
+}
+
+// ================================================
 // Present mode
 // ================================================
 
@@ -1296,12 +1586,15 @@ function enterPresentMode() {
     editorState.presentIndex = editorState.currentSlideIndex;
 
     $('presentOverlay').classList.remove('hidden');
-    
-    const request = $('presentOverlay').requestFullscreen();
-    if (request) {
-        request.catch(() => {});
+
+    // Skip the Fullscreen API on touch devices
+    const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    if (!isTouch) {
+        const request = $('presentOverlay').requestFullscreen();
+        if (request) {
+            request.catch(() => {});
+        }
     }
-   
 
     renderPresentSlide();
 }

@@ -191,7 +191,9 @@
     </nav>
 
     <!-- ============================================================
-         Editor Shell — slide sorter (left) + toolbar/canvas (right)
+         Editor Shell — slide sorter (left on desktop; on phones it
+         becomes a horizontal filmstrip docked below the canvas) +
+         toolbar/canvas
          ============================================================ -->
     <div class="editor-shell">
 
@@ -502,7 +504,8 @@
     <!-- ============================================================
          Present Mode overlay. editor.js renders slides onto
          #presentCanvas (a plain copy of each slide's JSON, scaled to the
-         window) and drives prev/next with keyboard + buttons.
+         window) and drives prev/next with keyboard + buttons + touch
+         swipes.
          ============================================================ -->
     <div id="presentOverlay" class="present-overlay hidden">
         <canvas id="presentCanvas"></canvas>

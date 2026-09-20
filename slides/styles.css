@@ -392,7 +392,6 @@ body {
     flex: 1;
 }
 
-/* One card per slide; editor.js sets data-slide-id and .active */
 .thumb-card {
     position: relative;
     border: 2px solid var(--border-color);
@@ -401,6 +400,9 @@ body {
     cursor: pointer;
     background: var(--bg-secondary);
     transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
 }
 
 .thumb-card:hover {
@@ -500,6 +502,15 @@ body {
 
 .thumb-card.dragging {
     opacity: 0.35;
+}
+
+/* Lifted look for the long-press touch drag (bindThumbTouchReorder) —
+   the card follows the finger via an inline transform; unlike the mouse
+   .dragging dim it stays visible under the finger. */
+.thumb-card.touch-dragging {
+    z-index: 5;
+    opacity: 0.9;
+    box-shadow: 0 8px 20px var(--shadow-color);
 }
 
 /* Drop indicator: an accent line on the edge the slide would land on.
@@ -1455,9 +1466,11 @@ body {
     }
 }
 
-/* Phones: icon-only nav, tighter chrome, smaller sorter + canvas gutters.
-   The toolbar keeps its horizontal scroll (scrollbar hidden — touch users
-   just swipe it). */
+/* Phones: icon-only nav, tighter chrome, and the Google-Slides phone
+   layout — the slide sorter leaves the left edge and docks below the
+   canvas as a swipeable filmstrip, so the slide gets the full width.
+   The toolbar keeps its horizontal scroll (scrollbar hidden — touch
+   users just swipe it). */
 @media (max-width: 640px) {
     .present-btn span,
     .top-nav-btn-wide span {
@@ -1484,13 +1497,81 @@ body {
         display: none;
     }
 
+    /* --- Bottom filmstrip (replaces the left sorter) --- */
+
+    .editor-shell {
+        flex-direction: column;
+        /* top-nav is 55px here (8px padding, vs 10px desktop) */
+        height: calc(100vh - 55px);
+        height: calc(100dvh - 55px);
+    }
+
     .slide-panel {
-        width: 120px;
+        order: 2;                    /* strip docks BELOW the stage */
+        width: 100%;
+        flex-direction: row;         /* [+] | thumbnails */
+        border-right: none;
+        border-top: 1px solid var(--border-color);
+        /* keep the strip clear of the iPhone home indicator */
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .stage-column {
+        order: 1;
+    }
+
+    .slide-panel-header {
+        flex-shrink: 0;
+        border-bottom: none;
+        border-right: 1px solid var(--border-color);
+        padding: 8px;
+    }
+
+    .slide-panel-title {
+        display: none;   /* the aside's aria-label still names the strip */
     }
 
     .slide-thumbs {
-        padding: 8px;
+        flex: 1;
+        min-width: 0;
+        flex-direction: row;
         gap: 8px;
+        padding: 8px;
+        overflow-y: hidden;
+        overflow-x: auto;
+        scrollbar-width: none;       /* same as the toolbar — swipe it */
+    }
+
+    .slide-thumbs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .thumb-card {
+        flex-shrink: 0;
+        width: 96px;                 /* 16:9 img -> 54px tall; strip stays one row */
+    }
+
+    /* Reorder drops become vertical lines on the card's left/right edge —
+       getDropIndex() reads clientX at this breakpoint (editor.js). */
+    .thumb-card.drop-above::before,
+    .thumb-card.drop-below::after {
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: auto;
+        width: 3px;
+        height: auto;
+    }
+
+    .thumb-card.drop-below::after {
+        left: auto;
+        right: 0;
+    }
+
+    /* The filmstrip is the pager on phones; the floating pill would only
+       cover the slide. */
+    .stage-nav {
+        display: none;
     }
 
     .toolbar {
@@ -1510,14 +1591,15 @@ body {
     .viewer-stage {
         padding: 12px;
     }
+
+    /* Toasts must clear the filmstrip */
+    .notification {
+        bottom: calc(88px + env(safe-area-inset-bottom));
+    }
 }
 
-/* Small phones: give the canvas the width the sorter takes */
+/* Small phones: tighter thumb chrome (the filmstrip width is fluid) */
 @media (max-width: 480px) {
-    .slide-panel {
-        width: 96px;
-    }
-
     .thumb-num {
         top: 4px;
         left: 4px;
