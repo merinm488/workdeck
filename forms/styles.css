@@ -555,6 +555,27 @@ body {
     }
 }
 
+/* ============================================================
+   Touch drag gating (long-press to drag — see editor.js
+   setupTouchDragGate). Keeps the iOS long-press text-selection
+   callout off the draggable rows/palette entries, and outlines
+   the element once the long press has armed a drag.
+   ============================================================ */
+@media (pointer: coarse) {
+    #builder .fjs-drag-move,
+    #builder .fjs-drag-copy,
+    #builder .fjs-drag-row-move {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+}
+
+#builder .touch-drag-armed {
+    outline: 2px dashed var(--accent-color);
+    outline-offset: 2px;
+}
+
 .btn:hover { background: var(--accent-light); }
 
 .btn:focus-visible {

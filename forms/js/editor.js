@@ -184,8 +184,7 @@ class FormsEditorApp {
         return {
             id: id,
             name: 'Untitled Form',
-            // form-js does NOT add a submit button automatically (unlike
-            // form.io) — seed one so a fresh form is submittable as-is.
+            // form-js does NOT add a submit button automatically — seed one so a fresh form is submittable as-is.
             // Last, so fields added by the owner land above it. The owner
             // can relabel or delete it in the builder.
             components: [
@@ -222,7 +221,7 @@ class FormsEditorApp {
      * keyboard users — same API), so on touch devices there is no way to
      * add a field. We bind click/tap ourselves and call the same
      * modeling.addFormField() the Enter path uses, reading data-field-type
-     * off the palette button. Desktop drag is untouched.
+     * off the palette button. 
      */
     async initBuilder() {
         if (typeof FormEditor === 'undefined') {
@@ -283,12 +282,16 @@ class FormsEditorApp {
         // Keep the caret in properties-panel inputs when form-js's canvas
         // re-render steals focus mid-typing (see setupFocusPreservation).
         this.setupFocusPreservation();
+
+        // On touchscreens dragula (form-js's DnD engine) starts a drag on
+        // the first few pixels of movement, so every scroll swipe across
+        // the canvas grabbed a field. Gate it behind a long press.
+        this.setupTouchDragGate();
     }
 
     /**
      * Add a field of the given type (tap-to-add + the palette drawer's
-     * entry point). Inserts ABOVE a trailing submit button so the action
-     * stays last, like form.io's builder kept it.
+     * entry point). 
      * @param {string} type - form-js field type, e.g. 'textfield'
      */
     addPaletteField(type) {
@@ -333,21 +336,108 @@ class FormsEditorApp {
     }
 
     /**
-     * form-js re-renders its canvas on every schema change, and the
-     * selected field row re-focuses itself as part of that (a
-     * useLayoutEffect inside the library's Element component calls
-     * focus() when mounted). When the change comes from a properties-
-     * panel input — the ~300ms debounced commit that lands shortly
-     * after the user stops typing — that re-focus yanks the caret out
-     * of the input mid-sentence: every pause in typing threw the cursor
-     * back onto the canvas row.
-     *
-     * Fix: when `changed` fires while the user is in a text entry inside
-     * the properties panel, remember that element and its caret position,
-     * then put both back once the re-render has settled — but only if
-     * focus was actually stolen (canvas row or nothing), never when the
-     * user moved it somewhere on purpose.
+     * Long-press gate for the builder's touch drag-and-drop.
      */
+    setupTouchDragGate() {
+        const isTouchDevice = window.matchMedia('(pointer: coarse)').matches ||
+            navigator.maxTouchPoints > 0;
+        if (!isTouchDevice) return;
+
+        const builder = document.getElementById('builder');
+        if (!builder) return;
+
+        const LONG_PRESS_MS = 400;      // hold still this long to arm a drag
+        const SCROLL_THRESHOLD_PX = 10; // movement before the timer = scroll
+        const JITTER_PX = 6;            // sensor drift allowed while holding
+
+        const GRABBABLE = '.fjs-drag-move, .fjs-drag-copy, .fjs-drag-row-move';
+        // Native behavior wins over arming a drag.
+        const NOT_ARMABLE = 'input, textarea, select, button, a, [contenteditable="true"], .fjs-no-move';
+        // dragula refuses to grab drop containers themselves — a press
+        // starting directly on one must keep scrolling.
+        const CONTAINER_CLASSES = [
+            'fjs-drag-container', 'fjs-drop-container-vertical', 'fjs-drop-container-horizontal'
+        ];
+        let press = null;
+
+        const disarmClass = () => {
+            builder.querySelectorAll('.touch-drag-armed').forEach(el =>
+                el.classList.remove('touch-drag-armed'));
+        };
+
+        const endPress = () => {
+            if (press) clearTimeout(press.timer);
+            press = null;
+            disarmClass();
+        };
+
+        document.addEventListener('pointerdown', (e) => {
+            if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+            if (!e.isPrimary || !builder.contains(e.target)) return;
+            const target = e.target;
+            if (CONTAINER_CLASSES.some(cls => target.classList.contains(cls))) return;
+            if (target.closest(NOT_ARMABLE)) return;
+            const grabbable = target.closest(GRABBABLE);
+            if (!grabbable) return;
+
+            endPress();
+            press = {
+                x: e.clientX,
+                y: e.clientY,
+                lastX: e.clientX,
+                lastY: e.clientY,
+                state: 'pending',
+                el: grabbable
+            };
+            press.timer = setTimeout(() => {
+                if (!press || press.state !== 'pending') return;
+                // A finger that drifted while "holding" was a slow scroll,
+                // not a long press. Pure sensor jitter still arms.
+                const drifted =
+                    Math.hypot(press.lastX - press.x, press.lastY - press.y) > JITTER_PX;
+                press.state = drifted ? 'scrolling' : 'armed';
+                if (press.state === 'armed') {
+                    press.el.classList.add('touch-drag-armed');
+                    navigator.vibrate?.(30); // no-op on iOS
+                }
+            }, LONG_PRESS_MS);
+        }, true);
+
+        // Registered on `document`, which precedes dragula's
+        // documentElement listener in the capture phase.
+        document.addEventListener('pointermove', (e) => {
+            if (!press || (e.pointerType !== 'touch' && e.pointerType !== 'pen')) return;
+            if (press.state === 'armed') return; // real drag — let it through
+
+            press.lastX = e.clientX;
+            press.lastY = e.clientY;
+            if (press.state === 'pending') {
+                const dx = e.clientX - press.x;
+                const dy = e.clientY - press.y;
+                if (dx * dx + dy * dy > SCROLL_THRESHOLD_PX * SCROLL_THRESHOLD_PX) {
+                    clearTimeout(press.timer);
+                    press.state = 'scrolling';
+                }
+            }
+            // Pending or scrolling: dragula must not see these moves.
+            e.stopPropagation();
+        }, true);
+
+        document.addEventListener('touchmove', (e) => {
+            if (press && press.state === 'armed') e.preventDefault();
+        }, { passive: false });
+
+        // Android fires contextmenu on long-press; it would interrupt an
+        // armed drag or an about-to-arm hold.
+        document.addEventListener('contextmenu', (e) => {
+            if (press && builder.contains(e.target)) e.preventDefault();
+        });
+
+        document.addEventListener('pointerup', endPress, true);
+        document.addEventListener('pointercancel', endPress, true);
+    }
+
+
     setupFocusPreservation() {
         const builderElement = document.getElementById('builder');
         let snapshot = null;   // { el, caret } — where the user was typing
@@ -1140,14 +1230,6 @@ class FormsEditorApp {
     }
 
     /**
-     * Open a Sheets spreadsheet in a new tab WITHOUT 'noopener'. Only a
-     * tab opened with a live opener (an auxiliary browsing context)
-     * inherits a copy of this tab's sessionStorage, which is where the
-     * Sheets editor looks for its session — with 'noopener' the new tab
-     * comes up logged out and bounces to the Sheets key-entry page, even
-     * though the account is the same. The opener link is detached right
-     * after creation (Workdeck's openInNewTab does the same), so the
-     * Sheets tab still can't reach back into Forms.
      * @param {string} url
      * @returns {Window|null} the new tab, or null when pop-ups are blocked
      */
