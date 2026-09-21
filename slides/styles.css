@@ -1012,6 +1012,11 @@ body {
 .key-modal-content {
     width: 100%;
     max-width: 420px;
+    /* tall content (the template chooser on phones) scrolls inside the
+       modal instead of clipping past both viewport edges */
+    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);   /* clear the backdrop's 16px padding */
+    overflow-y: auto;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
@@ -1595,6 +1600,12 @@ body {
     /* Toasts must clear the filmstrip */
     .notification {
         bottom: calc(88px + env(safe-area-inset-bottom));
+    }
+
+    /* Modal content can scroll to its very bottom; keep it off the home
+       indicator */
+    .key-modal {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
     }
 }
 
