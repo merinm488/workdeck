@@ -24,6 +24,8 @@
     --form-accent-soft: rgba(114, 72, 185, 0.18);
     --slide-accent: #ea580c;      /* Slides orange */
     --slide-accent-soft: rgba(234, 88, 12, 0.15);
+    --draw-accent: #e11d48;       /* Draw rose */
+    --draw-accent-soft: rgba(225, 29, 72, 0.12);
     --danger: #ef4444;
     --danger-soft: rgba(239, 68, 68, 0.12);
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
@@ -628,6 +630,11 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
     color: var(--slide-accent);
 }
 
+.wd-app-icon-draw {
+    background: var(--draw-accent-soft);
+    color: var(--draw-accent);
+}
+
 .wd-dropdown-item-text {
     display: flex;
     flex-direction: column;
@@ -901,6 +908,11 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
     color: var(--slide-accent);
 }
 
+.wd-file-icon-draw {
+    background: var(--draw-accent-soft);
+    color: var(--draw-accent);
+}
+
 .wd-file-actions {
     display: flex;
     gap: 4px;
@@ -979,6 +991,11 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
 .wd-file-app-badge.slide {
     background: var(--slide-accent-soft);
     color: var(--slide-accent);
+}
+
+.wd-file-app-badge.draw {
+    background: var(--draw-accent-soft);
+    color: var(--draw-accent);
 }
 
 /* ---------- Files list view ---------- */

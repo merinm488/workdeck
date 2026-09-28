@@ -1,14 +1,14 @@
 /**
  * ================================================
- * SLIDES - Configuration File
+ * DRAW - Configuration File
  * ================================================
  * App-wide constants and small session helpers.
  */
 
 const APP_CONFIG = {
-    name: 'Slides',
+    name: 'Draw',
     version: '1.0.0',
-    description: 'Slide deck editor for Workdeck',
+    description: 'Drawing app for Workdeck',
 
     // Environment detection
     isProduction: window.location.hostname !== 'localhost' &&
@@ -17,19 +17,19 @@ const APP_CONFIG = {
 
     // API endpoint. Dev: local JSON via server/dev-server.js.
     // Prod: textdb.dev via api/_lib/store.js.
-    apiEndpoint: '/api/slides',
+    apiEndpoint: '/api/draw',
 
     // sessionStorage keys — these MUST match what Workdeck writes on login.
     sessionKeys: {
-        userHash: 'slides_user_hash',
-        userKey: 'slides_user_key'
+        userHash: 'draw_user_hash',
+        userKey: 'draw_user_key'
     },
 
     // Theme
     themes: {
         default: 'light',
         available: ['light', 'dark'],   // 'system' is a preference, not a theme
-        storageKey: 'slides_theme'      // localStorage key holding the preference
+        storageKey: 'draw_theme'        // localStorage key holding the preference
     },
 
     // Auto-save configuration
@@ -38,14 +38,25 @@ const APP_CONFIG = {
         interval: 30000   // 30 seconds
     },
 
-    // Slide geometry — the logical coordinate system every deck uses.
-    // 960x540 = 16:9; templates/*.json and editor.html's .thumb-img
-    // aspect-ratio all assume this size.
-    slide: {
-        width: 960,
-        height: 540,
+    // Canvas defaults. The board is INFINITE — there is no fixed logical
+    // size; pan/zoom live in the drawing record's `viewport`. These values
+    // seed new drawings and defaults for shared/legacy records.
+    canvas: {
         defaultBackground: '#ffffff',
-        defaultFontFamily: 'Inter'
+        minZoom: 0.05,
+        maxZoom: 8,
+        zoomStep: 1.2,            // multiplicative step for the zoom buttons
+        wheelZoomFactor: 1.0015   // ctrl/trackpad-pinch wheel -> zoom curve
+    },
+
+    // Tool defaults — seeded into the toolbar and applied to new objects.
+    tools: {
+        strokeColor: '#1f2937',
+        fillColor: 'transparent',   // shapes start unfilled
+        strokeWidth: 2,
+        fontSize: 20,
+        fontFamily: 'Inter',
+        arrowHeadLength: 16         // px, scaled by stroke width when drawing
     }
 };
 
@@ -55,9 +66,9 @@ const APP_CONFIG = {
 
 /**
  * Read a session value: sessionStorage first, then Workdeck's persistent
- * localStorage seed. 
+ * localStorage seed.
  */
-function readSlidesSession(name) {
+function readDrawSession(name) {
     try {
         return sessionStorage.getItem(name) || localStorage.getItem(name) || null;
     } catch (err) {
@@ -67,27 +78,27 @@ function readSlidesSession(name) {
 
 /**
  * Get the logged-in user's hash from the session.
- * Workdeck writes this at login; Slides never shows a login page itself.
+ * Workdeck writes this at login; Draw never shows a login page itself.
  * @returns {string|null} User hash
  */
-function getSlidesUserHash() {
-    return readSlidesSession(APP_CONFIG.sessionKeys.userHash);
+function getDrawUserHash() {
+    return readDrawSession(APP_CONFIG.sessionKeys.userHash);
 }
 
 /**
  * Get the logged-in user's raw access key (for the "View My Key" modal).
  * @returns {string|null} User key
  */
-function getSlidesUserKey() {
-    return readSlidesSession(APP_CONFIG.sessionKeys.userKey);
+function getDrawUserKey() {
+    return readDrawSession(APP_CONFIG.sessionKeys.userKey);
 }
 
 /**
- * Clear the Slides session keys only (entry-guard use).
+ * Clear the Draw session keys only (entry-guard use).
  * Logout must use clearUnifiedSession() instead — logging out of one app
  * logs out of the whole unified account.
  */
-function clearSlidesSession() {
+function clearDrawSession() {
     [sessionStorage, localStorage].forEach(store => {
         store.removeItem(APP_CONFIG.sessionKeys.userHash);
         store.removeItem(APP_CONFIG.sessionKeys.userKey);
@@ -121,9 +132,9 @@ function goToWorkdeck() {
 // Expose globally (plain script tags, no modules)
 if (typeof window !== 'undefined') {
     window.APP_CONFIG = APP_CONFIG;
-    window.getSlidesUserHash = getSlidesUserHash;
-    window.getSlidesUserKey = getSlidesUserKey;
-    window.clearSlidesSession = clearSlidesSession;
+    window.getDrawUserHash = getDrawUserHash;
+    window.getDrawUserKey = getDrawUserKey;
+    window.clearDrawSession = clearDrawSession;
     window.clearUnifiedSession = clearUnifiedSession;
     window.goToWorkdeck = goToWorkdeck;
 }

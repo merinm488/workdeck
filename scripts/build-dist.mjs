@@ -28,6 +28,7 @@ cpSync(path.join(ROOT, 'public'), DIST, { recursive: true });
 cpSync(path.join(ROOT, 'sheets'), path.join(DIST, 'sheets'), { recursive: true });
 cpSync(path.join(ROOT, 'forms'), path.join(DIST, 'forms'), { recursive: true });
 cpSync(path.join(ROOT, 'slides'), path.join(DIST, 'slides'), { recursive: true });
+cpSync(path.join(ROOT, 'draw'), path.join(DIST, 'draw'), { recursive: true });
 cpSync(path.join(ROOT, 'docs-src', 'dist'), path.join(DIST, 'docs'), { recursive: true });
 
-console.log('[build-dist] Assembled dist/ (public -> /, sheets -> /sheets/, forms -> /forms/, slides -> /slides/, docs -> /docs/)');
+console.log('[build-dist] Assembled dist/ (public -> /, sheets -> /sheets/, forms -> /forms/, slides -> /slides/, draw -> /draw/, docs -> /docs/)');

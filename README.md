@@ -17,7 +17,7 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
 - 🔍 **Unified search** — searches titles of all files.
 - 🔳 **Grid / List view toggle** — persisted per account (server-side).
 - 🌗 **Dark / Light / System theme** — persisted per account, consistent
-  with all child apps.
+  with all child apps 
 - ⚙️ **Settings dropdown** — View My Key, Theme submenu, Logout, Delete
   Account (deletes the unified account).
 - ✏️ **Rename & delete files** from the landing page (including shared
@@ -41,7 +41,9 @@ workdeck/
 │   ├── workdeck.js         # Workdeck API: auth + unified file ops
 │   ├── docs.js             # Docs API (same shape as the original)
 │   ├── users.js            # Sheets API (same shape as the original)
-│   └── forms.js            # Forms API (incl. public response submission)
+│   ├── forms.js            # Forms API (incl. public response submission)
+│   ├── slides.js           # Slides API (deck records + public share snapshots)
+│   └── draw.js             # Draw API (drawing records + public share snapshots)
 ├── docs/                   # Docs build output (from docs-src, base /docs/)
 ├── docs-src/               # Docs source (React+Vite, with:
 │                           #   base '/docs/', ?doc= deep link, shared sessions)
@@ -58,8 +60,13 @@ workdeck/
 │   ├── styles.css
 │   ├── config/config.js
 │   ├── templates/          # starter decks (JSON, fabric v6 objects) + index.json
-│   └── js/                 # skeleton modules: auth/storage/themes/editor/shared
-│                           #   (config.js is complete — it is the contract)
+│   └── js/                 # auth/storage/themes/editor/shared
+├── draw/                   # Draw app (vanilla + Fabric.js v7 infinite canvas)
+│   ├── editor.html         # drawing editor (owner, needs Workdeck session)
+│   ├── shared.html         # public read-only drawing viewer (?shared=<id>)
+│   ├── styles.css
+│   ├── config/config.js
+│   └── js/                 # auth/storage/themes/editor/shared.
 ├── server/dev-server.js    # one Express server mirroring the prod layout
 ├── vercel.json             # routing for production
 ├── .env                    # PEPPER_SECRET for local dev
@@ -78,6 +85,7 @@ document per hash in production):
   "sheets": [ ... ],
   "forms": [ ... ],
   "slides": [ ... ],
+  "draws": [ ... ],
   "settings": {
     "theme": "dark",
     "viewMode": "grid",
@@ -86,10 +94,10 @@ document per hash in production):
 }
 ```
 
-All four APIs share `api/_lib/store.js` and save **section-merged**: Docs
+All the APIs share `api/_lib/store.js` and save **section-merged**: Docs
 only writes docs/tags, Sheets only writes sheets, Forms only writes
-forms, Slides only writes slides, Workdeck writes
-docs/tags/sheets/forms/slides/settings etc — so no app can wipe another's
+forms, Slides only writes slides, Draw only writes draws, Workdeck writes
+docs/tags/sheets/forms/slides/draws/settings etc — so no app can wipe another's
 data.
 
 ## 📄 License

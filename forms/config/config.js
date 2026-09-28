@@ -83,7 +83,8 @@ function clearUnifiedSession() {
         'docs_hash', 'docs_key',
         'sheets_user_hash', 'sheets_user_key',
         'forms_user_hash', 'forms_user_key',
-        'slides_user_hash', 'slides_user_key'
+        'slides_user_hash', 'slides_user_key',
+        'draw_user_hash', 'draw_user_key'
     ].forEach(name => sessionStorage.removeItem(name));
 }
 

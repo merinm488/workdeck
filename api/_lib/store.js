@@ -3,11 +3,11 @@
  * Shared Storage Layer (Workdeck / Docs / Sheets)
  * ================================================
  *
- * All three API routes (/api/workdeck, /api/docs, /api/users) share this
- * module so that they operate on the SAME document per user, in both
+ * All three API routes share this module so that 
+ * they operate on the SAME document per user, in both
  * environments:
  *
- *   development -> local JSON files under db/users/{hash}.json
+ *   development -> local JSON files 
  *   production  -> textdb.dev documents keyed by the user hash
  *
  * The unified document shape is:
@@ -45,11 +45,9 @@ export const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 const PEPPER_SECRET = process.env.PEPPER_SECRET || 'dev-pepper-change-in-production-9F2a-5xK8';
 const TEXTDB_API_BASE = 'https://textdb.dev/api/data';
 
-// textdb.dev rejects stored documents over 1MB — that is exactly why deck
-// saves started answering 500 once a deck's JSON (every slide's fabric
-// objects) outgrew the cap. Writes larger than COMPRESS_OVER_BYTES are
-// gzipped and stored as {"__wdz":1,"data":"<base64>"}; parseDocText detects
-// the wrapper and unpacks it on read, so pre-existing plain documents keep
+// textdb.dev rejects stored documents over 1MB —  Writes larger than 
+// COMPRESS_OVER_BYTES are gzipped and stored as {"__wdz":1,"data":"<base64>"}; 
+// parseDocText detects the wrapper and unpacks it on read, so pre-existing plain documents keep
 // working untouched. Base64 inflates by 4/3, so at JSON's typical gzip
 // ratios this lifts the practical ceiling to several MB of raw JSON; a
 // record still too big after compression is refused with a clear log line.
@@ -62,7 +60,7 @@ const COMPRESSED_FLAG = '__wdz';
 // ================================================
 
 /**
- * Generate SHA-256 hash with pepper: sha256(key.trim() + PEPPER_SECRET) as hex.
+ * Generate SHA-256 hash with pepper
  */
 export function generateHash(input) {
   const normalized = input ? String(input).trim() : '';
@@ -183,7 +181,7 @@ async function postTextdbDoc(id, value) {
 // User documents
 // ================================================
 
-const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'slides', 'settings'];
+const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'settings'];
 
 /** A stored doc counts as an existing account if it has any known section. */
 export function isValidUserDoc(doc) {
@@ -215,6 +213,7 @@ export async function getUserDoc(hash) {
   if (!Array.isArray(doc.sheets)) doc.sheets = [];
   if (!Array.isArray(doc.forms)) doc.forms = [];
   if (!Array.isArray(doc.slides)) doc.slides = [];
+  if (!Array.isArray(doc.draws)) doc.draws = [];
   if (!doc.settings || typeof doc.settings !== 'object') doc.settings = {};
 
   return doc;
@@ -235,7 +234,7 @@ export async function overwriteDoc(hash, doc) {
 
 /**
  * Save only the sections the caller owns, merging over whatever else is
- * stored. `owned.settings` is merged at the key level so that Docs (theme) and
+ * stored. `owned.settings` is merged at the key level so that apps (theme) and
  * Workdeck (theme, viewMode, lastOpened) can share one settings object
  * without clobbering each other.
  *
@@ -250,15 +249,14 @@ export async function saveOwnedSections(hash, owned) {
   } catch (error) {
     // A failed read is NOT the same as "no document yet": merging into {}
     // would store only this caller's sections and silently wipe the rest of
-    // the user's data (docs, sheets, forms...). Fail the save instead — the
-    // API answers 500 and the client retries.
+    // the user's data (docs, sheets, forms...). Hence fail the save instead 
     console.error('[STORE] Error reading before merge:', error);
     return false;
   }
 
   const next = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : {};
 
-  for (const key of ['docs', 'tags', 'sheets', 'forms', 'slides']) {
+  for (const key of ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws']) {
     if (owned[key] !== undefined) next[key] = owned[key];
   }
 
@@ -280,6 +278,7 @@ export async function createUserDoc(hash, defaults = {}) {
     sheets: [],
     forms: [],
     slides: [],
+    draws: [],
     settings: {
       theme: 'dark',
       viewMode: 'grid',
@@ -358,8 +357,7 @@ export async function deleteSharedDoc(shareId) {
 
 /**
  * Read a request header regardless of whether the handler received a Web
- * fetch `Request` (a `Headers` instance, as used by api/docs.js) or an
- * Express/Vercel `req` (a plain object, as used by api/users.js). Bracket
+ * fetch `Request` or an Express/Vercel `req`. Bracket
  * access on a Headers instance always yields undefined, which is how
  * `https://localhost` ended up in production share links.
  */

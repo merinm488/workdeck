@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#e11d48"/>
+  <!-- Pencil on a stroke -->
+  <path d="M14 46c6-2 8-8 14-8 5 0 6 4 11 4 4 0 6-2 9-5" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+  <g transform="rotate(45 36 26)">
+    <rect x="32" y="8" width="8" height="26" rx="2" fill="#ffffff"/>
+    <path d="M32 34h8l-4 8z" fill="#ffffff"/>
+    <rect x="32" y="8" width="8" height="6" rx="2" fill="#fecdd3"/>
+  </g>
+</svg>

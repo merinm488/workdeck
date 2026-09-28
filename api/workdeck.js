@@ -8,7 +8,6 @@
  *   POST { key, action: 'login'  } -> hash + user data, 404 when unknown
  *   POST { key, action: 'create' } -> creates the unified account
  *
- * The hash is sha256(key.trim() + PEPPER_SECRET) - so one key resolves to the same account/document in all the apps.
  *
  * Data actions (PUT) operate on the unified document
  * and only touch their own sections (see api/_lib/store.js).
@@ -31,10 +30,10 @@ const DEFAULT_SHEET_NAME = 'Untitled Sheet';
 const DEFAULT_DOC_TITLE = 'Untitled';
 const DEFAULT_FORM_TITLE = 'Untitled Form';
 const DEFAULT_DECK_NAME = 'Untitled';
+const DEFAULT_DRAWING_NAME = 'Untitled Drawing';
 
 /**
- * Build a fresh Univer workbook snapshot (matches what sheets/js/home.js
- * creates client-side, so the editor loads it without any migration).
+ * Build a fresh Univer workbook snapshot 
  */
 function createDefaultSheet(id) {
   const sheetId = `sheet-${Date.now().toString(36)}`;
@@ -94,6 +93,26 @@ function createDefaultForm(id) {
     name: DEFAULT_FORM_TITLE,
     display: 'form',
     components: [],
+    sharedId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * Create an empty drawing (same shape Draw creates client-side — see the
+ * record schema at the top of draw/js/storage.js). The canvas is infinite,
+ * so there is no fixed width/height; `viewport` remembers the last
+ * pan/zoom so reopening feels continuous.
+ */
+function createDefaultDrawing(id) {
+  return {
+    id,
+    name: DEFAULT_DRAWING_NAME,
+    formatVersion: 1,
+    background: '#ffffff',
+    objects: [],
+    viewport: { zoom: 1, panX: 0, panY: 0 },
     sharedId: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -245,6 +264,15 @@ export default async function handler(req, res) {
           break;
         }
 
+        // Create empty drawing
+        case 'createDrawing': {
+          const id = data?.id || generateId();
+          const drawing = createDefaultDrawing(id);
+          if (data?.name) drawing.name = data.name;
+          userData.draws.unshift(drawing);
+          break;
+        }
+
         // ---- Record that a file was just opened (recents ordering) ----
         case 'recordOpen': {
           const { fileId, app } = data || {};
@@ -257,6 +285,8 @@ export default async function handler(req, res) {
               ? userData.forms.find(f => f.id === fileId)
               : app === 'slides'
               ? userData.slides.find(d => d.id === fileId)
+              : app === 'draw'
+              ? userData.draws.find(d => d.id === fileId)
               : userData.docs.find(n => n.id === fileId);
 
           if (!target) {
@@ -275,11 +305,11 @@ export default async function handler(req, res) {
           if (!fileId || !name || !String(name).trim()) {
             return res.status(400).json({ success: false, error: 'fileId and name are required' });
           }
-          // Docs keep their name in `title`, sheets & forms in `name`
           const isSheet = app === "sheets";
           const isForm = app === "forms";
           const isDeck = app === "slides";
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : userData.docs;
+          const isDrawing = app === "draw";
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -291,6 +321,8 @@ export default async function handler(req, res) {
           } else if (isForm) {
             target.name = cleanName;
           } else if (isDeck){
+            target.name = cleanName;
+          } else if (isDrawing) {
             target.name = cleanName;
           } else {
             target.title = cleanName;
@@ -324,6 +356,12 @@ export default async function handler(req, res) {
               await deleteSharedDoc(deck.sharedId);
             }
             userData.slides = userData.slides.filter(d => d.id !== fileId);
+          } else if (app === 'draw') {
+            const drawing = userData.draws.find(f => f.id === fileId);
+            if (drawing?.sharedId) {
+              await deleteSharedDoc(drawing.sharedId);
+            }
+            userData.draws = userData.draws.filter(d => d.id !== fileId);
           } else {
             const doc = userData.docs.find(n => n.id === fileId);
             if (doc?.sharedId) {
@@ -357,6 +395,7 @@ export default async function handler(req, res) {
         sheets: userData.sheets,
         forms: userData.forms,
         slides: userData.slides,
+        draws: userData.draws,
         settings: userData.settings
       });
 

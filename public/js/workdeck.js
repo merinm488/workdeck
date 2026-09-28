@@ -43,6 +43,11 @@ const SLIDE_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" 
       + '<line x1="8" y1="21" x2="16" y2="21"></line>'
       + '</svg>';
 
+const DRAW_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>'
+      + '<path d="m15 5 4 4"></path>'
+      + '</svg>';
+
 /**
  * App registry — the single source of truth for every Workdeck app.
  * Adding an app (Forms, Slides, ...) = one new entry here plus API support.
@@ -113,7 +118,23 @@ const WD_APPS = [
             // The API unshifts, so the newest slide is first.
             pickNewest: function (data) { return data.slides && data.slides[0]; }
         },
-        contentSearch: false  
+        contentSearch: false
+    },
+    {
+        id: 'draw',
+        name: 'Draw',
+        label: 'Drawing',
+        accent: 'draw',
+        icon: DRAW_ICON,
+        route: '/draw/editor.html',
+        editorParam: 'id',
+        create: {
+            action: 'createDrawing',
+            payload: {},
+            // The API unshifts, so the newest drawing is first.
+            pickNewest: function (data) { return data.draws && data.draws[0]; }
+        },
+        contentSearch: false
     }
 ];
 
@@ -132,6 +153,7 @@ const state = {
     sheets: [],
     forms: [],
     slides: [],
+    draws: [],
     settings: {},
     searchQuery: '',
     filter: 'all',       // 'all' | app id from WD_APPS
@@ -230,7 +252,18 @@ function getAllFiles() {
         };
     });
 
-    return docs.concat(sheetFiles).concat(formFiles).concat(slideFiles).sort(function (a, b) {
+    const drawFiles = state.draws.map(function (f) {
+        return {
+            id: f.id,
+            app: 'draw',
+            name: f.name || 'Untitled Drawing',
+            updatedAt: f.updatedAt,
+            lastOpened: lastOpened[f.id] || null,
+            content: ''
+        };
+    });
+
+    return docs.concat(sheetFiles).concat(formFiles).concat(slideFiles).concat(drawFiles).sort(function (a, b) {
         const aTime = a.lastOpened || a.updatedAt || '';
         const bTime = b.lastOpened || b.updatedAt || '';
         return bTime.localeCompare(aTime);
@@ -305,6 +338,7 @@ function applyUserData(data) {
     state.sheets = data.sheets || [];
     state.forms = data.forms || [];
     state.slides = data.slides || [];
+    state.draws = data.draws || [];
     state.settings = data.settings || {};
     render();
 }
@@ -748,6 +782,8 @@ async function confirmDelete() {
         state.forms = state.forms.filter(function (f) { return f.id !== file.id; });
     } else if (file.app === 'slides'){
         state.slides = state.slides.filter(function (d) { return d.id !== file.id});
+    } else if (file.app === 'draw') {
+        state.draws = state.draws.filter(function (d) { return d.id !== file.id });
     } else {
         state.docs = state.docs.filter(function (n) { return n.id !== file.id; });
     }

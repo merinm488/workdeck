@@ -142,8 +142,8 @@ export function useAuth() {
 
   /**
    * Store the session for Docs AND its Workdeck siblings (single origin,
-   * shared sessionStorage). Mirrors the keys Workdeck and Sheets read, so
-   * navigating between the three apps never requires re-login.
+   * shared sessionStorage). Mirrors the keys, so
+   * navigating between the apps never requires re-login.
    */
   const setSessionKeys = useCallback((hash, key) => {
     sessionStorage.setItem('docs_hash', hash);
@@ -152,6 +152,12 @@ export function useAuth() {
     sessionStorage.setItem('wd_key', key);
     sessionStorage.setItem('sheets_user_hash', hash);
     sessionStorage.setItem('sheets_user_key', key);
+    sessionStorage.setItem('forms_user_hash', hash);
+    sessionStorage.setItem('forms_user_key', key);
+    sessionStorage.setItem('slides_user_hash', hash);
+    sessionStorage.setItem('slides_user_key', key);
+    sessionStorage.setItem('draw_user_hash', hash);
+    sessionStorage.setItem('draw_user_key', key);
   }, []);
 
   /**
@@ -160,7 +166,11 @@ export function useAuth() {
   const logout = useCallback(() => {
     setUserHash(null);
     setIsAuthenticated(false);
-    ['docs_hash', 'docs_key', 'wd_hash', 'wd_key', 'sheets_user_hash', 'sheets_user_key']
+    ['docs_hash', 'docs_key', 'wd_hash', 'wd_key',
+     'sheets_user_hash', 'sheets_user_key',
+     'forms_user_hash', 'forms_user_key',
+     'slides_user_hash', 'slides_user_key',
+     'draw_user_hash', 'draw_user_key']
       .forEach(name => sessionStorage.removeItem(name));
   }, []);
 
@@ -185,7 +195,11 @@ export function useAuth() {
       // Clear local session and storage
       setUserHash(null);
       setIsAuthenticated(false);
-      ['docs_hash', 'docs_key', 'wd_hash', 'wd_key', 'sheets_user_hash', 'sheets_user_key']
+      ['docs_hash', 'docs_key', 'wd_hash', 'wd_key',
+       'sheets_user_hash', 'sheets_user_key',
+       'forms_user_hash', 'forms_user_key',
+       'slides_user_hash', 'slides_user_key',
+       'draw_user_hash', 'draw_user_key']
         .forEach(name => sessionStorage.removeItem(name));
 
       setIsLoading(false);

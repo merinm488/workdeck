@@ -11,12 +11,14 @@
  *   /sheets/*      -> Sheets app (static)
  *   /forms/*       -> Forms app (static)
  *   /slides/*      -> Slides app (static)
+ *   /draw/*        -> Draw app (static)
  *   /docs/*        -> Docs build (static, vite base '/docs/')
  *   /api/workdeck  -> api/workdeck.js     (Workdeck API)
  *   /api/docs      -> api/docs.js         (Docs API, fetch-style handler)
  *   /api/users     -> api/users.js        (Sheets API)
  *   /api/forms     -> api/forms.js        (Forms API)
  *   /api/slides    -> api/slides.js       (Slides API)
+ *   /api/draw      -> api/draw.js         (Draw API)
  *
  * Storage: local JSON files under db/users/ (NODE_ENV=development).
  * Run with:  npm run dev   (port 4000)
@@ -52,6 +54,7 @@ const docsModule = await import('../api/docs.js');
 const { default: usersHandler } = await import('../api/users.js');
 const { default: formsHandler } = await import('../api/forms.js');
 const { default: slidesHandler } = await import('../api/slides.js');
+const { default: drawHandler } = await import('../api/draw.js');
 
 const app = express();
 const PORT = 4000;
@@ -84,7 +87,7 @@ function createMockResponse(res) {
   };
 }
 
-// api/docs.js uses the Web Fetch API style (Request/Response). Adapt it:
+// api/docs.js uses the Web Fetch API style (Request/Response). Adapting it:
 async function adaptDocsHandler(req, res, method) {
   const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
   const hasBody = method !== 'GET' && method !== 'DELETE';
@@ -107,6 +110,7 @@ app.all('/api/docs', (req, res) => adaptDocsHandler(req, res, req.method.toUpper
 app.all('/api/users', (req, res) => usersHandler(req, res));
 app.all('/api/forms', (req, res) => formsHandler(req, res));
 app.all('/api/slides', (req, res) => slidesHandler(req, res));
+app.all('/api/draw', (req, res) => drawHandler(req, res));
 
 // ---------- Static apps ----------
 // Workdeck landing page + assets
@@ -127,6 +131,9 @@ app.use('/forms', express.static(path.join(ROOT_DIR, 'forms'), { index: 'index.h
 // Slides (plain static)
 app.use('/slides', express.static(path.join(ROOT_DIR, 'slides'), { index: 'index.html' }));
 
+// Draw (plain static)
+app.use('/draw', express.static(path.join(ROOT_DIR, 'draw'), { index: 'index.html' }));
+
 // Root redirect to the Workdeck landing page
 app.get('/', (req, res) => {
   res.sendFile(path.join(ROOT_DIR, 'public', 'index.html'));
@@ -140,7 +147,8 @@ app.listen(PORT, () => {
   console.log(`📊 Sheets:     http://localhost:${PORT}/sheets/`);
   console.log(`📋 Forms:      http://localhost:${PORT}/forms/`);
   console.log(`🎬 Slides:     http://localhost:${PORT}/slides/`);
-  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides`);
+  console.log(`✏️  Draw:       http://localhost:${PORT}/draw/`);
+  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw`);
   console.log(`📁 Local DB:   ${path.join(ROOT_DIR, 'db')}`);
   console.log('\nPress Ctrl+C to stop\n');
 });

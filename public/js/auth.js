@@ -4,18 +4,12 @@
  * ================================================
  *
  *
- *   1. POST { key, action: 'login' }
- *   2. 404 "User not found"  ->  POST { key, action: 'create' }  (auto-create)
- *
- * The hash is computed server-side (sha256(key + pepper)), so the raw key
+ * The hash is computed server-side, so the raw key
  * never determines storage. On success, sessionStorage gets the Workdeck
  * session PLUS mirrors for every child app, so apps are
  * already logged in when the user navigates to them:
  *
- *   wd_hash / wd_key           -> Workdeck session
- *   docs_hash / docs_key       -> Docs expects these (useAuth.js)
- *   sheets_user_hash / ..._key -> Sheets expects these (js/auth.js)
- *   forms_user_hash / ..._key  -> Forms expects these (js/auth.js)
+
  */
 
 const WD_AUTH_CONFIG = {
@@ -30,7 +24,9 @@ const WD_AUTH_CONFIG = {
         formsHash: 'forms_user_hash',
         formsKey: 'forms_user_key',
         slidesHash: 'slides_user_hash',
-        slidesKey: 'slides_user_key'
+        slidesKey: 'slides_user_key',
+        drawHash: 'draw_user_hash',
+        drawKey: 'draw_user_key'
     }
 };
 
@@ -83,7 +79,7 @@ class WdAuthManager {
             }
 
             if (response.status === 404) {
-                // 2) Unknown key -> auto-create (Docs behavior)
+                // 2) Unknown key -> auto-create 
                 return await this.createAccount(normalizedKey);
             }
 
@@ -134,14 +130,18 @@ class WdAuthManager {
         sessionStorage.setItem(s.formsKey, key);
         sessionStorage.setItem(s.slidesHash, hash);
         sessionStorage.setItem(s.slidesKey, key);
+        sessionStorage.setItem(s.drawHash, hash);
+        sessionStorage.setItem(s.drawKey, key);
 
-        // Slides seed: Safari doesn't copy sessionStorage into a newly
+        // Safari doesn't copy sessionStorage into a newly
         // opened tab, so a fresh-tab Slides editor used to find no session
         // and bounce back to '/'. The localStorage mirror lets it recover;
         // clearSession() removes it so logout still sticks.
         try {
             localStorage.setItem(s.slidesHash, hash);
             localStorage.setItem(s.slidesKey, key);
+            localStorage.setItem(s.drawHash, hash);
+            localStorage.setItem(s.drawKey, key);
         } catch (err) {
             console.warn('[AUTH] localStorage seed failed (private mode?):', err);
         }

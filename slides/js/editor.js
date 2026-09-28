@@ -113,7 +113,6 @@ function initCanvas() {
     editorState.canvas.on('selection:cleared', syncToolbarFromSelection);
 
     editorState.canvas.on('mouse:down', (opt) => {
-        // 'draw' is handled by isDrawingMode/PencilBrush, not insert-at-pointer
         if (editorState.activeTool !== 'select' && editorState.activeTool !== 'draw') {
             insertObjectAtPointer(opt);
         }
