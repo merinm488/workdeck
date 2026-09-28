@@ -132,10 +132,12 @@ function initCanvas() {
     let gestureScale = 1;
     upperCanvas.addEventListener('gesturestart', (e) => {
         e.preventDefault();
+        if (editorState.touchMode === 'pan-zoom') return;
         gestureScale = 1;
     });
     upperCanvas.addEventListener('gesturechange', (e) => {
         e.preventDefault();
+        if (editorState.touchMode === 'pan-zoom') return;
         const rect = upperCanvas.getBoundingClientRect();
         zoomToPoint(e.scale / gestureScale, { x: e.clientX - rect.left, y: e.clientY - rect.top });
         gestureScale = e.scale;
@@ -1354,50 +1356,76 @@ function bindKeyboard() {
 // Touch / mobile
 // ================================================
 
+function cancelPendingDrawAction() {
+    const canvas = editorState.canvas;
+
+    if (canvas._isCurrentlyDrawing) {
+        canvas._isCurrentlyDrawing = false;   // __onMouseUp now skips the brush — no path is added
+        canvas.clearContext(canvas.contextTop);   // wipe the live stroke preview
+        canvas.contextTopDirty = false;           // renderAll's auto-clear skips drawing mode
+    }
+
+    if (editorState.draftLine) {
+        canvas.remove(editorState.draftLine);   // object:removed fires while the guard is still up
+        editorState.draftLine = null;
+    }
+
+    editorState.isErasing = false;
+
+    // object drag / marquee: stop where the fingers left it.
+    canvas._currentTransform = null;
+    canvas._groupSelector = null;
+}
+
 
 function bindTouchGestures() {
     const stage = document.querySelector('.canvas-stage');
     let gesture = null;   // pinch state, re-anchored on every move (Round 17 discipline)
 
+    let stageRect = null;
+
     // two-finger midpoint in CANVAS-element coordinates (clientX/Y are page coords)
-    const pinchCenter = (touches) => {
-        const rect = editorState.canvas.upperCanvasEl.getBoundingClientRect();
-        return {
-            x: (touches[0].clientX + touches[1].clientX) / 2 - rect.left,
-            y: (touches[0].clientY + touches[1].clientY) / 2 - rect.top
-        };
-    };
+    const pinchCenter = (touches) => ({
+        x: (touches[0].clientX + touches[1].clientX) / 2 - stageRect.left,
+        y: (touches[0].clientY + touches[1].clientY) / 2 - stageRect.top
+    });
 
     stage.addEventListener('touchstart', (e) => {
-        editorState.touchMode = e.touches.length >= 2 ? 'pan-zoom' : 'draw';
+        if (e.touches.length >= 2) {
+            e.preventDefault();
+            cancelPendingDrawAction();
+            editorState.touchMode = 'pan-zoom';
+            stageRect = editorState.canvas.upperCanvasEl.getBoundingClientRect();
 
-        if (editorState.touchMode === 'pan-zoom') {
             const t = e.touches;
             gesture = {
                 lastDist: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY),
                 lastMid: pinchCenter(t)
             };
             editorState.canvas.discardActiveObject();   // a selection shouldn't ride the pinch
+            return;
         }
+
+        editorState.touchMode = 'draw';
     }, { passive: false });
 
     stage.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+
         if (editorState.touchMode !== 'pan-zoom' || !gesture || e.touches.length < 2) return;
-        e.preventDefault();   // needs { passive: false } on the listener, or this is ignored
 
         const t = e.touches;
         const dist = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
         const mid = pinchCenter(t);
 
-        // pinch = zoom at the focal point (zoomToPoint, factor = distance ratio)
-        zoomToPoint(dist / gesture.lastDist, mid);
-
-        // then slide by however the midpoint itself moved
         const vp = getViewport();
+        const factor = gesture.lastDist > 0 ? dist / gesture.lastDist : 1;
+        const newZoom = Math.min(APP_CONFIG.canvas.maxZoom, Math.max(APP_CONFIG.canvas.minZoom, vp.zoom * factor));
+        const ratio = newZoom / vp.zoom;
         applyViewport({
-            zoom: vp.zoom,
-            panX: vp.panX + (mid.x - gesture.lastMid.x),
-            panY: vp.panY + (mid.y - gesture.lastMid.y)
+            zoom: newZoom,
+            panX: mid.x - (mid.x - vp.panX) * ratio + (mid.x - gesture.lastMid.x),
+            panY: mid.y - (mid.y - vp.panY) * ratio + (mid.y - gesture.lastMid.y)
         });
 
         gesture.lastDist = dist;   // re-anchor — forget these two lines and the pinch rockets
@@ -1406,10 +1434,14 @@ function bindTouchGestures() {
 
     const endGesture = () => {
         gesture = null;
+        stageRect = null;
         editorState.touchMode = null;
     };
     stage.addEventListener('touchend', endGesture);
-    stage.addEventListener('touchcancel', endGesture);
+    stage.addEventListener('touchcancel', () => {
+        cancelPendingDrawAction();
+        endGesture();
+    });
 }
 
 // ================================================
