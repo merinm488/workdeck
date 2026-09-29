@@ -216,7 +216,8 @@ function getAllFiles() {
                 name: d.title || 'Untitled',
                 updatedAt: d.updatedAt,
                 lastOpened: lastOpened[d.id] || null,
-                content: d.content || ''
+                content: d.content || '',
+                raw: d
             };
         });
 
@@ -227,7 +228,8 @@ function getAllFiles() {
             name: s.name || 'Untitled Spreadsheet',
             updatedAt: s.updatedAt,
             lastOpened: lastOpened[s.id] || null,
-            content: ''
+            content: '',
+            raw: s
         };
     });
 
@@ -238,7 +240,8 @@ function getAllFiles() {
             name: f.name || 'Untitled Form',
             updatedAt: f.updatedAt,
             lastOpened: lastOpened[f.id] || null,
-            content: ''
+            content: '',
+            raw: f
         };
     });
 
@@ -249,7 +252,8 @@ function getAllFiles() {
             name: f.name || 'Untitled',
             updatedAt: f.updatedAt,
             lastOpened: lastOpened[f.id] || null,
-            content: ''
+            content: '',
+            raw: f
         };
     });
 
@@ -260,7 +264,8 @@ function getAllFiles() {
             name: f.name || 'Untitled Drawing',
             updatedAt: f.updatedAt,
             lastOpened: lastOpened[f.id] || null,
-            content: ''
+            content: '',
+            raw: f
         };
     });
 
@@ -614,16 +619,22 @@ function buildCard(file) {
 
     card.innerHTML = '<div class="wd-file-card-top">'
         + '<div class="wd-file-icon wd-file-icon-' + app.accent + '">' + app.icon + '</div>'
+        + '<div class="wd-file-title">' + escapeHtml(file.name) + '</div>'
         + '<div class="wd-file-actions">'
         + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
         + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
         + '</div>'
         + '</div>'
-        + '<div class="wd-file-title">' + escapeHtml(file.name) + '</div>'
+        + '<div class="wd-file-preview"><div class="wd-file-preview-page">'
+        + '<div class="wd-preview-skeleton"></div>'
+        + '</div></div>'
         + '<div class="wd-file-meta">'
         + '<span class="wd-file-app-badge ' + app.accent + '">' + app.label + '</span>'
         + '<span>' + formatRelativeDate(when) + '</span>'
         + '</div>';
+
+    const previewPage = card.querySelector('.wd-file-preview-page');
+    if (previewPage && window.WDPreviews) WDPreviews.mount(previewPage, file);
 
     card.addEventListener('click', function (e) {
         if (!e.target.closest('.wd-file-action-btn')) openFile(file);

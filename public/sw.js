@@ -25,6 +25,7 @@ const PRECACHE_URLS = [
   '/workdeck.css',
   '/js/themes.js',
   '/js/auth.js',
+  '/js/previews.js',
   '/js/workdeck.js',
   '/js/pwa.js',
   '/manifest.json',
