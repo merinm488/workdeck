@@ -23,6 +23,7 @@ class SheetsApp {
         this.hasUnsavedChanges = false;
         // Rename reminder: dismissed once per spreadsheet (either button)
         this.renamePromptDismissed = false;
+        this.footerUpdatePending = false;
         this.isProduction = APP_CONFIG.isProduction;
     }
 
@@ -183,10 +184,18 @@ class SheetsApp {
                 if (themeSubmenu) {
                     themeSubmenu.classList.remove('active');
                 }
+                const themeContainer = themeToggleBtn && themeToggleBtn.closest('.theme-dropdown-container');
+                if (themeContainer) {
+                    themeContainer.classList.remove('active');
+                }
             }
             // Close theme submenu if clicking outside it but still in settings
             if (themeSubmenu && !e.target.closest('.theme-dropdown-container')) {
                 themeSubmenu.classList.remove('active');
+                const themeContainer = themeToggleBtn && themeToggleBtn.closest('.theme-dropdown-container');
+                if (themeContainer) {
+                    themeContainer.classList.remove('active');
+                }
             }
         });
 
@@ -196,10 +205,10 @@ class SheetsApp {
                 e.stopPropagation();
                 // Toggle the submenu
                 const isActive = themeSubmenu.classList.contains('active');
-                if (isActive) {
-                    themeSubmenu.classList.remove('active');
-                } else {
-                    themeSubmenu.classList.add('active');
+                themeSubmenu.classList.toggle('active');
+                const themeContainer = themeToggleBtn.closest('.theme-dropdown-container');
+                if (themeContainer) {
+                    themeContainer.classList.toggle('active', !isActive);
                 }
             });
         }
@@ -213,6 +222,10 @@ class SheetsApp {
                 this.setThemeFromOption(theme);
                 if (themeSubmenu) {
                     themeSubmenu.classList.remove('active');
+                }
+                const themeContainer = themeToggleBtn && themeToggleBtn.closest('.theme-dropdown-container');
+                if (themeContainer) {
+                    themeContainer.classList.remove('active');
                 }
             });
         });
@@ -704,6 +717,16 @@ class SheetsApp {
         spreadsheetManager.startChangeTracking(() => {
             this.markAsChanged();
         });
+
+        const fWorkbook = spreadsheetManager.fWorkbook;
+        if (fWorkbook && typeof fWorkbook.onSelectionChange === 'function') {
+            try {
+                fWorkbook.onSelectionChange(() => this.queueSheetFooterUpdate());
+            } catch (err) {
+                console.warn('[APP] Footer selection hook unavailable:', err);
+            }
+        }
+        this.updateSheetFooter();
     }
 
     /**
@@ -780,12 +803,7 @@ class SheetsApp {
                 themeDisplayName = currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1);
             }
 
-            // On mobile devices, show just "Theme" to fit on one line
-            if (window.innerWidth <= 640) {
-                themeText.textContent = 'Theme';
-            } else {
-                themeText.textContent = `Theme: ${themeDisplayName}`;
-            }
+            themeText.textContent = `Theme: ${themeDisplayName}`;
 
             // Update active state on theme options
             const themeOptions = document.querySelectorAll('.theme-option');
@@ -1143,6 +1161,70 @@ class SheetsApp {
      */
     markAsChanged() {
         this.hasUnsavedChanges = true;
+        this.queueSheetFooterUpdate();
+    }
+
+    // ================================================
+    // Status footer
+    // ================================================
+
+    columnLetter(col) {
+        let letters = '';
+        let n = col + 1;
+        while (n > 0) {
+            const rem = (n - 1) % 26;
+            letters = String.fromCharCode(65 + rem) + letters;
+            n = Math.floor((n - 1) / 26);
+        }
+        return letters;
+    }
+
+    updateSheetFooter() {
+        const el = document.getElementById('sheetsFooterStats');
+        if (!el || !spreadsheetManager.ready()) return;
+        try {
+            const ws = spreadsheetManager.getCurrentSheetData();
+            if (!ws) return;
+
+            const parts = [];
+
+            const range = typeof ws.getActiveRange === 'function' ? ws.getActiveRange() : null;
+            if (range && typeof range.getRow === 'function' && typeof range.getColumn === 'function') {
+                parts.push('Cell ' + this.columnLetter(range.getColumn()) + (range.getRow() + 1));
+            }
+
+            try {
+                if (typeof ws.getDataRange === 'function') {
+                    const used = ws.getDataRange();
+                    const collapsed = used.getLastRow() === 0 && used.getLastColumn() === 0;
+                    const emptyCollapsed = collapsed && (() => {
+                        try {
+                            const v = typeof used.getValue === 'function' ? used.getValue() : '';
+                            return v === '' || v == null;
+                        } catch (err) { return false; }
+                    })();
+                    if (!emptyCollapsed) {
+                        parts.push('Range A1:' + this.columnLetter(used.getLastColumn()) + (used.getLastRow() + 1));
+                    }
+                }
+            } catch (err) { /* skip the range segment */ }
+
+            const fWorkbook = spreadsheetManager.fWorkbook;
+            const sheetCount = (fWorkbook && typeof fWorkbook.getNumSheets === 'function')
+                ? fWorkbook.getNumSheets() : 1;
+            parts.push(sheetCount + (sheetCount === 1 ? ' sheet' : ' sheets'));
+
+            el.textContent = parts.join(' · ');
+        } catch (err) { /* footer is best-effort */ }
+    }
+
+    queueSheetFooterUpdate() {
+        if (this.footerUpdatePending) return;
+        this.footerUpdatePending = true;
+        setTimeout(() => {
+            this.footerUpdatePending = false;
+            this.updateSheetFooter();
+        }, 150);
     }
 
     /**

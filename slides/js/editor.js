@@ -30,6 +30,17 @@ let undoSnapshotTimer = null;
 let notificationTimer = null;
 
 // ================================================
+// Status footer
+// ================================================
+
+function updateSlideFooter() {
+    const el = $('slidesFooterStats');
+    if (!el || !editorState.deck) return;
+    const total = editorState.deck.slides.length;
+    el.textContent = `Slide ${editorState.currentSlideIndex + 1} of ${total}`;
+}
+
+// ================================================
 // Boot
 // ================================================
 
@@ -132,6 +143,7 @@ function loadSlide(index, skipSync = false) {
 
     editorState.currentSlideIndex = index;
     $('stageCounter').textContent = `${index + 1} / ${editorState.deck.slides.length}`;
+    updateSlideFooter();
     editorState.undoStack = [];
     editorState.redoStack = [];
     clearTimeout(undoSnapshotTimer);
@@ -476,6 +488,7 @@ function reorderSlides(fromId, dropIndex) {
 
     editorState.currentSlideIndex = slides.findIndex((s) => s.id === currentId);
     $('stageCounter').textContent = `${editorState.currentSlideIndex + 1} / ${slides.length}`;
+    updateSlideFooter();
     buildThumbs();
     markDirty();
 }
@@ -1682,6 +1695,7 @@ function closeMenusOnOutsideClick() {
         }
         if (!e.target.closest('.top-nav-settings')) {
             $('settingsDropdown').classList.remove('open');
+            closeThemeSubmenu();
         }
     });
 }
@@ -1964,22 +1978,39 @@ function closeRenamePrompt(renamed) {
 }
 
 
-function bindSettingsMenu() {
+function syncThemeControls() {
     $('themeText').textContent = 'Theme: ' + slidesThemeManager.getDisplayLabel();
+    const pref = slidesThemeManager.getPreference();
+    document.querySelectorAll('.theme-option').forEach((option) => {
+        option.classList.toggle('active', option.dataset.theme === pref);
+    });
+}
+
+function closeThemeSubmenu() {
+    $('themeSubmenu').classList.remove('open');
+    const container = $('themeToggleBtn').closest('.theme-dropdown-container');
+    if (container) container.classList.remove('active');
+}
+
+function bindSettingsMenu() {
+    syncThemeControls();
 
     $('settingsBtn').addEventListener('click', () => {
         $('settingsDropdown').classList.toggle('open');
         $('exportDropdown').classList.remove('open');
     });
 
+    // Theme row expands the submenu inline (docs pattern)
     $('themeToggleBtn').addEventListener('click', () => {
-        $('themeSubmenu').classList.toggle('open');
+        const open = $('themeSubmenu').classList.toggle('open');
+        $('themeToggleBtn').closest('.theme-dropdown-container').classList.toggle('active', open);
     });
 
     document.querySelectorAll('.theme-option').forEach((option) => {
         option.addEventListener('click', () => {
             slidesThemeManager.setTheme(option.dataset.theme);
-            $('themeText').textContent = 'Theme: ' + slidesThemeManager.getDisplayLabel();
+            syncThemeControls();
+            closeThemeSubmenu();
         });
     });
 

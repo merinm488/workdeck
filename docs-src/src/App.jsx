@@ -361,8 +361,8 @@ function App() {
     <div className={`min-h-screen ${effectiveTheme === 'dark' ? 'dark' : ''}`}>
       {/* Background decoration */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-yellow-400/5 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-yellow-400/5 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-400/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative min-h-screen flex">
@@ -376,8 +376,8 @@ function App() {
             {/* Logo */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-yellow-400/10 dark:bg-white/10 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-yellow-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-8 h-8 rounded-lg bg-blue-400/10 dark:bg-white/10 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -434,7 +434,7 @@ function App() {
                         onClick={() => handleDocClick(doc)}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors group ${
                           activeDoc?.id === doc.id && isDocViewOpen
-                            ? 'bg-yellow-100 dark:bg-yellow-900/20'
+                            ? 'bg-blue-100 dark:bg-blue-900/20'
                             : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                       >
@@ -510,7 +510,7 @@ function App() {
         )}
 
         {/* ===== MAIN CONTENT ===== */}
-        <main className={`flex-1 transition-all duration-300 ease-in-out ${showSidebar ? 'lg:ml-72' : 'lg:ml-0'}`}>
+        <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${showSidebar ? 'lg:ml-72' : 'lg:ml-0'}`}>
           {/* Header */}
           <header className="sticky top-0 z-10 bg-bg-primary/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between px-4 py-3 gap-2 sm:gap-4">
@@ -538,7 +538,7 @@ function App() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search docs..."
-                      className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       autoFocus
                     />
                   </div>
@@ -626,7 +626,7 @@ function App() {
                         onClick={() => setShowArchived(!showArchived)}
                         className={`p-2 rounded-lg transition-colors ${
                           showArchived
-                            ? 'bg-yellow-500 text-black'
+                            ? 'bg-blue-600 text-white'
                             : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
                       >
@@ -736,6 +736,16 @@ function App() {
               )
             )}
           </div>
+
+          {/* Status footer: file stats. Sticky so it stays pinned
+              to the viewport bottom while the list scrolls. */}
+          <footer className="sticky bottom-0 z-20 mt-auto px-4 sm:px-6 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] border-t border-gray-200 dark:border-gray-700 bg-[rgb(var(--bg-primary))] flex items-center justify-between gap-4 text-[11.5px] leading-none text-gray-400 dark:text-gray-500 tabular-nums select-none">
+            <span className="truncate">
+              {searchQuery
+                ? `${filteredDocs.length} of ${docs.filter(n => !n.archived).length} files`
+                : `${docs.filter(n => !n.archived).length} files · ${tags.length} ${tags.length === 1 ? 'tag' : 'tags'}`}
+            </span>
+          </footer>
         </main>
       </div>
 

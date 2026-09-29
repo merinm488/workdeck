@@ -222,14 +222,14 @@ export function DocActions({ doc, onPin, onDelete, onRename, onArchive, onShare,
             onKeyDown={handleRenameKeyDown}
             onBlur={handleRenameSubmit}
             placeholder="Enter doc title..."
-            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             autoFocus
           />
           <div className="flex gap-1 mt-2">
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleRenameSubmit}
-              className="flex-1 px-2 py-1 text-xs bg-yellow-500 text-black rounded hover:bg-yellow-600"
+              className="flex-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               Save
             </button>

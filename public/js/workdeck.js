@@ -150,6 +150,7 @@ function getApp(appId) {
 const state = {
     userHash: null,
     docs: [],
+    tags: [],
     sheets: [],
     forms: [],
     slides: [],
@@ -335,6 +336,7 @@ async function loadUserData() {
 
 function applyUserData(data) {
     state.docs = data.docs || [];
+    state.tags = data.tags || [];
     state.sheets = data.sheets || [];
     state.forms = data.forms || [];
     state.slides = data.slides || [];
@@ -448,6 +450,28 @@ function render() {
     renderFilterMenu();
 }
 
+// ================================================
+// Status footer
+// ================================================
+
+function renderFooter() {
+    const statsEl = $('wdFooterStats');
+    if (!statsEl) return;
+
+    const files = getAllFiles();
+    const total = files.length;
+
+    if (state.searchQuery.trim()) {
+        const visible = getVisibleFiles().length;
+        statsEl.textContent = visible + ' of ' + total + ' file' + (total === 1 ? '' : 's');
+    } else if (state.filter !== 'all') {
+        const count = files.filter(function (file) { return file.app === getApp(state.filter).id; }).length;
+        statsEl.textContent = count + ' file' + (count === 1 ? '' : 's');
+    } else {
+        statsEl.textContent = total + ' file' + (total === 1 ? '' : 's') + ' · ' + WD_APPS.length + ' apps';
+    }
+}
+
 function renderViewToggle() {
     document.querySelectorAll('.wd-view-btn').forEach(function (btn) {
         btn.classList.toggle('active', btn.dataset.view === state.viewMode);
@@ -544,6 +568,8 @@ function renderFiles() {
     viewTitle.textContent = isSearching ? 'Search results' : filterNames[state.filter];
     viewCount.textContent = files.length ? String(files.length) : '';
     searchHint.classList.toggle('hidden', !isSearching);
+
+    renderFooter();
 
     if (files.length === 0) {
         gridView.classList.add('hidden');
@@ -911,9 +937,43 @@ function setupEventListeners() {
 
     // ----- Search -----
     const searchInput = $('searchInput');
+    const searchWrapper = searchInput.closest('.wd-search-wrapper');
+    const searchGhost = $('searchGhost');
+    const searchGhostTyped = $('searchGhostTyped');
+    const searchGhostRest = $('searchGhostRest');
+    let searchSuggestion = null;
+
+    // Greyed-out inline completion from the most recent title matching the prefix.
+    function updateSearchSuggestion() {
+        const value = searchInput.value;
+        searchSuggestion = null;
+        if (value.trim()) {
+            const q = value.toLowerCase();
+            const match = getAllFiles().find(function (file) {
+                return (state.filter === 'all' || file.app === state.filter) &&
+                    file.name.toLowerCase().startsWith(q) &&
+                    file.name.length > value.length;
+            });
+            if (match) searchSuggestion = match.name;
+        }
+        if (searchSuggestion) {
+            searchGhostTyped.textContent = value;
+            searchGhostRest.textContent = searchSuggestion.slice(value.length);
+            searchWrapper.classList.add('suggesting');
+        } else {
+            searchWrapper.classList.remove('suggesting');
+        }
+    }
+
+    function hideSearchSuggestion() {
+        searchSuggestion = null;
+        searchWrapper.classList.remove('suggesting');
+    }
+
     searchInput.addEventListener('input', function (e) {
         state.searchQuery = e.target.value;
         $('clearSearch').classList.toggle('hidden', !state.searchQuery);
+        updateSearchSuggestion();
         renderFiles();
     });
 
@@ -923,15 +983,30 @@ function setupEventListeners() {
             state.searchQuery = '';
             $('clearSearch').classList.add('hidden');
             renderFiles();
+            hideSearchSuggestion();
             searchInput.blur();
+        } else if (e.key === 'Tab' && searchSuggestion && !e.shiftKey && !e.isComposing) {
+            e.preventDefault();
+            searchInput.value = searchSuggestion;
+            state.searchQuery = searchSuggestion;
+            $('clearSearch').classList.remove('hidden');
+            renderFiles();
+            updateSearchSuggestion();
         }
     });
+
+    searchInput.addEventListener('scroll', function () {
+        searchGhost.scrollLeft = searchInput.scrollLeft;
+    });
+    searchInput.addEventListener('focus', updateSearchSuggestion);
+    searchInput.addEventListener('blur', hideSearchSuggestion);
 
     $('clearSearch').addEventListener('click', function () {
         searchInput.value = '';
         state.searchQuery = '';
         $('clearSearch').classList.add('hidden');
         renderFiles();
+        hideSearchSuggestion();
     });
 
     // ----- + New dropdowns (header + empty state) -----
@@ -941,8 +1016,14 @@ function setupEventListeners() {
         $('newBtn').closest('.wd-new-container').classList.toggle('active');
     });
 
+    // Empty-state "+ New": inside a filtered app section the app is implied,
+    // so create in it directly; with "All files" active, open the picker.
     $('emptyNewBtn').addEventListener('click', function (e) {
         e.stopPropagation();
+        if (state.filter !== 'all') {
+            createFile(state.filter);
+            return;
+        }
         toggleDropdown($('emptyNewDropdown'), $('emptyNewBtn'));
         $('emptyNewBtn').closest('.wd-new-container').classList.toggle('active');
     });
@@ -1119,11 +1200,12 @@ function updateThemeLabel() {
         ? 'System'
         : current.charAt(0).toUpperCase() + current.slice(1);
 
-    if (window.innerWidth <= 640) {
-        label.textContent = 'Theme';
-    } else {
-        label.textContent = 'Theme: ' + display;
-    }
+    label.textContent = 'Theme: ' + display;
+
+    // Checkmark on the row matching the saved preference
+    document.querySelectorAll('.wd-theme-option').forEach(function (option) {
+        option.classList.toggle('active', option.dataset.theme === saved);
+    });
 }
 
 // ================================================

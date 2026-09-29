@@ -765,32 +765,8 @@
         visibility: visible !important;
     }
 
-    /* Ensure solid background for theme submenu */
-    .theme-submenu {
-        background-color: #ffffff !important;
-        background: #ffffff !important;
-        border: 1px solid #e5e5e5 !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        position: absolute !important;
-        z-index: 100000 !important;
-    }
-
-    .theme-submenu.active {
-        opacity: 1 !important;
-        visibility: visible !important;
-    }
-
     /* Dark theme overrides */
     [data-theme="dark"] .settings-dropdown {
-        background-color: #1a1a1a !important;
-        background: #1a1a1a !important;
-        border-color: #2a2a2a !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-    }
-
-    [data-theme="dark"] .theme-submenu {
         background-color: #1a1a1a !important;
         background: #1a1a1a !important;
         border-color: #2a2a2a !important;
@@ -810,19 +786,6 @@
         color: #1a1a1a !important;
     }
 
-    /* Ensure theme options have proper contrast */
-    .theme-option {
-        background-color: transparent !important;
-    }
-
-    [data-theme="dark"] .theme-option {
-        color: #e5e5e5 !important;
-    }
-
-    [data-theme="light"] .theme-option {
-        color: #1a1a1a !important;
-    }
-
     /* Ensure dropdown items have proper hover states */
     [data-theme="dark"] .settings-dropdown-item:hover {
         background-color: #14532d !important;
@@ -832,31 +795,6 @@
     [data-theme="light"] .settings-dropdown-item:hover {
         background-color: #dcfce7 !important;
         color: #22c55e !important;
-    }
-
-    /* Ensure theme options have proper hover states */
-    [data-theme="dark"] .theme-option:hover {
-        background-color: #14532d !important;
-        color: #22c55e !important;
-    }
-
-    [data-theme="light"] .theme-option:hover {
-        background-color: #dcfce7 !important;
-        color: #22c55e !important;
-    }
-
-    /* Mobile: position theme submenu below parent instead of to the right */
-    .theme-submenu {
-        top: 100% !important;
-        right: auto !important;
-        left: 0 !important;
-        margin-right: 0 !important;
-        margin-top: 4px !important;
-        transform: translateY(10px) !important;
-    }
-
-    .theme-submenu.active {
-        transform: translateY(0) !important;
     }
 
     /* Ensure dropdown items have solid backgrounds */

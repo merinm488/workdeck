@@ -17,10 +17,6 @@ export function useDocs(userHash) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  // True once the first fetch for the current user has completed. Unlike
-  // isLoading (which is also false before the fetch starts), this lets
-  // callers distinguish "loaded, doc really isn't there" from "still
-  // fetching" — e.g. when resolving a /docs/?doc= deep link.
   const [hasLoaded, setHasLoaded] = useState(false);
 
   /**
@@ -34,14 +30,11 @@ export function useDocs(userHash) {
 
     setIsLoading(true);
     try {
-      // Fetch docs and tags in parallel for better performance
-      const [userDocs, userTags] = await Promise.all([
-        db.getDocs(userHash),
-        db.getTags(userHash)
-      ]);
+      
+      const userData = await db.getUserData(userHash);
 
-      setDocs(userDocs || []);
-      setTags(userTags || []);
+      setDocs(userData?.docs || []);
+      setTags(userData?.tags || []);
       setHasLoaded(true);
     } catch (error) {
       console.error('Failed to fetch data:', error);

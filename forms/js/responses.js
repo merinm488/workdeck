@@ -125,13 +125,11 @@ class FormsResponsesView {
     // ================================================
 
     /**
-     * Load + render responses for one form.
+
      * @param {string} formId
      * @returns {Promise<boolean>} true when data loaded (even 0 responses)
      */
     async load(formId) {
-        // 1. Remember formId on `this` (refresh() reuses it) and return
-        //    false if it's missing.
         if (!formId) {
             return false;
         }
@@ -143,17 +141,14 @@ class FormsResponsesView {
             return false;
         }
 
-        // 3. Set this.isLoading = true, show the loading state, drop any
-        //    stale views, then fetch.
+
         this.isLoading = true;
         this.showState('loading');
         this.destroyCharts();
         this.destroyTable();
         const result = await formsStorage.getResponses(this.formId);
 
-        // 4. Failure: result === null -> surface the error through the
-        //    editor's toast (editor.js exposes itself as
-        //    window.formsEditorApp) and bail.
+
         if (result === null) {
             this.isLoading = false;
             window.formsEditorApp?.showError('Failed to load responses');
@@ -166,16 +161,10 @@ class FormsResponsesView {
         this.linkedSheet = result.linkedSheet || null;
         this.isLoading = false;
 
-        // Header count ("N responses") + link-state UI. The active
-        // sub-tab's view is rendered by showState -> applyView below —
-        // charts build while their panel is VISIBLE so Chart.js measures
-        // real pixel sizes.
+        window.formsEditorApp?.updateResponseCount?.(this.responses.length);
+
         this.renderHeaderCount();
         this.updateSheetsUI();
-        // With zero responses the summary cards would all read "0 of 0
-        // answered" — the dedicated empty state says something useful
-        // instead (and showState itself picks the right wording based on
-        // whether the form has ever been shared).
         this.showState(this.responses.length > 0 ? 'summary' : 'empty');
         return true;
     }

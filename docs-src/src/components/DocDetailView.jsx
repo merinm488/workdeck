@@ -353,8 +353,8 @@ export function DocDetailView({
         </button>
 
         {/* Doc icon */}
-        <div className="w-8 h-8 rounded-lg bg-yellow-400/10 dark:bg-white/10 flex items-center justify-center">
-          <svg className="w-4 h-4 text-yellow-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-8 h-8 rounded-lg bg-blue-400/10 dark:bg-white/10 flex items-center justify-center">
+          <svg className="w-4 h-4 text-blue-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         </div>
@@ -370,7 +370,7 @@ export function DocDetailView({
         {/* Edit button */}
         <button
           onClick={() => setMode('edit')}
-          className="px-3 py-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-black font-medium transition-colors flex items-center gap-2"
+          className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors flex items-center gap-2"
           title="Edit doc (Cmd/Ctrl+E)"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -518,33 +518,44 @@ export function DocDetailView({
    * Render save status footer (edit mode only)
    */
   const renderSaveStatus = () => {
-    if (mode === 'view') return null;
+    const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+    const charCount = content.length;
+    const readMinutes = wordCount ? Math.max(1, Math.round(wordCount / 200)) : 0;
 
     return (
-      <div className="px-4 sm:px-6 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-end">
-        {/* Save button */}
-        <button
-          type="button"
-          onClick={handleExplicitSave}
-          disabled={saveStatus === 'saving'}
-          className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-black font-medium rounded-lg transition-colors flex items-center gap-2"
-        >
-          {saveStatus === 'saving' ? (
-            <>
-              <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Saving...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Save Changes
-            </>
+      <div className="px-4 sm:px-6 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between gap-4">
+        {/* Doc stats (left) */}
+        <span className="text-[11.5px] leading-none text-gray-400 dark:text-gray-500 tabular-nums select-none truncate">
+          {wordCount.toLocaleString()} words · {charCount.toLocaleString()} characters{readMinutes ? ` · ${readMinutes} min read` : ''}
+        </span>
+
+        {/* Save button (right) */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {mode === 'edit' && (
+            <button
+              type="button"
+              onClick={handleExplicitSave}
+              disabled={saveStatus === 'saving'}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              {saveStatus === 'saving' ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Save Changes
+                </>
+              )}
+            </button>
           )}
-        </button>
+        </div>
       </div>
     );
   };
@@ -609,7 +620,7 @@ export function DocDetailView({
             <button
               type="button"
               onClick={handleRenameConfirm}
-              className="px-4 py-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-black font-medium transition-colors"
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
             >
               Rename
             </button>

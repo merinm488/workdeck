@@ -67,6 +67,8 @@ class FormsEditorApp {
         this.responsesView = null;
         // Which tab is open: 'questions' | 'responses'
         this.activeTab = 'questions';
+        // Status footer: response count 
+        this.responseCount = 0;
     }
 
     // ================================================
@@ -136,6 +138,7 @@ class FormsEditorApp {
 
             // 4. Wire every button before anything slow happens
             this.setupEventListeners();
+            this.updateThemeIndicator();   // label + active mark reflect the saved theme
 
             // 5-6. Load the record (or seed a default one on first open)
             this.showLoading();
@@ -149,6 +152,12 @@ class FormsEditorApp {
 
             // 7. Show the saved name in nav + browser tab
             this.updateFormTitle(this.formRecord.name);
+
+            // 7a. Status footer: responses arrive async.
+            this.updateFormsFooter();
+            formsStorage.getResponses(this.formId)
+                .then(result => this.updateResponseCount(result && result.responses ? result.responses.length : 0))
+                .catch(() => { /* footer stays at 0 responses */ });
 
             // 7b. Responses view — create the handle now (it reads
             //     this.formId when its tab is opened).
@@ -249,7 +258,10 @@ class FormsEditorApp {
             container: element,
             schema: schema
         });
-        this.builderInstance.on('changed', () => this.markAsChanged());
+        this.builderInstance.on('changed', () => {
+            this.markAsChanged();
+            this.updateFormsFooter();
+        });
 
         // Mobile/narrow properties drawer: selecting a field slides the
         // properties panel in from the right (CSS on
@@ -602,17 +614,42 @@ class FormsEditorApp {
     }
 
     // ================================================
+    // Status footer
+    // ================================================
+
+    countQuestions() {
+        let components = null;
+        try {
+            if (this.builderInstance) {
+                const state = this.builderInstance._getState();
+                components = (state && state.schema && state.schema.components) || null;
+            }
+        } catch (err) { /* fall back to the saved record */ }
+        if (!components && this.formRecord) components = this.formRecord.components || [];
+        return (components || []).filter(c => c && c.type !== 'button').length;
+    }
+
+    updateFormsFooter() {
+        const el = document.getElementById('formsFooterStats');
+        if (!el) return;
+        const questions = this.countQuestions();
+        const responses = this.responseCount || 0;
+        el.textContent = questions + (questions === 1 ? ' question' : ' questions')
+            + ' · ' + responses + (responses === 1 ? ' response' : ' responses');
+    }
+
+    updateResponseCount(count) {
+        this.responseCount = count || 0;
+        this.updateFormsFooter();
+    }
+
+    // ================================================
     // Rename reminder (untitled explicit saves)
-    // Before the first real save of a form still called 'Untitled Form',
-    // ask for a name. Rename applies it and continues the interrupted
-    // save; Later saves as-is and stops nagging for this session.
-    // Auto-save paths never see the modal.
+
     // ================================================
 
     /**
-     * Check whether the form still has its default name. Covers the
-     * variants in circulation: the editor and the Workdeck API seed
-     * 'Untitled Form'; older/looser naming uses 'Untitled'.
+
      * @returns {boolean} True if the name is empty or a default untitled name
      */
     isUntitledForm() {
@@ -939,10 +976,23 @@ class FormsEditorApp {
 
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const themeSubmenu = document.getElementById('themeSubmenu');
+
+        const closeThemeSubmenu = () => {
+            if (themeSubmenu) themeSubmenu.classList.remove('active');
+            const themeContainer = themeToggleBtn && themeToggleBtn.closest('.theme-dropdown-container');
+            if (themeContainer) themeContainer.classList.remove('active');
+        };
+
+        // Theme toggle - expands the submenu inline (docs pattern)
         if (themeToggleBtn && themeSubmenu) {
             themeToggleBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                const isOpen = themeSubmenu.classList.contains('active');
                 themeSubmenu.classList.toggle('active');
+                const themeContainer = themeToggleBtn.closest('.theme-dropdown-container');
+                if (themeContainer) {
+                    themeContainer.classList.toggle('active', !isOpen);
+                }
             });
         }
 
@@ -953,9 +1003,7 @@ class FormsEditorApp {
                 e.stopPropagation();
                 formsThemeManager.setTheme(option.dataset.theme);
                 this.updateThemeIndicator();
-                if (themeSubmenu) {
-                    themeSubmenu.classList.remove('active');
-                }
+                closeThemeSubmenu();
             });
         });
 
@@ -963,12 +1011,10 @@ class FormsEditorApp {
         document.addEventListener('click', (e) => {
             if (settingsDropdown && !e.target.closest('.top-nav-settings')) {
                 settingsDropdown.classList.remove('active');
-                if (themeSubmenu) {
-                    themeSubmenu.classList.remove('active');
-                }
+                closeThemeSubmenu();
             }
             if (themeSubmenu && !e.target.closest('.theme-dropdown-container')) {
-                themeSubmenu.classList.remove('active');
+                closeThemeSubmenu();
             }
             if (!e.target.closest('.responses-more')) {
                 this.hideResponsesMoreMenu();
@@ -1089,9 +1135,6 @@ class FormsEditorApp {
             }
         });
 
-        // --- Mobile label swap for the theme row ---
-        window.addEventListener('resize', () => this.updateThemeIndicator());
-
         // --- Warn before leaving with unsaved changes ---
         window.addEventListener('beforeunload', (e) => {
             if (this.hasUnsavedChanges) {
@@ -1111,8 +1154,7 @@ class FormsEditorApp {
         if (!themeText) return;
         const label = formsThemeManager.getDisplayLabel();
 
-        const narrow = window.innerWidth <= 640;
-        themeText.textContent = narrow ? 'Theme' : 'Theme: ' + label;
+        themeText.textContent = 'Theme: ' + label;
 
         const pref = formsThemeManager.getPreference();
         document.querySelectorAll('.theme-option').forEach(option => {

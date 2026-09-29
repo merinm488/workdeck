@@ -16,16 +16,16 @@ export default {
           text: '#E5E5E5',
           muted: '#737373'
         },
-        // Light theme colors (White + Yellow)
+        // Light theme colors (White + Docs Blue)
         light: {
           bg: '#FAFAFA',
           card: '#FFFFFF',
           border: '#E5E5E5',
           text: '#1A1A1A',
           muted: '#737373',
-          accent: '#FACC15', // Yellow-500
-          accentHover: '#EAB308', // Yellow-600
-          accentLight: '#FEF08A', // Yellow-200
+          accent: '#4285F4', // Docs blue
+          accentHover: '#3367D6', // Docs blue hover
+          accentLight: '#D2E3FC', // Docs blue tint
         }
       },
       fontFamily: {

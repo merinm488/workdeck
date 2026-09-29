@@ -11,7 +11,7 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
   (re-opening bumps a file to the top), with fallback to last-modified.
 - ➕ **+ New dropdowns** — in the header and the empty state; create a blank
   file in any registered app (Docs, Sheets, …) and jump straight into its
-  editor. 
+  editor.
 - 🎛️ **App filter** — an "All files" pill plus one app-chooser dropdown
   listing every registered app, so new apps don't crowd the screen.
 - 🔍 **Unified search** — searches titles of all files.

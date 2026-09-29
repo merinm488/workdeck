@@ -366,10 +366,18 @@ class SheetsHome {
                 if (themeSubmenu) {
                     themeSubmenu.classList.remove('active');
                 }
+                const themeContainer = themeToggleBtn && themeToggleBtn.closest('.theme-dropdown-container');
+                if (themeContainer) {
+                    themeContainer.classList.remove('active');
+                }
             }
             // Close theme submenu if clicking outside it but still in settings
             if (themeSubmenu && !e.target.closest('.theme-dropdown-container')) {
                 themeSubmenu.classList.remove('active');
+                const themeContainer = themeToggleBtn && themeToggleBtn.closest('.theme-dropdown-container');
+                if (themeContainer) {
+                    themeContainer.classList.remove('active');
+                }
             }
         });
 
@@ -398,6 +406,10 @@ class SheetsHome {
                 this.setThemeFromOption(theme);
                 if (themeSubmenu) {
                     themeSubmenu.classList.remove('active');
+                }
+                const themeContainer = themeToggleBtn && themeToggleBtn.closest('.theme-dropdown-container');
+                if (themeContainer) {
+                    themeContainer.classList.remove('active');
                 }
             });
         });
@@ -806,12 +818,7 @@ class SheetsHome {
                 themeDisplayName = currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1);
             }
 
-            // On mobile devices, show just "Theme" to fit on one line
-            if (window.innerWidth <= 640) {
-                themeText.textContent = 'Theme';
-            } else {
-                themeText.textContent = `Theme: ${themeDisplayName}`;
-            }
+            themeText.textContent = `Theme: ${themeDisplayName}`;
 
             // Update active state on theme options
             const themeOptions = document.querySelectorAll('.theme-option');

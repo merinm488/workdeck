@@ -14,7 +14,7 @@ export default defineConfig({
         name: 'Docs',
         short_name: 'Docs',
         description: 'Docs — a private docs app with passwordless authentication',
-        theme_color: '#FACC15',
+        theme_color: '#4285F4',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait-primary',

@@ -201,48 +201,85 @@ body {
     margin: 6px 8px;
 }
 
-/* Theme submenu */
 .theme-dropdown-container {
     position: relative;
 }
 
-.theme-submenu {
-    display: none;
-    position: absolute;
-    right: calc(100% + 8px);
-    top: 0;
-    min-width: 150px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    box-shadow: 0 10px 40px var(--shadow-color);
-    padding: 6px;
-    z-index: 110;
+.dropdown-arrow {
+    width: 16px;
+    height: 16px;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
 }
 
-.theme-dropdown-container.active .theme-submenu,
+/* Right-pointing chevron rotates down while the submenu is expanded */
+.theme-dropdown-container.active .dropdown-arrow {
+    transform: rotate(90deg);
+}
+
+.theme-submenu {
+    display: none;
+    background: #f9fafb;
+}
+
 .theme-submenu.active {
     display: block;
+}
+
+[data-theme="dark"] .theme-submenu {
+    background: rgba(17, 24, 39, 0.5);
 }
 
 .theme-option {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     width: 100%;
-    padding: 9px 12px;
+    padding: 8px 16px;
     border: none;
-    border-radius: var(--radius-sm);
     background: transparent;
-    color: var(--text-primary);
-    font-size: 14px;
     cursor: pointer;
+    text-align: left;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    color: #111827;
+    transition: background-color 0.2s ease;
+}
+
+[data-theme="dark"] .theme-option {
+    color: #f3f4f6;
 }
 
 .theme-option:hover,
 .theme-option.active {
     background: var(--accent-light);
+}
+
+.theme-option-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: #4b5563;
+    transition: color 0.3s ease;
+}
+
+[data-theme="dark"] .theme-option-icon {
+    color: #9ca3af;
+}
+
+.theme-check {
+    width: 16px;
+    height: 16px;
+    margin-left: auto;
+    flex-shrink: 0;
     color: var(--accent-color);
+    display: none;
+}
+
+.theme-option.active .theme-check {
+    display: block;
 }
 
 /* ============================================================
@@ -250,9 +287,47 @@ body {
    ============================================================ */
 
 .form-editor-container {
-    height: calc(100vh - 59px);   /* below the top nav */
+    height: calc(100vh - 59px - 28px);   /* below the top nav, above the status footer */
     overflow: hidden;             /* form-js panes scroll internally */
     position: relative;           /* anchors the phone palette drawer + FAB */
+}
+
+/* ============================================================
+   Status footer — question/response counts + account storage
+   ============================================================ */
+
+.app-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 28px;
+    padding: 2px 14px;
+    padding-bottom: max(2px, env(safe-area-inset-bottom));
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+    font-size: 11.5px;
+    line-height: 1.2;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+}
+
+.app-footer-stats {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 480px) {
+    .app-footer {
+        padding-left: 10px;
+        padding-right: 10px;
+        gap: 8px;
+        font-size: 11px;
+    }
 }
 
 /* ============================================================
@@ -1070,17 +1145,6 @@ body {
         justify-content: center;
         padding: 10px;
     }
-
-    /* The submenu normally flies out to the left of the dropdown; on a
-       phone that pushes it past the viewport edge. Drop it straight down
-       instead, spanning the dropdown's width. */
-    .theme-submenu {
-        position: absolute;
-        right: 0;
-        left: 0;
-        top: calc(100% + 6px);
-        min-width: 0;
-    }
 }
 
 /* ============================================================
@@ -1152,7 +1216,7 @@ body {
     --viz-5: #e87ba4;   /* magenta */
     --viz-6: #008300;   /* green */
     --viz-other: #898781;
-    height: calc(100vh - 59px);   /* below the top nav, like the builder */
+    height: calc(100vh - 59px - 28px);   /* below the top nav, like the builder */
     overflow-y: auto;
     padding: 24px 16px 120px;
 }

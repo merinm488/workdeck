@@ -50,6 +50,7 @@ class FormsStorage {
      */
     async getForm(formId) {
         const userData = await this.loadUserData();
+        this.lastUserData = userData;
         if (!userData || !userData.forms)
             return null;
         return userData.forms.find(f => f.id === formId) || null;

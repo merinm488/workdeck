@@ -113,6 +113,7 @@ class SheetsStorage {
      */
     async getSpreadsheet(sheetId) {
         const userData = await this.loadUserData();
+        this.lastUserData = userData;
 
         if (!userData || !userData.sheets) {
             console.error('[STORAGE] No user data or spreadsheets found');

@@ -68,7 +68,7 @@ export function TagList({
         onClick={() => onTagSelect(null)}
         className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
           activeTag === null
-            ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
+            ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
             : 'hover:bg-bg-tertiary/50 text-text-primary'
         }`}
       >
@@ -154,7 +154,7 @@ export function TagList({
               onClick={() => onTagSelect(tag.id)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors group ${
                 activeTag === tag.id
-                  ? 'bg-accent/10 text-accent'
+                  ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
                   : 'hover:bg-bg-tertiary/50 text-text-primary'
               }`}
             >

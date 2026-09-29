@@ -90,8 +90,8 @@ export function ShareModal({ doc, shareUrl, alreadyShared = false, onClose }) {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-yellow-400/10 dark:bg-white/10 flex items-center justify-center">
-              <svg className="w-4 h-4 text-yellow-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 rounded-lg bg-blue-400/10 dark:bg-white/10 flex items-center justify-center">
+              <svg className="w-4 h-4 text-blue-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
             </div>
@@ -130,7 +130,7 @@ export function ShareModal({ doc, shareUrl, alreadyShared = false, onClose }) {
                 type="text"
                 value={shareUrl || ''}
                 readOnly
-                className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-500 select-all"
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 select-all"
                 onClick={(e) => {
                   e.target.select();
                   e.target.setSelectionRange(0, 99999);
@@ -149,7 +149,7 @@ export function ShareModal({ doc, shareUrl, alreadyShared = false, onClose }) {
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 select-none ${
                   copied
                     ? 'bg-green-500 text-white'
-                    : 'bg-yellow-500 text-black hover:bg-yellow-600 dark:bg-white dark:text-black dark:hover:bg-gray-200'
+                    : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-white dark:text-black dark:hover:bg-gray-200'
                 }`}
               >
                 {copied ? (

@@ -53,8 +53,8 @@ export function UserDisplay({ userHash, onLogout, onDeleteAccount, onShowKey }) 
           title="Settings"
         >
           {/* Settings/gear icon */}
-          <div className="w-8 h-8 rounded-full bg-yellow-400/10 dark:bg-white/10 flex items-center justify-center">
-            <svg className="w-4 h-4 text-yellow-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-8 h-8 rounded-full bg-blue-400/10 dark:bg-white/10 flex items-center justify-center">
+            <svg className="w-4 h-4 text-blue-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -184,7 +184,7 @@ export function UserDisplay({ userHash, onLogout, onDeleteAccount, onShowKey }) 
                     navigator.clipboard.writeText(key);
                   }
                 }}
-                className="px-4 py-3 rounded-lg bg-yellow-500 text-black hover:bg-yellow-600 transition-colors font-medium flex-shrink-0"
+                className="px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium flex-shrink-0"
                 title="Copy to clipboard"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

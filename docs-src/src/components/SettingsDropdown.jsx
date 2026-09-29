@@ -233,7 +233,7 @@ export function SettingsDropdown({
                   <button
                     onClick={() => handleThemeSelect('dark')}
                     className={`w-full px-4 py-2 text-left text-sm flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                      theme === 'dark' ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+                      theme === 'dark' ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                     }`}
                   >
                     <svg
@@ -251,7 +251,7 @@ export function SettingsDropdown({
                     </svg>
                     <span className="text-gray-900 dark:text-gray-100">Dark</span>
                     {theme === 'dark' && (
-                      <svg className="w-4 h-4 text-yellow-500 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-4 h-4 text-blue-500 ml-auto" fill="currentColor" viewBox="0 0 20 20">
                         <path
                           fillRule="evenodd"
                           d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -264,7 +264,7 @@ export function SettingsDropdown({
                   <button
                     onClick={() => handleThemeSelect('light')}
                     className={`w-full px-4 py-2 text-left text-sm flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                      theme === 'light' ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+                      theme === 'light' ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                     }`}
                   >
                     <svg
@@ -282,7 +282,7 @@ export function SettingsDropdown({
                     </svg>
                     <span className="text-gray-900 dark:text-gray-100">Light</span>
                     {theme === 'light' && (
-                      <svg className="w-4 h-4 text-yellow-500 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-4 h-4 text-blue-500 ml-auto" fill="currentColor" viewBox="0 0 20 20">
                         <path
                           fillRule="evenodd"
                           d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -295,7 +295,7 @@ export function SettingsDropdown({
                   <button
                     onClick={() => handleThemeSelect('system')}
                     className={`w-full px-4 py-2 text-left text-sm flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                      theme === 'system' ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+                      theme === 'system' ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                     }`}
                   >
                     <svg
@@ -313,7 +313,7 @@ export function SettingsDropdown({
                     </svg>
                     <span className="text-gray-900 dark:text-gray-100">System</span>
                     {theme === 'system' && (
-                      <svg className="w-4 h-4 text-yellow-500 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-4 h-4 text-blue-500 ml-auto" fill="currentColor" viewBox="0 0 20 20">
                         <path
                           fillRule="evenodd"
                           d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -350,7 +350,7 @@ export function SettingsDropdown({
                     onClick={() => handleTagSelect(null)}
                     className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
                       selectedTag === null
-                        ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
                         : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100'
                     }`}
                   >
@@ -367,7 +367,7 @@ export function SettingsDropdown({
                       onClick={() => handleTagSelect(tag.id)}
                       className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
                         selectedTag === tag.id
-                          ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
+                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
                           : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100'
                       }`}
                     >
@@ -394,7 +394,7 @@ export function SettingsDropdown({
                         value={newTagName}
                         onChange={(e) => setNewTagName(e.target.value)}
                         placeholder="Tag name"
-                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && newTagName.trim()) {
@@ -426,7 +426,7 @@ export function SettingsDropdown({
                         <button
                           onClick={handleCreateTag}
                           disabled={isCreatingTag || !newTagName.trim()}
-                          className="flex-1 px-3 py-2 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-black disabled:cursor-not-allowed rounded-lg font-medium text-sm transition-colors"
+                          className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white disabled:cursor-not-allowed rounded-lg font-medium text-sm transition-colors"
                         >
                           {isCreatingTag ? 'Creating...' : 'Create'}
                         </button>

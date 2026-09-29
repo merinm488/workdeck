@@ -48,9 +48,9 @@ export function Login({ onLogin, isLoading, error }) {
       <div className="max-w-md w-full">
         {/* Logo/Title */}
         <div className="text-center mb-8 animate-fade-in">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-yellow-400/10 mb-4 dark:bg-white/10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-400/10 mb-4 dark:bg-white/10">
             <svg
-              className="w-8 h-8 text-yellow-500 dark:text-white"
+              className="w-8 h-8 text-blue-500 dark:text-white"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -90,7 +90,7 @@ export function Login({ onLogin, isLoading, error }) {
                   setKeyInput(e.target.value);
                 }}
                 placeholder="Enter your key to access the account"
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-500 [&::placeholder]:italic"
+                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 [&::placeholder]:italic"
                 disabled={isLoading}
                 autoFocus
                 autoComplete="off"
@@ -102,7 +102,7 @@ export function Login({ onLogin, isLoading, error }) {
             <button
               type="submit"
               disabled={isLoading || !keyInput}
-              className="bg-yellow-500 text-black dark:bg-white dark:text-black px-4 py-2 rounded-lg font-medium w-full disabled:opacity-50 hover:bg-yellow-600 dark:hover:bg-gray-200"
+              className="bg-blue-600 text-white dark:bg-white dark:text-black px-4 py-2 rounded-lg font-medium w-full disabled:opacity-50 hover:bg-blue-700 dark:hover:bg-gray-200"
             >
               {isLoading ? 'Signing in...' : 'Sign In'}
             </button>

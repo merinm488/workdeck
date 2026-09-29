@@ -77,6 +77,7 @@ async function init() {
     if (drawing.objects && drawing.objects.length > 0) {
         await editorState.canvas.loadFromJSON({ objects: drawing.objects });
     }
+    updateDrawFooter();
 
     editorState.canvas.backgroundColor = drawing.background || APP_CONFIG.canvas.defaultBackground;
     if (/^#[0-9a-f]{6}$/i.test(editorState.canvas.backgroundColor)) {
@@ -113,6 +114,8 @@ function initCanvas() {
 
     editorState.canvas.on('object:added', onObjectChanged);
     editorState.canvas.on('object:removed', onObjectChanged);
+    editorState.canvas.on('object:added', updateDrawFooter);
+    editorState.canvas.on('object:removed', updateDrawFooter);
     editorState.canvas.on('object:modified', (opt) => {
         onObjectModified(opt);   // arrow resize -> bake the transform (must run first)
         onObjectChanged();
@@ -158,6 +161,17 @@ function onObjectChanged() {
     if(editorState.draftLine) return;
     recordUndoSnapshot();
     markDirty();
+}
+
+// ================================================
+// Status footer
+// ================================================
+
+function updateDrawFooter() {
+    const el = $('drawFooterStats');
+    if (!el || !editorState.canvas) return;
+    const count = editorState.canvas.getObjects().length - (editorState.draftLine ? 1 : 0);
+    el.textContent = count + (count === 1 ? ' object' : ' objects');
 }
 
 
@@ -1120,10 +1134,24 @@ async function confirmDeleteAccount() {
     }
 }
 
+function syncThemeControls() {
+    $('themeText').textContent = 'Theme: ' + drawThemeManager.getDisplayLabel();
+    const pref = drawThemeManager.getPreference();
+    document.querySelectorAll('.theme-option').forEach((option) => {
+        option.classList.toggle('active', option.dataset.theme === pref);
+    });
+}
+
+function closeThemeSubmenu() {
+    $('themeSubmenu').classList.remove('open');
+    const container = $('themeToggleBtn').closest('.theme-dropdown-container');
+    if (container) container.classList.remove('active');
+}
+
 function applyThemeChoice(pref) {
     // Theme restyles chrome only
     drawThemeManager.setTheme(pref);
-    $('themeText').textContent = 'Theme: ' + drawThemeManager.getDisplayLabel();
+    syncThemeControls();
 }
 
 function openModal(el) {
@@ -1155,14 +1183,19 @@ function bindTopNav() {
     });
 
     // --- settings items ---
-    $('themeText').textContent = 'Theme: ' + drawThemeManager.getDisplayLabel();
+    syncThemeControls();
 
+    // Theme row expands the submenu inline 
     $('themeToggleBtn').addEventListener('click', () => {
-        $('themeSubmenu').classList.toggle('open');
+        const open = $('themeSubmenu').classList.toggle('open');
+        $('themeToggleBtn').closest('.theme-dropdown-container').classList.toggle('active', open);
     });
 
     document.querySelectorAll('.theme-option').forEach((option) => {
-        option.addEventListener('click', () => applyThemeChoice(option.dataset.theme));
+        option.addEventListener('click', () => {
+            applyThemeChoice(option.dataset.theme);
+            closeThemeSubmenu();
+        });
     });
 
     $('viewKeyBtn').addEventListener('click', openKeyModal);
@@ -1184,6 +1217,7 @@ function bindTopNav() {
         }
         if (!e.target.closest('#settingsBtn, #settingsDropdown')) {
             $('settingsDropdown').classList.remove('open');
+            closeThemeSubmenu();
         }
     });
 }
