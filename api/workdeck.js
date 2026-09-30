@@ -242,6 +242,7 @@ export default async function handler(req, res) {
           const id = data?.id || generateId();
           const sheet = createDefaultSheet(id);
           if (data?.name) sheet.name = data.name;
+          if (data?.tagId) sheet.tagId = data.tagId;
           userData.sheets.push(sheet);
           break;
         }
@@ -251,6 +252,7 @@ export default async function handler(req, res) {
           const id = data?.id || generateId();
           const form = createDefaultForm(id);
           if (data?.name) form.name = data.name;
+          if (data?.tagId) form.tagId = data.tagId;
           userData.forms.unshift(form);
           break;
         }
@@ -260,6 +262,7 @@ export default async function handler(req, res) {
           const id = data?.id || generateId();
           const deck = createDefaultDeck(id);
           if (data?.name) deck.name = data.name;
+          if (data?.tagId) deck.tagId = data.tagId;
           userData.slides.unshift(deck);
           break;
         }
@@ -269,7 +272,92 @@ export default async function handler(req, res) {
           const id = data?.id || generateId();
           const drawing = createDefaultDrawing(id);
           if (data?.name) drawing.name = data.name;
+          if (data?.tagId) drawing.tagId = data.tagId;
           userData.draws.unshift(drawing);
+          break;
+        }
+
+        // ---- Projects (tags) ----
+        case 'createTag': {
+          if (!Array.isArray(userData.tags)) userData.tags = [];
+          userData.tags.push({
+            id: generateId(),
+            name: data?.name || 'New Project',
+            color: data?.color || '#FACC15'
+          });
+          break;
+        }
+
+        case 'updateTag': {
+          const tagIndex = (userData.tags || []).findIndex(t => t.id === data?.tagId);
+          if (tagIndex === -1) {
+            return res.status(404).json({ success: false, error: 'Tag not found' });
+          }
+          userData.tags[tagIndex] = {
+            ...userData.tags[tagIndex],
+            ...(data?.updates || {}),
+            id: data.tagId
+          };
+          break;
+        }
+
+        // Deleting a project deletes its files too — the same cleanup as
+        // deleteFile (shared copies + lastOpened), for every file in the
+        // project across all apps at once.
+        case 'deleteTag': {
+          const tagId = data?.tagId;
+          if (!tagId) {
+            return res.status(400).json({ success: false, error: 'tagId is required' });
+          }
+          const taggedIn = collection => collection.filter(f => f && f.tagId === tagId);
+          const doomed = [
+            ...taggedIn(userData.docs),
+            ...taggedIn(userData.sheets),
+            ...taggedIn(userData.forms),
+            ...taggedIn(userData.slides),
+            ...taggedIn(userData.draws)
+          ];
+          for (const file of doomed) {
+            if (file.sharedId) {
+              try {
+                await deleteSharedDoc(file.sharedId);
+              } catch (error) {
+                console.error('[WORKDECK API] Failed to delete shared copy:', error);
+              }
+            }
+            if (userData.settings?.lastOpened) {
+              delete userData.settings.lastOpened[file.id];
+            }
+          }
+          userData.docs = userData.docs.filter(f => !f || f.tagId !== tagId);
+          userData.sheets = userData.sheets.filter(f => !f || f.tagId !== tagId);
+          userData.forms = userData.forms.filter(f => !f || f.tagId !== tagId);
+          userData.slides = userData.slides.filter(f => !f || f.tagId !== tagId);
+          userData.draws = userData.draws.filter(f => !f || f.tagId !== tagId);
+          userData.tags = (userData.tags || []).filter(t => t.id !== tagId);
+          break;
+        }
+
+        // ---- Move a file into / out of a project ----
+        case 'setFileTag': {
+          const { fileId, app, tagId } = data || {};
+          if (!fileId) {
+            return res.status(400).json({ success: false, error: 'fileId is required' });
+          }
+          if (tagId && !(userData.tags || []).some(t => t.id === tagId)) {
+            return res.status(404).json({ success: false, error: 'Tag not found' });
+          }
+          const isSheet = app === 'sheets';
+          const isForm = app === 'forms';
+          const isDeck = app === 'slides';
+          const isDrawing = app === 'draw';
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : userData.docs;
+          const target = collection.find(f => f.id === fileId);
+          if (!target) {
+            return res.status(404).json({ success: false, error: 'File not found' });
+          }
+          target.tagId = tagId || null;
+          target.updatedAt = new Date().toISOString();
           break;
         }
 

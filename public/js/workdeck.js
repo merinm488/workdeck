@@ -19,6 +19,14 @@ const WD_APP = {
     viewKey: 'workdeck_view_mode'
 };
 
+const WD_SIDEBAR = {
+    // Desktop pin/unpin is remembered; the mobile drawer never auto-opens.
+    storageKey: 'workdeck_sidebar_open',
+    desktopQuery: window.matchMedia('(min-width: 1024px)')
+};
+
+const PROJECT_COLORS = ['#FACC15', '#3B82F6', '#10B981', '#8B5CF6', '#EF4444', '#EC4899', '#06B6D4', '#F97316'];
+
 const DOC_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     + '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>'
     + '<polyline points="14 2 14 8 20 8"></polyline>'
@@ -143,6 +151,19 @@ function getApp(appId) {
     return WD_APPS.find(function (app) { return app.id === appId; }) || WD_APPS[0];
 }
 
+/** Look up a project (tag) by id. */
+function getTag(tagId) {
+    return state.tags.find(function (t) { return t.id === tagId; }) || null;
+}
+
+/** #rrggbb -> rgba(), so active rows can tint with the project color. */
+function hexToRgba(hex, alpha) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!match) return '';
+    const n = parseInt(match[1], 16);
+    return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+}
+
 // ================================================
 // State
 // ================================================
@@ -158,9 +179,14 @@ const state = {
     settings: {},
     searchQuery: '',
     filter: 'all',       // 'all' | app id from WD_APPS
+    activeTag: null,     // project (tag) id, null = All files
+    sidebarOpen: false,
     viewMode: 'grid',    // 'grid' | 'list'
     fileToRename: null,
-    fileToDelete: null
+    fileToDelete: null,
+    fileToMove: null,
+    moveTarget: null,
+    projectToDelete: null
 };
 
 // ================================================
@@ -216,6 +242,7 @@ function getAllFiles() {
                 name: d.title || 'Untitled',
                 updatedAt: d.updatedAt,
                 lastOpened: lastOpened[d.id] || null,
+                tagId: getTag(d.tagId) ? d.tagId : null,
                 content: d.content || '',
                 raw: d
             };
@@ -228,6 +255,7 @@ function getAllFiles() {
             name: s.name || 'Untitled Spreadsheet',
             updatedAt: s.updatedAt,
             lastOpened: lastOpened[s.id] || null,
+            tagId: getTag(s.tagId) ? s.tagId : null,
             content: '',
             raw: s
         };
@@ -240,6 +268,7 @@ function getAllFiles() {
             name: f.name || 'Untitled Form',
             updatedAt: f.updatedAt,
             lastOpened: lastOpened[f.id] || null,
+            tagId: getTag(f.tagId) ? f.tagId : null,
             content: '',
             raw: f
         };
@@ -252,6 +281,7 @@ function getAllFiles() {
             name: f.name || 'Untitled',
             updatedAt: f.updatedAt,
             lastOpened: lastOpened[f.id] || null,
+            tagId: getTag(f.tagId) ? f.tagId : null,
             content: '',
             raw: f
         };
@@ -264,6 +294,7 @@ function getAllFiles() {
             name: f.name || 'Untitled Drawing',
             updatedAt: f.updatedAt,
             lastOpened: lastOpened[f.id] || null,
+            tagId: getTag(f.tagId) ? f.tagId : null,
             content: '',
             raw: f
         };
@@ -283,6 +314,7 @@ function getAllFiles() {
 function getVisibleFiles() {
     const q = state.searchQuery.toLowerCase().trim();
     return getAllFiles().filter(function (file) {
+        if (state.activeTag && file.tagId !== state.activeTag) return false;
         if (state.filter !== 'all' && file.app !== state.filter) return false;
         if (!q) return true;
         if (file.name.toLowerCase().includes(q)) return true;
@@ -396,9 +428,6 @@ function openDropdown(dd, trigger) {
 function closeDropdown(dd) {
     dd.classList.remove('active');
     dd._wdTrigger = null;
-    dd.style.top = '';
-    dd.style.bottom = '';
-    dd.style.maxHeight = '';
 }
 
 function toggleDropdown(dd, trigger) {
@@ -446,13 +475,110 @@ function showHome() {
 }
 
 // ================================================
+// Sidebar (projects)
+// ================================================
+
+function applySidebar() {
+    document.body.classList.toggle('wd-sidebar-open', state.sidebarOpen);
+    const toggle = $('sidebarToggle');
+    if (toggle) toggle.setAttribute('aria-expanded', String(state.sidebarOpen));
+}
+
+function initSidebar() {
+    // Desktop: pinned unless the user collapsed it. Mobile: always start
+    // with the drawer closed, whatever the desktop preference says.
+    state.sidebarOpen = WD_SIDEBAR.desktopQuery.matches &&
+        localStorage.getItem(WD_SIDEBAR.storageKey) !== '0';
+    applySidebar();
+}
+
+function toggleSidebar() {
+    state.sidebarOpen = !state.sidebarOpen;
+    // Only desktop pin/unpin is remembered; drawer open/close is per-session.
+    if (WD_SIDEBAR.desktopQuery.matches) {
+        localStorage.setItem(WD_SIDEBAR.storageKey, state.sidebarOpen ? '1' : '0');
+    }
+    applySidebar();
+}
+
+function closeSidebarDrawer() {
+    if (!WD_SIDEBAR.desktopQuery.matches && state.sidebarOpen) {
+        state.sidebarOpen = false;
+        applySidebar();
+    }
+}
+
+// ================================================
 // Rendering
 // ================================================
 
 function render() {
+    renderSidebar();
     renderFiles();
     renderViewToggle();
     renderFilterMenu();
+}
+
+// ================================================
+// Sidebar rendering
+// ================================================
+
+function renderSidebar() {
+    $('allFilesBtn').classList.toggle('active', state.activeTag === null);
+
+    const counts = {};
+    getAllFiles().forEach(function (file) {
+        if (file.tagId) counts[file.tagId] = (counts[file.tagId] || 0) + 1;
+    });
+
+    const list = $('projectList');
+    list.innerHTML = '';
+    state.tags.forEach(function (tag) {
+        const active = state.activeTag === tag.id;
+        const row = document.createElement('div');
+        row.className = 'wd-side-row wd-project-row' + (active ? ' active' : '');
+        row.dataset.tag = tag.id;
+        row.setAttribute('role', 'button');
+        row.tabIndex = 0;
+        if (active && tag.color) row.style.background = hexToRgba(tag.color, 0.14);
+
+        row.innerHTML = '<span class="wd-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
+            + '<span class="wd-side-row-name">' + escapeHtml(tag.name) + '</span>'
+            + '<span class="wd-side-count">' + (counts[tag.id] || 0) + '</span>'
+            + '<span class="wd-side-actions">'
+            + '<button class="wd-side-action edit" title="Edit project">' + RENAME_ICON + '</button>'
+            + '<button class="wd-side-action danger" title="Delete project">' + DELETE_ICON + '</button>'
+            + '</span>';
+
+        row.addEventListener('click', function (e) {
+            if (e.target.closest('.wd-side-action')) return;
+            selectTag(tag.id);
+        });
+        row.addEventListener('keydown', function (e) {
+            if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.wd-side-action')) {
+                e.preventDefault();
+                selectTag(tag.id);
+            }
+        });
+        row.querySelector('.edit').addEventListener('click', function (e) {
+            e.stopPropagation();
+            openProjectForm(tag);
+        });
+        row.querySelector('.danger').addEventListener('click', function (e) {
+            e.stopPropagation();
+            showDeleteProjectModal(tag);
+        });
+        makeDropTarget(row, tag.id);
+        list.appendChild(row);
+    });
+
+    $('projectEmpty').classList.toggle('hidden', state.tags.length > 0);
+}
+
+function selectTag(tagId) {
+    state.activeTag = tagId;
+    render();
+    closeSidebarDrawer();
 }
 
 // ================================================
@@ -469,11 +595,15 @@ function renderFooter() {
     if (state.searchQuery.trim()) {
         const visible = getVisibleFiles().length;
         statsEl.textContent = visible + ' of ' + total + ' file' + (total === 1 ? '' : 's');
+    } else if (state.activeTag) {
+        const count = files.filter(function (file) { return file.tagId === state.activeTag; }).length;
+        statsEl.textContent = count + ' file' + (count === 1 ? '' : 's');
     } else if (state.filter !== 'all') {
         const count = files.filter(function (file) { return file.app === getApp(state.filter).id; }).length;
         statsEl.textContent = count + ' file' + (count === 1 ? '' : 's');
     } else {
-        statsEl.textContent = total + ' file' + (total === 1 ? '' : 's') + ' · ' + WD_APPS.length + ' apps';
+        statsEl.textContent = total + ' file' + (total === 1 ? '' : 's') + ' · ' + WD_APPS.length + ' apps · '
+            + state.tags.length + (state.tags.length === 1 ? ' project' : ' projects');
     }
 }
 
@@ -554,6 +684,24 @@ const DELETE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"
     + '<path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />'
     + '</svg>';
 
+const MOVE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />'
+    + '</svg>';
+
+const CHECK_ICON = '<svg class="wd-move-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">'
+    + '<polyline points="20 6 9 17 4 12"></polyline>'
+    + '</svg>';
+
+/** Colored project chip shown on cards and list rows (empty when untagged). */
+function projectChipHtml(file, extraClass) {
+    const tag = file.tagId ? getTag(file.tagId) : null;
+    if (!tag) return '';
+    return '<span class="wd-file-project' + (extraClass ? ' ' + extraClass : '') + '" title="' + escapeHtml(tag.name) + '">'
+        + '<span class="wd-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
+        + '<span class="wd-file-project-name">' + escapeHtml(tag.name) + '</span>'
+        + '</span>';
+}
+
 function renderFiles() {
     const files = getVisibleFiles();
     const gridView = $('filesGrid');
@@ -568,9 +716,15 @@ function renderFiles() {
 
     // Title + count
     const isSearching = Boolean(state.searchQuery.trim());
+    const activeTag = state.activeTag ? getTag(state.activeTag) : null;
     const filterNames = { all: 'Recent files' };
     WD_APPS.forEach(function (app) { filterNames[app.id] = app.name; });
-    viewTitle.textContent = isSearching ? 'Search results' : filterNames[state.filter];
+    if (activeTag) {
+        viewTitle.innerHTML = '<span class="wd-dot" style="background:' + escapeHtml(activeTag.color) + '"></span>'
+            + escapeHtml(activeTag.name);
+    } else {
+        viewTitle.textContent = isSearching ? 'Search results' : filterNames[state.filter];
+    }
     viewCount.textContent = files.length ? String(files.length) : '';
     searchHint.classList.toggle('hidden', !isSearching);
 
@@ -592,7 +746,9 @@ function renderFiles() {
         } else {
             actions.classList.remove('hidden');
             title.textContent = 'Nothing here yet';
-            desc.textContent = 'Create your first file to get started';
+            desc.textContent = activeTag
+                ? 'No files in this project yet. Create one to get started.'
+                : 'Create your first file to get started';
         }
         return;
     }
@@ -621,6 +777,7 @@ function buildCard(file) {
         + '<div class="wd-file-icon wd-file-icon-' + app.accent + '">' + app.icon + '</div>'
         + '<div class="wd-file-title">' + escapeHtml(file.name) + '</div>'
         + '<div class="wd-file-actions">'
+        + '<button class="wd-file-action-btn move" title="Move to project">' + MOVE_ICON + '</button>'
         + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
         + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
         + '</div>'
@@ -630,6 +787,7 @@ function buildCard(file) {
         + '</div></div>'
         + '<div class="wd-file-meta">'
         + '<span class="wd-file-app-badge ' + app.accent + '">' + app.label + '</span>'
+        + projectChipHtml(file)
         + '<span>' + formatRelativeDate(when) + '</span>'
         + '</div>';
 
@@ -639,6 +797,10 @@ function buildCard(file) {
     card.addEventListener('click', function (e) {
         if (!e.target.closest('.wd-file-action-btn')) openFile(file);
     });
+    card.querySelector('.move').addEventListener('click', function (e) {
+        e.stopPropagation();
+        showMoveModal(file);
+    });
     card.querySelector('.rename').addEventListener('click', function (e) {
         e.stopPropagation();
         showRenameModal(file);
@@ -647,6 +809,7 @@ function buildCard(file) {
         e.stopPropagation();
         showDeleteModal(file);
     });
+    makeDraggable(card, file);
 
     return card;
 }
@@ -663,16 +826,22 @@ function buildListRow(file) {
     row.innerHTML = '<div class="wd-file-icon wd-file-icon-' + app.accent + '">' + app.icon + '</div>'
         + '<div class="wd-file-row-main">'
         + '<div class="wd-file-row-title">' + escapeHtml(file.name) + '</div>'
+        + projectChipHtml(file, 'wd-file-row-project')
         + '</div>'
         + '<span class="wd-file-app-badge ' + app.accent + '">' + app.label + '</span>'
         + '<div class="wd-file-row-meta">' + formatRelativeDate(when) + '</div>'
         + '<div class="wd-file-actions">'
+        + '<button class="wd-file-action-btn move" title="Move to project">' + MOVE_ICON + '</button>'
         + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
         + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
         + '</div>';
 
     row.addEventListener('click', function (e) {
         if (!e.target.closest('.wd-file-action-btn')) openFile(file);
+    });
+    row.querySelector('.move').addEventListener('click', function (e) {
+        e.stopPropagation();
+        showMoveModal(file);
     });
     row.querySelector('.rename').addEventListener('click', function (e) {
         e.stopPropagation();
@@ -682,6 +851,7 @@ function buildListRow(file) {
         e.stopPropagation();
         showDeleteModal(file);
     });
+    makeDraggable(row, file);
 
     return row;
 }
@@ -738,7 +908,10 @@ async function createFile(appId) {
     const app = getApp(appId);
     showLoading('Creating ' + app.label.toLowerCase() + '...');
     try {
-        const data = await api(app.create.action, app.create.payload);
+        // Inside a project, new files are created straight into it.
+        const payload = Object.assign({}, app.create.payload);
+        if (state.activeTag) payload.tagId = state.activeTag;
+        const data = await api(app.create.action, payload);
         const file = app.create.pickNewest(data);
         if (!file) throw new Error('File creation failed');
         openInNewTab(app.route + '?' + app.editorParam + '=' + encodeURIComponent(file.id) + '&edit=1');
@@ -834,6 +1007,263 @@ async function confirmDelete() {
         showNotification(error.message || 'Failed to delete', 'error');
         await loadUserData();
     }
+}
+
+// ================================================
+// Projects (tags)
+// ================================================
+
+let projectFormTagId = null;   // null = create mode, else editing this tag
+let projectFormColor = PROJECT_COLORS[0];
+
+function renderProjectColors() {
+    const picker = $('projectColorPicker');
+    picker.innerHTML = '';
+    PROJECT_COLORS.forEach(function (color) {
+        const swatch = document.createElement('button');
+        swatch.type = 'button';
+        swatch.className = 'wd-color-swatch' + (color === projectFormColor ? ' selected' : '');
+        swatch.style.background = color;
+        swatch.setAttribute('aria-label', 'Pick color ' + color);
+        swatch.addEventListener('click', function () {
+            projectFormColor = color;
+            renderProjectColors();
+        });
+        picker.appendChild(swatch);
+    });
+}
+
+function openProjectForm(tag) {
+    projectFormTagId = tag ? tag.id : null;
+    projectFormColor = tag && tag.color ? tag.color : PROJECT_COLORS[0];
+    $('projectNameInput').value = tag ? tag.name : '';
+    $('projectFormSubmit').textContent = tag ? 'Save' : 'Create';
+    renderProjectColors();
+    $('projectForm').classList.remove('hidden');
+    $('projectForm').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    setTimeout(function () { $('projectNameInput').focus(); }, 60);
+}
+
+function closeProjectForm() {
+    projectFormTagId = null;
+    $('projectForm').classList.add('hidden');
+    $('projectNameInput').value = '';
+}
+
+async function submitProjectForm(e) {
+    e.preventDefault();
+    const name = $('projectNameInput').value.trim();
+    if (!name) {
+        $('projectNameInput').focus();
+        return;
+    }
+
+    const editing = projectFormTagId ? getTag(projectFormTagId) : null;
+
+    if (editing) {
+        // Optimistic rename/recolor
+        const before = { name: editing.name, color: editing.color };
+        editing.name = name;
+        editing.color = projectFormColor;
+        render();
+        closeProjectForm();
+        try {
+            await api('updateTag', { tagId: editing.id, updates: { name: name, color: projectFormColor } });
+            showNotification('Project updated', 'success');
+        } catch (error) {
+            editing.name = before.name;
+            editing.color = before.color;
+            render();
+            showNotification(error.message || 'Failed to update project', 'error');
+        }
+    } else {
+        try {
+            await api('createTag', { name: name, color: projectFormColor });
+            closeProjectForm();
+            await loadUserData();
+            showNotification('Project created', 'success');
+        } catch (error) {
+            showNotification(error.message || 'Failed to create project', 'error');
+        }
+    }
+}
+
+function showDeleteProjectModal(tag) {
+    state.projectToDelete = tag;
+    const count = getAllFiles().filter(function (file) { return file.tagId === tag.id; }).length;
+    $('deleteProjectName').textContent = tag.name;
+    $('deleteProjectCount').textContent = count + (count === 1 ? ' file' : ' files');
+    $('deleteProjectModal').classList.add('active');
+}
+
+function hideDeleteProjectModal() {
+    state.projectToDelete = null;
+    $('deleteProjectModal').classList.remove('active');
+}
+
+async function confirmDeleteProject() {
+    const tag = state.projectToDelete;
+    if (!tag) return;
+    hideDeleteProjectModal();
+
+    if (state.activeTag === tag.id) state.activeTag = null;
+
+    // Optimistic removal of the project and every file in it
+    const dropTagged = function (list) {
+        return list.filter(function (f) { return f.tagId !== tag.id; });
+    };
+    state.tags = state.tags.filter(function (t) { return t.id !== tag.id; });
+    state.docs = dropTagged(state.docs);
+    state.sheets = dropTagged(state.sheets);
+    state.forms = dropTagged(state.forms);
+    state.slides = dropTagged(state.slides);
+    state.draws = dropTagged(state.draws);
+    render();
+
+    try {
+        await api('deleteTag', { tagId: tag.id });
+        showNotification('Project deleted', 'success');
+    } catch (error) {
+        showNotification(error.message || 'Failed to delete project', 'error');
+        await loadUserData();
+    }
+}
+
+// ================================================
+// Move-to-project modal
+// ================================================
+
+function showMoveModal(file) {
+    state.fileToMove = file;
+    state.moveTarget = file.tagId || null;
+    $('moveFileName').textContent = file.name;
+    renderMoveOptions();
+    closeMoveDropdown();
+    $('moveModal').classList.add('active');
+}
+
+function hideMoveModal() {
+    state.fileToMove = null;
+    state.moveTarget = null;
+    closeMoveDropdown();
+    $('moveModal').classList.remove('active');
+}
+
+function closeMoveDropdown() {
+    $('moveDropdown').classList.remove('active');
+    $('moveSelect').classList.remove('active');
+    $('moveSelectBtn').setAttribute('aria-expanded', 'false');
+}
+
+function setMoveTriggerValue(option) {
+    $('moveSelectValue').innerHTML = option && option.color
+        ? '<span class="wd-dot" style="background:' + escapeHtml(option.color) + '"></span>'
+            + '<span class="wd-move-select-name">' + escapeHtml(option.name) + '</span>'
+        : '<span class="wd-move-select-placeholder">' + (option ? escapeHtml(option.name) : 'Choose tags') + '</span>';
+}
+
+function renderMoveOptions() {
+    const dd = $('moveDropdown');
+    dd.innerHTML = '';
+
+    if (state.tags.length === 0) {
+        dd.innerHTML = '<div class="wd-move-empty">No projects yet — create one in the sidebar.</div>';
+        setMoveTriggerValue(null);
+        return;
+    }
+
+    const options = [{ id: null, name: 'No project', color: null }].concat(state.tags);
+    options.forEach(function (option) {
+        const selected = (state.moveTarget || null) === option.id;
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'wd-move-option' + (selected ? ' selected' : '');
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', String(selected));
+        row.innerHTML = '<span class="wd-dot' + (option.color ? '' : ' wd-dot-none') + '"'
+            + (option.color ? ' style="background:' + option.color + '"' : '') + '></span>'
+            + '<span class="wd-move-option-name">' + escapeHtml(option.name) + '</span>'
+            + CHECK_ICON;
+        row.addEventListener('click', function () {
+            state.moveTarget = option.id;
+            renderMoveOptions();
+            closeMoveDropdown();
+        });
+        dd.appendChild(row);
+    });
+
+    setMoveTriggerValue(options.find(function (option) { return (state.moveTarget || null) === option.id; }));
+}
+
+async function confirmMove() {
+    const file = state.fileToMove;
+    if (!file) return;
+    const target = state.moveTarget || null;
+    hideMoveModal();
+    applyFileMove(file, target);
+}
+
+// Optimistic move shared by the modal confirm and sidebar drag-and-drop.
+async function applyFileMove(file, target) {
+    const original = file.tagId || null;
+    if (target === original) return;
+
+    file.tagId = target;
+    render();
+    try {
+        await api('setFileTag', { fileId: file.id, app: file.app, tagId: target });
+        showNotification(target ? 'Moved to project' : 'Removed from project', 'success');
+        loadUserData();
+    } catch (error) {
+        file.tagId = original;
+        render();
+        showNotification(error.message || 'Failed to move file', 'error');
+    }
+}
+
+// ================================================
+// Drag a file onto a sidebar project to move it
+// (HTML5 drag & drop — touch devices keep using the move modal)
+// ================================================
+
+let dragFile = null;
+
+function makeDraggable(el, file) {
+    el.draggable = true;
+    el.addEventListener('dragstart', function (e) {
+        dragFile = file;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', file.app + ':' + file.id);
+        el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', function () {
+        dragFile = null;
+        el.classList.remove('dragging');
+        clearDropHints();
+    });
+}
+
+function clearDropHints() {
+    document.querySelectorAll('.wd-side-row.drop-target').forEach(function (row) {
+        row.classList.remove('drop-target');
+    });
+}
+
+function makeDropTarget(row, tagId) {
+    row.addEventListener('dragover', function (e) {
+        if (!dragFile) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        row.classList.add('drop-target');
+    });
+    row.addEventListener('dragleave', function (e) {
+        if (!row.contains(e.relatedTarget)) row.classList.remove('drop-target');
+    });
+    row.addEventListener('drop', function (e) {
+        e.preventDefault();
+        row.classList.remove('drop-target');
+        if (dragFile) applyFileMove(dragFile, tagId);
+    });
 }
 
 // ================================================
@@ -962,6 +1392,7 @@ function setupEventListeners() {
             const q = value.toLowerCase();
             const match = getAllFiles().find(function (file) {
                 return (state.filter === 'all' || file.app === state.filter) &&
+                    (!state.activeTag || file.tagId === state.activeTag) &&
                     file.name.toLowerCase().startsWith(q) &&
                     file.name.length > value.length;
             });
@@ -1048,6 +1479,74 @@ function setupEventListeners() {
             createFile(item.dataset.app);
         });
     });
+
+    // ----- Projects sidebar -----
+    $('sidebarToggle').addEventListener('click', function (e) {
+        e.stopPropagation();
+        toggleSidebar();
+    });
+
+    $('sidebarClose').addEventListener('click', function (e) {
+        e.stopPropagation();
+        toggleSidebar();
+    });
+
+    $('sidebarScrim').addEventListener('click', closeSidebarDrawer);
+
+    function selectAllFiles() {
+        selectTag(null);
+    }
+    $('allFilesBtn').addEventListener('click', selectAllFiles);
+    $('allFilesBtn').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            selectAllFiles();
+        }
+    });
+    // Dropping a file here removes it from its project.
+    makeDropTarget($('allFilesBtn'), null);
+
+    $('newProjectBtn').addEventListener('click', function () {
+        if ($('projectForm').classList.contains('hidden')) {
+            openProjectForm(null);
+        } else {
+            closeProjectForm();
+        }
+    });
+    $('projectForm').addEventListener('submit', submitProjectForm);
+    $('projectFormCancel').addEventListener('click', closeProjectForm);
+    $('projectNameInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeProjectForm();
+    });
+
+    // Escape closes the mobile drawer (modals have their own handling)
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeSidebarDrawer();
+    });
+
+    // ----- Move-to-project modal -----
+    $('moveModalClose').addEventListener('click', hideMoveModal);
+    $('cancelMove').addEventListener('click', hideMoveModal);
+    $('confirmMove').addEventListener('click', confirmMove);
+    $('moveSelectBtn').addEventListener('click', function (e) {
+        e.stopPropagation();
+        const open = $('moveDropdown').classList.toggle('active');
+        $('moveSelect').classList.toggle('active', open);
+        this.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' || !$('moveModal').classList.contains('active')) return;
+        if ($('moveDropdown').classList.contains('active')) {
+            closeMoveDropdown();
+            return;
+        }
+        hideMoveModal();
+    });
+
+    // ----- Delete project modal -----
+    $('deleteProjectModalClose').addEventListener('click', hideDeleteProjectModal);
+    $('cancelDeleteProject').addEventListener('click', hideDeleteProjectModal);
+    $('confirmDeleteProject').addEventListener('click', confirmDeleteProject);
 
     // ----- Filter chooser -----
     document.querySelectorAll('.wd-filter[data-filter]').forEach(function (btn) {
@@ -1186,11 +1685,16 @@ function setupEventListeners() {
             const themeContainer = $('themeToggleBtn').closest('.wd-theme-container');
             if (themeContainer) themeContainer.classList.remove('active');
         }
+        if (!e.target.closest('#moveSelect')) {
+            closeMoveDropdown();
+        }
         document.querySelectorAll('.wd-modal.active').forEach(function (modal) {
             if (e.target === modal) {
                 modal.classList.remove('active');
                 state.fileToRename = null;
                 state.fileToDelete = null;
+                state.fileToMove = null;
+                state.projectToDelete = null;
             }
         });
     });
@@ -1228,6 +1732,7 @@ async function init() {
     renderNewMenus();
     setupEventListeners();
     updateThemeLabel();
+    initSidebar();
 
     const session = wdAuth.getSession();
     if (!session) {

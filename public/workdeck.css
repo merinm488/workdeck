@@ -1635,3 +1635,509 @@ html[data-theme="dark"] .wd-theme-option-icon {
         padding: 7px 12px;
     }
 }
+
+/* ============================================================
+   Projects sidebar
+   Pinned on desktop (≥1024px, content shifts right), drawer
+   + scrim below. Off-screen rows are untabbable via visibility.
+   ============================================================ */
+
+.wd-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: 280px;
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
+    display: flex;
+    flex-direction: column;
+}
+
+body.wd-sidebar-open .wd-sidebar {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.25s ease, visibility 0s;
+}
+
+.wd-side-brand {
+    flex-shrink: 0;
+    padding: 14px 14px 12px;
+}
+
+.wd-sidebar-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px 12px calc(20px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.wd-side-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    background: var(--bg-elevated);
+}
+
+.wd-side-close:hover {
+    background: var(--bg-input);
+    color: var(--text);
+}
+
+.wd-sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+body.wd-sidebar-open .wd-sidebar-scrim {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Content shifts right when the sidebar is pinned */
+.wd-home-view {
+    transition: padding-left 0.25s ease;
+}
+
+/* Toggle button: hamburger (drawer) on touch-width screens, panel on desktop */
+.wd-sidebar-toggle .wd-icon-menu {
+    display: none;
+}
+
+/* ---------- Sidebar rows ---------- */
+.wd-side-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.wd-side-row:hover {
+    background: var(--bg-input);
+    color: var(--text);
+}
+
+.wd-side-row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.wd-side-row.active {
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+/* Row highlighted while a dragged file hovers over it */
+.wd-side-row.drop-target {
+    background: var(--accent-soft);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* The card/list row being dragged */
+.wd-file-card.dragging,
+.wd-file-row.dragging {
+    opacity: 0.45;
+}
+
+.wd-side-row-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.wd-side-row-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wd-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.wd-dot-none {
+    border: 1.5px dashed var(--text-tertiary);
+}
+
+.wd-side-count {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Hover swaps the count for row actions (edit / delete) */
+.wd-side-actions {
+    display: none;
+    align-items: center;
+    gap: 2px;
+}
+
+.wd-project-row:hover .wd-side-actions,
+.wd-project-row:focus-within .wd-side-actions {
+    display: flex;
+}
+
+.wd-project-row:hover .wd-side-count,
+.wd-project-row:focus-within .wd-side-count {
+    display: none;
+}
+
+.wd-side-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--text-tertiary);
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.wd-side-action:hover {
+    background: var(--bg-input);
+    color: var(--text);
+}
+
+.wd-side-action.danger:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+/* ---------- Section header ---------- */
+.wd-side-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 12px 6px;
+}
+
+.wd-side-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+}
+
+.wd-side-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--text-tertiary);
+}
+
+.wd-side-add:hover {
+    background: var(--bg-input);
+    color: var(--text);
+}
+
+.wd-side-empty {
+    padding: 10px 12px 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-tertiary);
+}
+
+/* ---------- Create / edit project form ---------- */
+.wd-project-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 6px 0 10px;
+    padding: 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.wd-project-input {
+    padding: 8px 10px;
+    font-size: 13px;
+}
+
+.wd-color-picker {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+.wd-color-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wd-color-swatch:hover {
+    transform: scale(1.15);
+}
+
+.wd-color-swatch.selected {
+    box-shadow: 0 0 0 2px var(--bg-input), 0 0 0 4px var(--text-secondary);
+}
+
+.wd-project-form-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.wd-project-form-actions .wd-primary-btn,
+.wd-project-form-actions .wd-secondary-btn {
+    flex: 1;
+    padding: 7px 10px;
+    font-size: 12.5px;
+}
+
+/* ---------- Project chip on file cards & list rows ---------- */
+.wd-file-project {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    max-width: 130px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
+.wd-file-project .wd-dot {
+    width: 7px;
+    height: 7px;
+}
+
+.wd-file-project-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wd-file-row-project {
+    margin-top: 3px;
+}
+
+/* View title when a project is active */
+.wd-view-title .wd-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 8px;
+    vertical-align: baseline;
+}
+
+/* ---------- Move-to-project modal ---------- */
+.wd-move-select {
+    margin-bottom: 20px;
+}
+
+.wd-move-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.wd-move-select-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    color: var(--text);
+    font-size: 14px;
+    text-align: left;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wd-move-select-trigger:hover:not(:disabled) {
+    border-color: var(--accent);
+}
+
+.wd-move-select-trigger:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.wd-move-select-value {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+}
+
+.wd-move-select-name,
+.wd-move-select-placeholder {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wd-move-select-placeholder {
+    color: var(--text-tertiary);
+}
+
+.wd-move-select-caret {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+    transition: transform 0.2s ease;
+}
+
+.wd-move-select.active .wd-move-select-caret {
+    transform: rotate(180deg);
+}
+
+/* Expands inline between trigger and actions, so it never leaves the card. */
+.wd-move-menu {
+    display: none;
+    margin-top: 8px;
+    padding: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.wd-move-menu.active {
+    display: block;
+    animation: wd-move-menu-in 0.15s ease;
+}
+
+@keyframes wd-move-menu-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+}
+
+.wd-move-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: left;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.wd-move-option:hover {
+    background: var(--bg-input);
+    color: var(--text);
+}
+
+.wd-move-option.selected {
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+.wd-move-option-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wd-move-check {
+    flex-shrink: 0;
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+
+.wd-move-option.selected .wd-move-check {
+    opacity: 1;
+}
+
+.wd-move-empty {
+    padding: 14px 10px;
+    font-size: 12.5px;
+    color: var(--text-tertiary);
+    text-align: center;
+}
+
+/* ---------- Breakpoints ---------- */
+@media (min-width: 1024px) {
+    body.wd-sidebar-open .wd-home-view {
+        padding-left: 280px;
+    }
+
+    body.wd-sidebar-open .wd-sidebar-scrim {
+        display: none;
+    }
+}
+
+@media (max-width: 1023px) {
+    .wd-sidebar {
+        box-shadow: var(--shadow);
+    }
+
+    .wd-side-close {
+        display: flex;
+    }
+
+    .wd-sidebar-toggle .wd-icon-panel {
+        display: none;
+    }
+
+    .wd-sidebar-toggle .wd-icon-menu {
+        display: block;
+    }
+}
+
+/* Touch devices have no hover: keep row actions reachable */
+@media (pointer: coarse) {
+    .wd-side-actions {
+        display: flex;
+    }
+
+    .wd-project-row .wd-side-count {
+        display: none;
+    }
+}

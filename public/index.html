@@ -100,19 +100,78 @@
 
     <!-- ===== HOME VIEW ===== -->
     <div id="homeView" class="wd-home-view hidden">
+        <!-- Projects sidebar: pinned on desktop, drawer + scrim on smaller screens -->
+        <div id="sidebarScrim" class="wd-sidebar-scrim" aria-hidden="true"></div>
+        <aside id="sidebar" class="wd-sidebar" aria-label="Projects">
+            <button id="sidebarClose" class="wd-side-close" aria-label="Close sidebar" title="Close sidebar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <a href="/" class="wd-logo wd-side-brand">
+                <div class="wd-logo-icon">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 01-1-1h4a1 1 0 001 1v4a1 1 0 001 1h3a1 1 0 001-1V10" />
+                    </svg>
+                </div>
+                <span class="wd-logo-text">Workdeck</span>
+            </a>
+            <nav class="wd-sidebar-scroll">
+                <!-- All files -->
+                <div id="allFilesBtn" class="wd-side-row" role="button" tabindex="0" title="All files">
+                    <svg class="wd-side-row-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span class="wd-side-row-name">All files</span>
+                </div>
+
+                <!-- Projects header -->
+                <div class="wd-side-header">
+                    <h2 class="wd-side-title">Projects</h2>
+                    <button id="newProjectBtn" class="wd-side-add" aria-label="New project" title="New project">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 4v16m8-8H4" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Create / edit project form (swatches rendered by JS) -->
+                <form id="projectForm" class="wd-project-form hidden">
+                    <input
+                        type="text"
+                        id="projectNameInput"
+                        class="wd-input wd-project-input"
+                        placeholder="Project name"
+                        maxlength="60"
+                        autocomplete="off"
+                    >
+                    <div id="projectColorPicker" class="wd-color-picker"></div>
+                    <div class="wd-project-form-actions">
+                        <button type="submit" id="projectFormSubmit" class="wd-primary-btn">Create</button>
+                        <button type="button" id="projectFormCancel" class="wd-secondary-btn">Cancel</button>
+                    </div>
+                </form>
+
+                <!-- Project rows rendered by renderSidebar() in workdeck.js -->
+                <div id="projectList"></div>
+                <div id="projectEmpty" class="wd-side-empty hidden">No projects yet. Create one to group your files.</div>
+            </nav>
+        </aside>
+
         <main class="wd-container">
             <!-- Header -->
             <header class="wd-header">
                 <div class="wd-header-content">
-                    <!-- Logo -->
-                    <a href="/" class="wd-logo">
-                        <div class="wd-logo-icon">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 01-1-1h4a1 1 0 001 1v4a1 1 0 001 1h3a1 1 0 001-1V10" />
-                            </svg>
-                        </div>
-                        <span class="wd-logo-text">Workdeck</span>
-                    </a>
+                    <!-- Sidebar toggle: hamburger (drawer) below 1024px, panel toggle on desktop -->
+                    <button id="sidebarToggle" class="wd-icon-btn wd-sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="false" title="Toggle sidebar">
+                        <svg class="wd-icon-panel" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <path d="M9 3v18"></path>
+                        </svg>
+                        <svg class="wd-icon-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
 
                     <!-- Search -->
                     <div class="wd-search-container">
@@ -404,6 +463,52 @@
                 <div class="wd-modal-actions">
                     <button id="cancelDeleteAccount" class="wd-secondary-btn">Cancel</button>
                     <button id="confirmDeleteAccount" class="wd-danger-btn">Delete Account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move to project modal -->
+    <div id="moveModal" class="wd-modal">
+        <div class="wd-modal-content">
+            <div class="wd-modal-header">
+                <h3 class="wd-modal-title">Move to project</h3>
+                <button class="wd-modal-close" id="moveModalClose">&times;</button>
+            </div>
+            <div class="wd-modal-body">
+                <p class="wd-modal-text">Choose where "<span id="moveFileName" class="wd-strong"></span>" lives.</p>
+                <div id="moveSelect" class="wd-move-select">
+                    <span id="moveSelectLabel" class="wd-move-label">Add to</span>
+                    <button type="button" id="moveSelectBtn" class="wd-move-select-trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="moveSelectLabel moveSelectValue">
+                        <span id="moveSelectValue" class="wd-move-select-value"></span>
+                        <svg class="wd-move-select-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 9l6 6 6-6" />
+                        </svg>
+                    </button>
+                    <div id="moveDropdown" class="wd-move-menu" role="listbox" aria-label="Add to project"></div>
+                </div>
+                <div class="wd-modal-actions">
+                    <button id="cancelMove" class="wd-secondary-btn">Cancel</button>
+                    <button id="confirmMove" class="wd-primary-btn">Move</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete project modal -->
+    <div id="deleteProjectModal" class="wd-modal">
+        <div class="wd-modal-content">
+            <div class="wd-modal-header">
+                <h3 class="wd-modal-title">Delete Project</h3>
+                <button class="wd-modal-close" id="deleteProjectModalClose">&times;</button>
+            </div>
+            <div class="wd-modal-body">
+                <p class="wd-modal-text">
+                    Delete "<span id="deleteProjectName" class="wd-strong"></span>" and the <span id="deleteProjectCount" class="wd-strong"></span> inside it? This cannot be undone.
+                </p>
+                <div class="wd-modal-actions">
+                    <button id="cancelDeleteProject" class="wd-secondary-btn">Cancel</button>
+                    <button id="confirmDeleteProject" class="wd-danger-btn">Delete Project</button>
                 </div>
             </div>
         </div>
