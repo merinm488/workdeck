@@ -308,6 +308,92 @@ class SpreadsheetManager {
     }
 
     /**
+     * Snapshot Univer's own render canvases into a small image data URL,
+     * stored on the record as the Workdeck card thumbnail.
+     * Returns null when there is nothing to capture (not rendered yet,
+     * tainted canvas, ...) - callers then just omit the thumbnail.
+     * @param {number} maxWidth - Output pixel width cap
+     * @returns {string|null} PNG (or JPEG when too large) data URL
+     */
+    captureThumbnail(maxWidth = 640) {
+        try {
+            if (!this.container || !this.isInitialized) return null;
+
+            const containerRect = this.container.getBoundingClientRect();
+            if (!containerRect.width || !containerRect.height) return null;
+
+            let canvases = Array.from(
+                this.container.querySelectorAll('canvas[data-u-comp="render-canvas"]')
+            );
+            if (!canvases.length) {
+                canvases = Array.from(this.container.querySelectorAll('canvas'));
+            }
+
+            const rects = new Map();
+            let largest = 0;
+            canvases = canvases.filter(c => {
+                if (!c.width || !c.height) return false;
+                const rect = c.getBoundingClientRect();
+                rects.set(c, rect);
+                const area = rect.width * rect.height;
+                if (area > largest) largest = area;
+                return true;
+            });
+            if (!canvases.length || !largest) return null;
+
+            // Keep the layer stack, drop tiny helper canvases
+            const layers = canvases.filter(
+                c => rects.get(c).width * rects.get(c).height >= largest * 0.1
+            );
+            if (!layers.length) return null;
+
+            let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+            layers.forEach(c => {
+                const r = rects.get(c);
+                left = Math.min(left, r.left - containerRect.left);
+                top = Math.min(top, r.top - containerRect.top);
+                right = Math.max(right, r.right - containerRect.left);
+                bottom = Math.max(bottom, r.bottom - containerRect.top);
+            });
+            const unionW = right - left;
+            const unionH = bottom - top;
+            if (unionW <= 0 || unionH <= 0) return null;
+
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const composite = document.createElement('canvas');
+            composite.width = Math.round(unionW * dpr);
+            composite.height = Math.round(unionH * dpr);
+            const ctx = composite.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, composite.width, composite.height);
+            layers.forEach(c => {
+                const r = rects.get(c);
+                ctx.drawImage(
+                    c,
+                    (r.left - containerRect.left - left) * dpr,
+                    (r.top - containerRect.top - top) * dpr,
+                    r.width * dpr,
+                    r.height * dpr
+                );
+            });
+
+            const outW = Math.min(composite.width, maxWidth);
+            const outH = Math.max(1, Math.round(composite.height * outW / composite.width));
+            const out = document.createElement('canvas');
+            out.width = outW;
+            out.height = outH;
+            out.getContext('2d').drawImage(composite, 0, 0, outW, outH);
+
+            const png = out.toDataURL('image/png');
+            if (png.length <= 250000) return png;
+            return out.toDataURL('image/jpeg', 0.75);
+        } catch (error) {
+            console.warn('[SPREADSHEET] Thumbnail capture failed:', error);
+            return null;
+        }
+    }
+
+    /**
      * Get the active worksheet facade
      * @returns {object|null} FWorksheet
      */
@@ -360,6 +446,11 @@ class SpreadsheetManager {
             updatedAt: new Date().toISOString(),
             sharedId: existingSpreadsheet.sharedId || null
         };
+
+        // True canvas snapshot for the Workdeck card. On failure it's
+        // omitted, which keeps the previous thumbnail via the API merge.
+        const thumbnail = this.captureThumbnail();
+        if (thumbnail) spreadsheetData.thumbnail = thumbnail;
 
         const success = await sheetsStorage.saveSpreadsheet(this.currentSheetId, spreadsheetData);
 

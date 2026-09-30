@@ -3,7 +3,7 @@
  *
  * Live mini-renders of file content for grid cards:
  *   docs   -> markdown/plain text laid out on a virtual page, scaled to fit
- *   sheets -> mini cell grid drawn on canvas
+ *   sheets -> editor canvas snapshot stored at save (mini-grid sketch fallback)
  *   forms  -> simplified component rows
  *   slides -> first slide rendered offscreen by fabric@6 in a sandboxed iframe
  *   draw   -> content-fit render by fabric@7 in a sandboxed iframe
@@ -279,6 +279,14 @@
     }
 
     function renderSheets(page, file) {
+        // Snapshot stored by the editor at save time; the sketch below
+        // only covers files that haven't been re-saved since
+        const thumb = file.raw && typeof file.raw.thumbnail === 'string' && file.raw.thumbnail;
+        if (thumb) {
+            setImage(page, thumb);
+            return;
+        }
+
         const info = extractSheetCells(file.raw);
         if (!info) return;
 
