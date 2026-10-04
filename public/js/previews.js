@@ -553,6 +553,22 @@
     }
 
     // ================================================
+    // Filebox previews (extension tile; files carry no thumbnails)
+    // ================================================
+
+    function fileExtension(name) {
+        const match = /\.([a-z0-9]{1,8})$/i.exec(String(name || ''));
+        return match ? match[1].toUpperCase() : 'FILE';
+    }
+
+    function renderFilebox(page, file) {
+        const raw = file.raw || {};
+        page.innerHTML = '<div class="wd-preview-filebox-tile">'
+            + '<span class="wd-preview-filebox-ext">' + escapeHtml(fileExtension(raw.name || file.name)) + '</span>'
+            + '</div>';
+    }
+
+    // ================================================
     // Resize: keep DOM previews scaled to their card
     // ================================================
 
@@ -581,6 +597,7 @@
             case 'sheets': renderSheets(page, file); break;
             case 'slides':
             case 'draw': renderFabric(page, file); break;
+            case 'filebox': renderFilebox(page, file); break;
         }
     }
 

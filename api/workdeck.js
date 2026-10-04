@@ -22,6 +22,7 @@ import {
   createUserDoc,
   deleteUserDoc,
   deleteSharedDoc,
+  deleteRawDoc,
   getBaseUrl,
   applyCorsHeaders
 } from './_lib/store.js';
@@ -31,6 +32,40 @@ const DEFAULT_DOC_TITLE = 'Untitled';
 const DEFAULT_FORM_TITLE = 'Untitled Form';
 const DEFAULT_DECK_NAME = 'Untitled';
 const DEFAULT_DRAWING_NAME = 'Untitled Drawing';
+const DEFAULT_FOLDER_NAME = 'Untitled';
+
+/**
+ * Filebox tags are multi-valued
+ */
+function sanitizeTagIds(tagIds, userData) {
+  if (!Array.isArray(tagIds)) return [];
+  const known = new Set((userData.tags || []).map(t => t.id));
+  const seen = new Set();
+  return tagIds.filter(id => {
+    if (!known.has(id) || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+/**
+ * All folder ids in the subtree rooted at rootId (inclusive). Walks
+ * parentId chains to arbitrary depth — Filebox folders nest unlimited.
+ */
+function collectFolderTree(folders, rootId) {
+  const doomed = new Set([rootId]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const folder of folders) {
+      if (folder && folder.parentId && doomed.has(folder.parentId) && !doomed.has(folder.id)) {
+        doomed.add(folder.id);
+        grew = true;
+      }
+    }
+  }
+  return doomed;
+}
 
 /**
  * Build a fresh Univer workbook snapshot 
@@ -301,9 +336,9 @@ export default async function handler(req, res) {
           break;
         }
 
-        // Deleting a project deletes its files too — the same cleanup as
-        // deleteFile (shared copies + lastOpened), for every file in the
-        // project across all apps at once.
+        // Deleting a tag deletes its files in docs/sheets/forms/slides/draws
+        // (shared copies + lastOpened, like deleteFile). Filebox items are
+        // multi-tag — they only lose the tag id, never their bytes.
         case 'deleteTag': {
           const tagId = data?.tagId;
           if (!tagId) {
@@ -334,7 +369,113 @@ export default async function handler(req, res) {
           userData.forms = userData.forms.filter(f => !f || f.tagId !== tagId);
           userData.slides = userData.slides.filter(f => !f || f.tagId !== tagId);
           userData.draws = userData.draws.filter(f => !f || f.tagId !== tagId);
+          (userData.files || []).forEach(f => {
+            if (Array.isArray(f.tags)) f.tags = f.tags.filter(id => id !== tagId);
+          });
+          (userData.folders || []).forEach(f => {
+            if (Array.isArray(f.tags)) f.tags = f.tags.filter(id => id !== tagId);
+          });
           userData.tags = (userData.tags || []).filter(t => t.id !== tagId);
+          break;
+        }
+
+        // ---- Filebox: nested folders + multi-tag files/folders ----
+        case 'createFolder': {
+          const name = String(data?.name || '').trim();
+          if (!name) {
+            return res.status(400).json({ success: false, error: 'name is required' });
+          }
+          if (data?.parentId && !(userData.folders || []).some(f => f.id === data.parentId)) {
+            return res.status(404).json({ success: false, error: 'Parent folder not found' });
+          }
+          const now = new Date().toISOString();
+          userData.folders.push({
+            id: generateId(),
+            name,
+            color: data?.color || '#FACC15',
+            parentId: data?.parentId || null,
+            tags: sanitizeTagIds(data?.tags, userData),
+            createdAt: now,
+            updatedAt: now
+          });
+          break;
+        }
+
+        case 'updateFolder': {
+          const folderIndex = (userData.folders || []).findIndex(f => f.id === data?.folderId);
+          if (folderIndex === -1) {
+            return res.status(404).json({ success: false, error: 'Folder not found' });
+          }
+          userData.folders[folderIndex] = {
+            ...userData.folders[folderIndex],
+            ...(data?.updates || {}),
+            id: data.folderId,
+            updatedAt: new Date().toISOString()
+          };
+          break;
+        }
+
+        // Destructive cascade: the folder, every descendant folder, and all
+        // contained files (bytes + metadata) are permanently deleted.
+        case 'deleteFolder': {
+          const folderId = data?.folderId;
+          if (!folderId) {
+            return res.status(400).json({ success: false, error: 'folderId is required' });
+          }
+          if (!(userData.folders || []).some(f => f.id === folderId)) {
+            return res.status(404).json({ success: false, error: 'Folder not found' });
+          }
+          const doomed = collectFolderTree(userData.folders || [], folderId);
+          const removedFiles = (userData.files || []).filter(f => f && doomed.has(f.folderId));
+          for (const file of removedFiles) {
+            if (file.storageKey) {
+              try {
+                await deleteRawDoc(file.storageKey);
+              } catch (error) {
+                console.error('[WORKDECK API] Failed to delete file content:', error);
+              }
+            }
+            if (userData.settings?.lastOpened) {
+              delete userData.settings.lastOpened[file.id];
+            }
+          }
+          userData.files = (userData.files || []).filter(f => !f || !doomed.has(f.folderId));
+          userData.folders = (userData.folders || []).filter(f => f && !doomed.has(f.id));
+          break;
+        }
+
+        // Moving a file = one pointer change.
+        case 'setFileFolder': {
+          const target = (userData.files || []).find(f => f.id === data?.fileId);
+          if (!target) {
+            return res.status(404).json({ success: false, error: 'File not found' });
+          }
+          if (data?.folderId && !(userData.folders || []).some(f => f.id === data.folderId)) {
+            return res.status(404).json({ success: false, error: 'Folder not found' });
+          }
+          target.folderId = data.folderId || null;
+          target.updatedAt = new Date().toISOString();
+          break;
+        }
+
+        // Full-array replace, so one call both adds and removes tags.
+        case 'setFileTags': {
+          const target = (userData.files || []).find(f => f.id === data?.fileId);
+          if (!target) {
+            return res.status(404).json({ success: false, error: 'File not found' });
+          }
+          target.tags = sanitizeTagIds(data?.tagIds, userData);
+          target.updatedAt = new Date().toISOString();
+          break;
+        }
+
+        case 'setFolderTags': {
+          const target = (userData.folders || []).find(f => f.id === data?.folderId);
+          if (!target) {
+            return res.status(404).json({ success: false, error: 'Folder not found' });
+          }
+          target.tags = sanitizeTagIds(data?.tagIds, userData);
+          target.updatedAt = new Date().toISOString();
           break;
         }
 
@@ -367,17 +508,26 @@ export default async function handler(req, res) {
           if (!fileId) {
             return res.status(400).json({ success: false, error: 'fileId is required' });
           }
-          const target = app === 'sheets'
-            ? userData.sheets.find(s => s.id === fileId)
-            : app === 'forms'
-              ? userData.forms.find(f => f.id === fileId)
-              : app === 'slides'
-              ? userData.slides.find(d => d.id === fileId)
-              : app === 'draw'
-              ? userData.draws.find(d => d.id === fileId)
-              : userData.docs.find(n => n.id === fileId);
+          let found;
+          if (app === 'filebox') {
+            // Files AND folders use settings.lastOpened for recency.
+            found = (userData.files || []).some(f => f.id === fileId) ||
+              (userData.folders || []).some(f => f.id === fileId);
+          } else {
+            found = Boolean(
+              app === 'sheets'
+                ? userData.sheets.find(s => s.id === fileId)
+                : app === 'forms'
+                  ? userData.forms.find(f => f.id === fileId)
+                  : app === 'slides'
+                  ? userData.slides.find(d => d.id === fileId)
+                  : app === 'draw'
+                  ? userData.draws.find(d => d.id === fileId)
+                  : userData.docs.find(n => n.id === fileId)
+            );
+          }
 
-          if (!target) {
+          if (!found) {
             return res.status(404).json({ success: false, error: 'File not found' });
           }
 
@@ -397,7 +547,8 @@ export default async function handler(req, res) {
           const isForm = app === "forms";
           const isDeck = app === "slides";
           const isDrawing = app === "draw";
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : userData.docs;
+          const isFileboxFile = app === "filebox";
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -411,6 +562,8 @@ export default async function handler(req, res) {
           } else if (isDeck){
             target.name = cleanName;
           } else if (isDrawing) {
+            target.name = cleanName;
+          } else if (isFileboxFile) {
             target.name = cleanName;
           } else {
             target.title = cleanName;
@@ -450,6 +603,16 @@ export default async function handler(req, res) {
               await deleteSharedDoc(drawing.sharedId);
             }
             userData.draws = userData.draws.filter(d => d.id !== fileId);
+          } else if (app === 'filebox') {
+            const file = (userData.files || []).find(f => f.id === fileId);
+            if (file?.storageKey) {
+              try {
+                await deleteRawDoc(file.storageKey);
+              } catch (error) {
+                console.error('[WORKDECK API] Failed to delete file content:', error);
+              }
+            }
+            userData.files = (userData.files || []).filter(f => f.id !== fileId);
           } else {
             const doc = userData.docs.find(n => n.id === fileId);
             if (doc?.sharedId) {
@@ -484,6 +647,8 @@ export default async function handler(req, res) {
         forms: userData.forms,
         slides: userData.slides,
         draws: userData.draws,
+        files: userData.files,
+        folders: userData.folders,
         settings: userData.settings
       });
 
@@ -507,6 +672,18 @@ export default async function handler(req, res) {
       const userData = await getUserDoc(hash);
       if (!userData) {
         return res.status(404).json({ success: false, error: 'User not found' });
+      }
+
+      // Filebox bytes live in separate records — remove them BEFORE the doc
+      // goes, or they'd survive as orphans no metadata points at.
+      for (const file of userData.files || []) {
+        if (file && file.storageKey) {
+          try {
+            await deleteRawDoc(file.storageKey);
+          } catch (error) {
+            console.error('[WORKDECK API] Failed to delete file content:', error);
+          }
+        }
       }
 
       const deleted = await deleteUserDoc(hash);

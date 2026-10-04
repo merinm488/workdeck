@@ -1,0 +1,40 @@
+{
+  "name": "Filebox — Workdeck",
+  "short_name": "Filebox",
+  "description": "Your files, organized in nested folders. Part of Workdeck.",
+  "start_url": "/filebox/",
+  "scope": "/filebox/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0d9488",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/filebox/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/filebox/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "shortcuts": [
+    {
+      "name": "Upload files",
+      "short_name": "Upload",
+      "description": "Open Filebox and pick files to upload",
+      "url": "/filebox/?upload=1",
+      "icons": [
+        {
+          "src": "/filebox/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

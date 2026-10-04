@@ -100,9 +100,9 @@
 
     <!-- ===== HOME VIEW ===== -->
     <div id="homeView" class="wd-home-view hidden">
-        <!-- Projects sidebar: pinned on desktop, drawer + scrim on smaller screens -->
+        <!-- Tags sidebar: pinned on desktop, drawer + scrim on smaller screens -->
         <div id="sidebarScrim" class="wd-sidebar-scrim" aria-hidden="true"></div>
-        <aside id="sidebar" class="wd-sidebar" aria-label="Projects">
+        <aside id="sidebar" class="wd-sidebar" aria-label="Tags">
             <button id="sidebarClose" class="wd-side-close" aria-label="Close sidebar" title="Close sidebar">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M6 18L18 6M6 6l12 12" />
@@ -125,23 +125,23 @@
                     <span class="wd-side-row-name">All files</span>
                 </div>
 
-                <!-- Projects header -->
+                <!-- Tags header -->
                 <div class="wd-side-header">
-                    <h2 class="wd-side-title">Projects</h2>
-                    <button id="newProjectBtn" class="wd-side-add" aria-label="New project" title="New project">
+                    <h2 class="wd-side-title">Tags</h2>
+                    <button id="newProjectBtn" class="wd-side-add" aria-label="New tag" title="New tag">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 4v16m8-8H4" />
                         </svg>
                     </button>
                 </div>
 
-                <!-- Create / edit project form (swatches rendered by JS) -->
+                <!-- Create / edit tag form (swatches rendered by JS) -->
                 <form id="projectForm" class="wd-project-form hidden">
                     <input
                         type="text"
                         id="projectNameInput"
                         class="wd-input wd-project-input"
-                        placeholder="Project name"
+                        placeholder="Tag name"
                         maxlength="60"
                         autocomplete="off"
                     >
@@ -152,9 +152,9 @@
                     </div>
                 </form>
 
-                <!-- Project rows rendered by renderSidebar() in workdeck.js -->
+                <!-- Tag rows rendered by renderSidebar() in workdeck.js -->
                 <div id="projectList"></div>
-                <div id="projectEmpty" class="wd-side-empty hidden">No projects yet. Create one to group your files.</div>
+                <div id="projectEmpty" class="wd-side-empty hidden">No tags yet. Create one to group your files.</div>
             </nav>
         </aside>
 
@@ -415,7 +415,7 @@
                 <button class="wd-modal-close" id="deleteModalClose">&times;</button>
             </div>
             <div class="wd-modal-body">
-                <p class="wd-modal-text">
+                <p class="wd-modal-text" id="deleteModalText">
                     Are you sure you want to delete "<span id="deleteFileName" class="wd-strong"></span>"? This cannot be undone.
                 </p>
                 <div class="wd-modal-actions">
@@ -468,47 +468,53 @@
         </div>
     </div>
 
-    <!-- Move to project modal -->
+    <!-- Add tag modal (single-tag for docs/sheets/etc, multi-tag checkboxes
+         for Filebox items — workdeck.js picks the variant) -->
     <div id="moveModal" class="wd-modal">
         <div class="wd-modal-content">
             <div class="wd-modal-header">
-                <h3 class="wd-modal-title">Move to project</h3>
+                <h3 class="wd-modal-title">Add tag</h3>
                 <button class="wd-modal-close" id="moveModalClose">&times;</button>
             </div>
             <div class="wd-modal-body">
-                <p class="wd-modal-text">Choose where "<span id="moveFileName" class="wd-strong"></span>" lives.</p>
+                <p class="wd-modal-text">Choose tags for "<span id="moveFileName" class="wd-strong"></span>".</p>
                 <div id="moveSelect" class="wd-move-select">
-                    <span id="moveSelectLabel" class="wd-move-label">Add to</span>
+                    <span id="moveSelectLabel" class="wd-move-label">Tag</span>
                     <button type="button" id="moveSelectBtn" class="wd-move-select-trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="moveSelectLabel moveSelectValue">
                         <span id="moveSelectValue" class="wd-move-select-value"></span>
                         <svg class="wd-move-select-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M6 9l6 6 6-6" />
                         </svg>
                     </button>
-                    <div id="moveDropdown" class="wd-move-menu" role="listbox" aria-label="Add to project"></div>
+                    <div id="moveDropdown" class="wd-move-menu" role="listbox" aria-label="Add tag"></div>
                 </div>
                 <div class="wd-modal-actions">
                     <button id="cancelMove" class="wd-secondary-btn">Cancel</button>
-                    <button id="confirmMove" class="wd-primary-btn">Move</button>
+                    <button id="confirmMove" class="wd-primary-btn">Save</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Delete project modal -->
+    <!-- Delete tag modal — the copy states the mixed semantics explicitly:
+         docs/sheets/forms/slides/draws carrying the tag are DELETED, while
+         Filebox files/folders only lose the tag. -->
     <div id="deleteProjectModal" class="wd-modal">
         <div class="wd-modal-content">
             <div class="wd-modal-header">
-                <h3 class="wd-modal-title">Delete Project</h3>
+                <h3 class="wd-modal-title">Delete Tag</h3>
                 <button class="wd-modal-close" id="deleteProjectModalClose">&times;</button>
             </div>
             <div class="wd-modal-body">
                 <p class="wd-modal-text">
-                    Delete "<span id="deleteProjectName" class="wd-strong"></span>" and the <span id="deleteProjectCount" class="wd-strong"></span> inside it? This cannot be undone.
+                    Delete "<span id="deleteProjectName" class="wd-strong"></span>"? Deleting this tag deletes the <span id="deleteProjectCount" class="wd-strong"></span> carrying it in Docs, Sheets, Forms, Slides and Draw.
+                </p>
+                <p class="wd-modal-text hidden" id="deleteProjectFileboxNote">
+                    <span id="deleteProjectFileboxCount" class="wd-strong"></span> in Filebox keep existing but lose this tag.
                 </p>
                 <div class="wd-modal-actions">
                     <button id="cancelDeleteProject" class="wd-secondary-btn">Cancel</button>
-                    <button id="confirmDeleteProject" class="wd-danger-btn">Delete Project</button>
+                    <button id="confirmDeleteProject" class="wd-danger-btn">Delete Tag</button>
                 </div>
             </div>
         </div>

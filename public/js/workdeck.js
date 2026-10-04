@@ -56,6 +56,28 @@ const DRAW_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" s
       + '<path d="m15 5 4 4"></path>'
       + '</svg>';
 
+const FILEBOX_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>'
+      + '</svg>';
+
+/** #rrggbb -> darkened/lightened copy, for two-tone folder art. */
+function shadeColor(hex, percent) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!match) return hex || '#FACC15';
+    const n = parseInt(match[1], 16);
+    const shift = c => Math.max(0, Math.min(255, Math.round(c + (percent / 100) * 255)));
+    const r = shift(n >> 16), g = shift((n >> 8) & 255), b = shift(n & 255);
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+function folderArt(color) {
+    const dark = shadeColor(color, -18);
+    return '<svg viewBox="0 0 48 40" aria-hidden="true">'
+        + '<path d="M2 8a4 4 0 0 1 4-4h11a4 4 0 0 1 3.2 1.6L23 10h19a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" fill="' + dark + '"/>'
+        + '<path d="M2 14h44v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V14z" fill="' + color + '"/>'
+        + '</svg>';
+}
+
 /**
  * App registry — the single source of truth for every Workdeck app.
  * Adding an app (Forms, Slides, ...) = one new entry here plus API support.
@@ -143,6 +165,18 @@ const WD_APPS = [
             pickNewest: function (data) { return data.draws && data.draws[0]; }
         },
         contentSearch: false
+    },
+    {
+        id: 'filebox',
+        name: 'Filebox',
+        label: 'File',
+        accent: 'filebox',
+        icon: FILEBOX_ICON,
+        route: '/filebox/',
+        editorParam: 'id',
+        create: null,
+        chooserOpensApp: true,
+        contentSearch: false
     }
 ];
 
@@ -151,9 +185,24 @@ function getApp(appId) {
     return WD_APPS.find(function (app) { return app.id === appId; }) || WD_APPS[0];
 }
 
-/** Look up a project (tag) by id. */
+/** Look up a tag by id. */
 function getTag(tagId) {
     return state.tags.find(function (t) { return t.id === tagId; }) || null;
+}
+
+/**
+ * Tag match across both models: the single tagId on docs/sheets/forms/
+ * slides/draws, or the tags[] array on Filebox files and folders.
+ */
+function fileMatchesTag(file, tagId) {
+    if (!tagId) return false;
+    if (file.tagId === tagId) return true;
+    return Array.isArray(file.tags) && file.tags.includes(tagId);
+}
+
+/** Filebox items carry tags[] instead of a single tagId. */
+function isMultiTagItem(file) {
+    return Array.isArray(file.tags);
 }
 
 /** #rrggbb -> rgba(), so active rows can tint with the project color. */
@@ -176,16 +225,19 @@ const state = {
     forms: [],
     slides: [],
     draws: [],
+    files: [],           // Filebox file metadata
+    folders: [],         // Filebox folders
     settings: {},
     searchQuery: '',
     filter: 'all',       // 'all' | app id from WD_APPS
-    activeTag: null,     // project (tag) id, null = All files
+    activeTag: null,     // tag id, null = All files
     sidebarOpen: false,
     viewMode: 'grid',    // 'grid' | 'list'
     fileToRename: null,
     fileToDelete: null,
     fileToMove: null,
     moveTarget: null,
+    moveChecked: null,   // Set of tag ids while the multi-tag modal is open
     projectToDelete: null
 };
 
@@ -226,9 +278,10 @@ function formatRelativeDate(iso) {
 }
 
 /**
- * Unified file list: docs and sheets tagged with their app,
- * sorted most-recently-used first (lastOpened wins over updatedAt so
- * re-opening an old file bumps it to the top, like Drive).
+ * Unified file list: everything tagged with its app, sorted
+ * most-recently-used first. Filebox contributes two kinds
+ * of entries: file cards (raw.metadata in raw) and — top level only —
+ * folder cards ({kind:'folder'}), interleaved in the same recency sort.
  */
 function getAllFiles() {
     const lastOpened = (state.settings && state.settings.lastOpened) || {};
@@ -300,11 +353,51 @@ function getAllFiles() {
         };
     });
 
-    return docs.concat(sheetFiles).concat(formFiles).concat(slideFiles).concat(drawFiles).sort(function (a, b) {
-        const aTime = a.lastOpened || a.updatedAt || '';
-        const bTime = b.lastOpened || b.updatedAt || '';
-        return bTime.localeCompare(aTime);
+    const fileboxFiles = (state.files || []).map(function (f) {
+        return {
+            id: f.id,
+            app: 'filebox',
+            kind: 'file',
+            name: f.name || 'Untitled',
+            updatedAt: f.updatedAt,
+            lastOpened: lastOpened[f.id] || null,
+            tagId: null,
+            tags: Array.isArray(f.tags) ? f.tags.slice() : [],
+            folderId: f.folderId || null,
+            content: '',
+            raw: f
+        };
     });
+
+    // Only root-level folders appear here — nested depth is navigated
+    // inside Filebox itself.
+    const folderCards = (state.folders || [])
+        .filter(function (f) { return !f.parentId; })
+        .map(function (f) {
+            const childCount = (state.folders || []).filter(function (c) { return c && c.parentId === f.id; }).length
+                + (state.files || []).filter(function (c) { return c && c.folderId === f.id; }).length;
+            return {
+                id: f.id,
+                app: 'filebox',
+                kind: 'folder',
+                name: f.name || 'Untitled',
+                updatedAt: f.updatedAt,
+                lastOpened: lastOpened[f.id] || null,
+                tagId: null,
+                tags: Array.isArray(f.tags) ? f.tags.slice() : [],
+                childCount: childCount,
+                content: '',
+                raw: f
+            };
+        });
+
+    return docs.concat(sheetFiles).concat(formFiles).concat(slideFiles).concat(drawFiles)
+        .concat(fileboxFiles).concat(folderCards)
+        .sort(function (a, b) {
+            const aTime = a.lastOpened || a.updatedAt || '';
+            const bTime = b.lastOpened || b.updatedAt || '';
+            return bTime.localeCompare(aTime);
+        });
 }
 
 /**
@@ -314,7 +407,7 @@ function getAllFiles() {
 function getVisibleFiles() {
     const q = state.searchQuery.toLowerCase().trim();
     return getAllFiles().filter(function (file) {
-        if (state.activeTag && file.tagId !== state.activeTag) return false;
+        if (state.activeTag && !fileMatchesTag(file, state.activeTag)) return false;
         if (state.filter !== 'all' && file.app !== state.filter) return false;
         if (!q) return true;
         if (file.name.toLowerCase().includes(q)) return true;
@@ -378,6 +471,8 @@ function applyUserData(data) {
     state.forms = data.forms || [];
     state.slides = data.slides || [];
     state.draws = data.draws || [];
+    state.files = data.files || [];
+    state.folders = data.folders || [];
     state.settings = data.settings || {};
     render();
 }
@@ -529,6 +624,9 @@ function renderSidebar() {
     const counts = {};
     getAllFiles().forEach(function (file) {
         if (file.tagId) counts[file.tagId] = (counts[file.tagId] || 0) + 1;
+        (file.tags || []).forEach(function (id) {
+            counts[id] = (counts[id] || 0) + 1;
+        });
     });
 
     const list = $('projectList');
@@ -546,8 +644,8 @@ function renderSidebar() {
             + '<span class="wd-side-row-name">' + escapeHtml(tag.name) + '</span>'
             + '<span class="wd-side-count">' + (counts[tag.id] || 0) + '</span>'
             + '<span class="wd-side-actions">'
-            + '<button class="wd-side-action edit" title="Edit project">' + RENAME_ICON + '</button>'
-            + '<button class="wd-side-action danger" title="Delete project">' + DELETE_ICON + '</button>'
+            + '<button class="wd-side-action edit" title="Edit tag">' + RENAME_ICON + '</button>'
+            + '<button class="wd-side-action danger" title="Delete tag">' + DELETE_ICON + '</button>'
             + '</span>';
 
         row.addEventListener('click', function (e) {
@@ -596,14 +694,14 @@ function renderFooter() {
         const visible = getVisibleFiles().length;
         statsEl.textContent = visible + ' of ' + total + ' file' + (total === 1 ? '' : 's');
     } else if (state.activeTag) {
-        const count = files.filter(function (file) { return file.tagId === state.activeTag; }).length;
+        const count = files.filter(function (file) { return fileMatchesTag(file, state.activeTag); }).length;
         statsEl.textContent = count + ' file' + (count === 1 ? '' : 's');
     } else if (state.filter !== 'all') {
         const count = files.filter(function (file) { return file.app === getApp(state.filter).id; }).length;
         statsEl.textContent = count + ' file' + (count === 1 ? '' : 's');
     } else {
         statsEl.textContent = total + ' file' + (total === 1 ? '' : 's') + ' · ' + WD_APPS.length + ' apps · '
-            + state.tags.length + (state.tags.length === 1 ? ' project' : ' projects');
+            + state.tags.length + (state.tags.length === 1 ? ' tag' : ' tags');
     }
 }
 
@@ -626,9 +724,7 @@ function buildAppMenuItem(app, extraAttrs) {
         + '</button>';
 }
 
-/**
- * Fill both "+ New" dropdowns (header + empty state) from WD_APPS.
- */
+
 function renderNewMenus() {
     const items = WD_APPS.map(function (app) { return buildAppMenuItem(app); }).join('');
     $('newDropdown').innerHTML = items;
@@ -692,11 +788,33 @@ const CHECK_ICON = '<svg class="wd-move-check" width="16" height="16" viewBox="0
     + '<polyline points="20 6 9 17 4 12"></polyline>'
     + '</svg>';
 
-/** Colored project chip shown on cards and list rows (empty when untagged). */
+/**
+ * Tag chips on cards and list rows. Filebox items are multi-tag: up to
+ * 3 chips + an overflow count. Other apps keep the single chip.
+ */
 function projectChipHtml(file, extraClass) {
+    const base = 'wd-file-project' + (extraClass ? ' ' + extraClass : '');
+    if (isMultiTagItem(file)) {
+        const tags = (file.tags || []).map(getTag).filter(Boolean);
+        if (!tags.length) return '';
+        const shown = tags.slice(0, 3);
+        const overflow = tags.length - shown.length;
+        return shown.map(function (tag) {
+            return '<span class="' + base + '" title="' + escapeHtml(tag.name) + '">'
+                + '<span class="wd-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
+                + '<span class="wd-file-project-name">' + escapeHtml(tag.name) + '</span>'
+                + '</span>';
+        }).join('')
+            + (overflow > 0
+                ? '<span class="' + base + ' wd-file-project-more" title="'
+                    + tags.slice(3).map(function (t) { return escapeHtml(t.name); }).join(', ')
+                    + '">+' + overflow + '</span>'
+                : '');
+    }
+
     const tag = file.tagId ? getTag(file.tagId) : null;
     if (!tag) return '';
-    return '<span class="wd-file-project' + (extraClass ? ' ' + extraClass : '') + '" title="' + escapeHtml(tag.name) + '">'
+    return '<span class="' + base + '" title="' + escapeHtml(tag.name) + '">'
         + '<span class="wd-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
         + '<span class="wd-file-project-name">' + escapeHtml(tag.name) + '</span>'
         + '</span>';
@@ -747,7 +865,7 @@ function renderFiles() {
             actions.classList.remove('hidden');
             title.textContent = 'Nothing here yet';
             desc.textContent = activeTag
-                ? 'No files in this project yet. Create one to get started.'
+                ? 'No files with this tag yet. Tag something to see it here.'
                 : 'Create your first file to get started';
         }
         return;
@@ -765,6 +883,8 @@ function renderFiles() {
 }
 
 function buildCard(file) {
+    if (file.kind === 'folder') return buildFolderCard(file);
+
     const card = document.createElement('div');
     card.className = 'wd-file-card';
     card.dataset.id = file.id;
@@ -777,7 +897,7 @@ function buildCard(file) {
         + '<div class="wd-file-icon wd-file-icon-' + app.accent + '">' + app.icon + '</div>'
         + '<div class="wd-file-title">' + escapeHtml(file.name) + '</div>'
         + '<div class="wd-file-actions">'
-        + '<button class="wd-file-action-btn move" title="Move to project">' + MOVE_ICON + '</button>'
+        + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
         + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
         + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
         + '</div>'
@@ -814,7 +934,58 @@ function buildCard(file) {
     return card;
 }
 
+/** Drive-style folder tile card (homepage shows root-level folders only). */
+function buildFolderCard(folder) {
+    const card = document.createElement('div');
+    card.className = 'wd-file-card wd-file-card--folder';
+    card.dataset.id = folder.id;
+    card.dataset.app = 'filebox';
+
+    const when = folder.lastOpened || folder.updatedAt;
+    const color = (folder.raw && folder.raw.color) || '#FACC15';
+
+    card.innerHTML = '<div class="wd-file-card-top">'
+        + '<div class="wd-file-icon wd-file-icon-filebox">' + FILEBOX_ICON + '</div>'
+        + '<div class="wd-file-title">' + escapeHtml(folder.name) + '</div>'
+        + '<div class="wd-file-actions">'
+        + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
+        + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
+        + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
+        + '</div>'
+        + '</div>'
+        + '<div class="wd-file-preview"><div class="wd-folder-tile">'
+        + '<span class="wd-folder-tile-glyph">' + folderArt(color) + '</span>'
+        + '<span class="wd-folder-tile-count">' + folder.childCount + (folder.childCount === 1 ? ' item' : ' items') + '</span>'
+        + '</div></div>'
+        + '<div class="wd-file-meta">'
+        + '<span class="wd-file-app-badge filebox">Folder</span>'
+        + projectChipHtml(folder)
+        + '<span>' + formatRelativeDate(when) + '</span>'
+        + '</div>';
+
+    card.addEventListener('click', function (e) {
+        if (!e.target.closest('.wd-file-action-btn')) openFile(folder);
+    });
+    card.querySelector('.move').addEventListener('click', function (e) {
+        e.stopPropagation();
+        showMoveModal(folder);
+    });
+    card.querySelector('.rename').addEventListener('click', function (e) {
+        e.stopPropagation();
+        showRenameModal(folder);
+    });
+    card.querySelector('.delete').addEventListener('click', function (e) {
+        e.stopPropagation();
+        showDeleteModal(folder);
+    });
+    makeDraggable(card, folder);
+
+    return card;
+}
+
 function buildListRow(file) {
+    if (file.kind === 'folder') return buildFolderRow(file);
+
     const row = document.createElement('div');
     row.className = 'wd-file-row';
     row.dataset.id = file.id;
@@ -831,7 +1002,7 @@ function buildListRow(file) {
         + '<span class="wd-file-app-badge ' + app.accent + '">' + app.label + '</span>'
         + '<div class="wd-file-row-meta">' + formatRelativeDate(when) + '</div>'
         + '<div class="wd-file-actions">'
-        + '<button class="wd-file-action-btn move" title="Move to project">' + MOVE_ICON + '</button>'
+        + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
         + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
         + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
         + '</div>';
@@ -852,6 +1023,50 @@ function buildListRow(file) {
         showDeleteModal(file);
     });
     makeDraggable(row, file);
+
+    return row;
+}
+
+/** List-mode folder row (same actions as the folder card). */
+function buildFolderRow(folder) {
+    const row = document.createElement('div');
+    row.className = 'wd-file-row wd-file-row--folder';
+    row.dataset.id = folder.id;
+    row.dataset.app = 'filebox';
+
+    const when = folder.lastOpened || folder.updatedAt;
+    const color = (folder.raw && folder.raw.color) || '#FACC15';
+
+    row.innerHTML = '<div class="wd-file-icon wd-file-icon-filebox">' + FILEBOX_ICON + '</div>'
+        + '<div class="wd-file-row-main">'
+        + '<div class="wd-file-row-title">' + escapeHtml(folder.name) + '</div>'
+        + projectChipHtml(folder, 'wd-file-row-project')
+        + '</div>'
+        + '<span class="wd-file-app-badge filebox">Folder</span>'
+        + '<span class="wd-folder-row-count" style="color:' + escapeHtml(color) + '">' + folder.childCount + (folder.childCount === 1 ? ' item' : ' items') + '</span>'
+        + '<div class="wd-file-row-meta">' + formatRelativeDate(when) + '</div>'
+        + '<div class="wd-file-actions">'
+        + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
+        + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
+        + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
+        + '</div>';
+
+    row.addEventListener('click', function (e) {
+        if (!e.target.closest('.wd-file-action-btn')) openFile(folder);
+    });
+    row.querySelector('.move').addEventListener('click', function (e) {
+        e.stopPropagation();
+        showMoveModal(folder);
+    });
+    row.querySelector('.rename').addEventListener('click', function (e) {
+        e.stopPropagation();
+        showRenameModal(folder);
+    });
+    row.querySelector('.delete').addEventListener('click', function (e) {
+        e.stopPropagation();
+        showDeleteModal(folder);
+    });
+    makeDraggable(row, folder);
 
     return row;
 }
@@ -890,11 +1105,20 @@ function openInNewTab(url) {
 /**
  * Open a file in its app (new tab) and record lastOpened fire-and-forget —
  * the Workdeck tab stays open and refreshes on visibilitychange, so the
- * recents ordering picks it up then.
+ * recents ordering picks it up then. Filebox files deep-link to the viewer
+ * (?id=); folder cards open Filebox inside that folder (?folder=).
  */
 function openFile(file) {
-    const app = getApp(file.app);
-    openInNewTab(app.route + '?' + app.editorParam + '=' + encodeURIComponent(file.id));
+    let url;
+    if (file.kind === 'folder') {
+        url = '/filebox/?folder=' + encodeURIComponent(file.id);
+    } else if (file.app === 'filebox') {
+        url = '/filebox/?id=' + encodeURIComponent(file.id);
+    } else {
+        const app = getApp(file.app);
+        url = app.route + '?' + app.editorParam + '=' + encodeURIComponent(file.id);
+    }
+    openInNewTab(url);
     api('recordOpen', { fileId: file.id, app: file.app })
         .catch(function (err) { console.error('[WORKDECK] recordOpen failed:', err); });
 }
@@ -906,6 +1130,10 @@ function openFile(file) {
  */
 async function createFile(appId) {
     const app = getApp(appId);
+    if (!app.create) {
+        openInNewTab(app.route + '?upload=1');
+        return;
+    }
     showLoading('Creating ' + app.label.toLowerCase() + '...');
     try {
         // Inside a project, new files are created straight into it.
@@ -960,7 +1188,11 @@ async function confirmRename() {
     hideRenameModal();
 
     try {
-        await api('renameFile', { fileId: file.id, app: file.app, name: name });
+        if (file.kind === 'folder') {
+            await api('updateFolder', { folderId: file.id, updates: { name: name } });
+        } else {
+            await api('renameFile', { fileId: file.id, app: file.app, name: name });
+        }
         await loadUserData();
         showNotification('Renamed successfully', 'success');
     } catch (error) {
@@ -972,8 +1204,40 @@ async function confirmRename() {
 
 function showDeleteModal(file) {
     state.fileToDelete = file;
-    $('deleteFileName').textContent = file.name;
+    if (file.kind === 'folder') {
+        // Destructive cascade: everything inside goes with it.
+        const count = folderDeleteCount(file.id);
+        $('deleteModalText').innerHTML = 'Delete "<span class="wd-strong">' + escapeHtml(file.name)
+            + '</span>" and its ' + count + (count === 1 ? ' item' : ' items')
+            + '? This cannot be undone.';
+    } else {
+        $('deleteModalText').innerHTML = 'Are you sure you want to delete "<span class="wd-strong">'
+            + escapeHtml(file.name) + '</span>"? This cannot be undone.';
+    }
     $('deleteModal').classList.add('active');
+}
+
+/** Items (subfolders + files) that die with a folder, matching the server's
+ *  cascade in api/workdeck.js deleteFolder. */
+function folderDeleteCount(rootId) {
+    const doomed = collectFolderIds(rootId);
+    return state.folders.filter(function (f) { return f && doomed.has(f.id) && f.id !== rootId; }).length
+        + state.files.filter(function (f) { return f && doomed.has(f.folderId); }).length;
+}
+
+function collectFolderIds(rootId) {
+    const doomed = new Set([rootId]);
+    let grew = true;
+    while (grew) {
+        grew = false;
+        state.folders.forEach(function (f) {
+            if (f && f.parentId && doomed.has(f.parentId) && !doomed.has(f.id)) {
+                doomed.add(f.id);
+                grew = true;
+            }
+        });
+    }
+    return doomed;
 }
 
 function hideDeleteModal() {
@@ -985,6 +1249,22 @@ async function confirmDelete() {
     if (!state.fileToDelete) return;
     const file = state.fileToDelete;
 
+    if (file.kind === 'folder') {
+        const doomed = collectFolderIds(file.id);
+        state.folders = state.folders.filter(function (f) { return f && !doomed.has(f.id); });
+        state.files = state.files.filter(function (f) { return f && !doomed.has(f.folderId); });
+        render();
+        hideDeleteModal();
+        try {
+            await api('deleteFolder', { folderId: file.id });
+            showNotification('Folder deleted', 'success');
+        } catch (error) {
+            showNotification(error.message || 'Failed to delete folder', 'error');
+            await loadUserData();
+        }
+        return;
+    }
+
     // Optimistic removal
     if (file.app === "sheets") {
         state.sheets = state.sheets.filter(function (s) { return s.id !== file.id; });
@@ -994,6 +1274,8 @@ async function confirmDelete() {
         state.slides = state.slides.filter(function (d) { return d.id !== file.id});
     } else if (file.app === 'draw') {
         state.draws = state.draws.filter(function (d) { return d.id !== file.id });
+    } else if (file.app === 'filebox') {
+        state.files = state.files.filter(function (f) { return f.id !== file.id; });
     } else {
         state.docs = state.docs.filter(function (n) { return n.id !== file.id; });
     }
@@ -1069,30 +1351,38 @@ async function submitProjectForm(e) {
         closeProjectForm();
         try {
             await api('updateTag', { tagId: editing.id, updates: { name: name, color: projectFormColor } });
-            showNotification('Project updated', 'success');
+            showNotification('Tag updated', 'success');
         } catch (error) {
             editing.name = before.name;
             editing.color = before.color;
             render();
-            showNotification(error.message || 'Failed to update project', 'error');
+            showNotification(error.message || 'Failed to update tag', 'error');
         }
     } else {
         try {
             await api('createTag', { name: name, color: projectFormColor });
             closeProjectForm();
             await loadUserData();
-            showNotification('Project created', 'success');
+            showNotification('Tag created', 'success');
         } catch (error) {
-            showNotification(error.message || 'Failed to create project', 'error');
+            showNotification(error.message || 'Failed to create tag', 'error');
         }
     }
 }
 
 function showDeleteProjectModal(tag) {
     state.projectToDelete = tag;
-    const count = getAllFiles().filter(function (file) { return file.tagId === tag.id; }).length;
+    // Mixed semantics, stated explicitly: docs/sheets/forms/slides/draws
+    // carrying the tag are deleted; Filebox items only lose the tag.
+    const files = getAllFiles();
+    const doomedCount = files.filter(function (file) { return file.tagId === tag.id; }).length;
+    const fileboxCount = files.filter(function (file) {
+        return isMultiTagItem(file) && file.tags.includes(tag.id);
+    }).length;
     $('deleteProjectName').textContent = tag.name;
-    $('deleteProjectCount').textContent = count + (count === 1 ? ' file' : ' files');
+    $('deleteProjectCount').textContent = doomedCount + (doomedCount === 1 ? ' file' : ' files');
+    $('deleteProjectFileboxNote').classList.toggle('hidden', fileboxCount === 0);
+    $('deleteProjectFileboxCount').textContent = fileboxCount + (fileboxCount === 1 ? ' item' : ' items');
     $('deleteProjectModal').classList.add('active');
 }
 
@@ -1108,9 +1398,15 @@ async function confirmDeleteProject() {
 
     if (state.activeTag === tag.id) state.activeTag = null;
 
-    // Optimistic removal of the project and every file in it
+    // Optimistic removal: single-tag files die, Filebox items lose the tag
     const dropTagged = function (list) {
         return list.filter(function (f) { return f.tagId !== tag.id; });
+    };
+    const stripTag = function (list) {
+        return list.map(function (f) {
+            if (!Array.isArray(f.tags) || !f.tags.includes(tag.id)) return f;
+            return Object.assign({}, f, { tags: f.tags.filter(function (id) { return id !== tag.id; }) });
+        });
     };
     state.tags = state.tags.filter(function (t) { return t.id !== tag.id; });
     state.docs = dropTagged(state.docs);
@@ -1118,13 +1414,15 @@ async function confirmDeleteProject() {
     state.forms = dropTagged(state.forms);
     state.slides = dropTagged(state.slides);
     state.draws = dropTagged(state.draws);
+    state.files = stripTag(state.files);
+    state.folders = stripTag(state.folders);
     render();
 
     try {
         await api('deleteTag', { tagId: tag.id });
-        showNotification('Project deleted', 'success');
+        showNotification('Tag deleted', 'success');
     } catch (error) {
-        showNotification(error.message || 'Failed to delete project', 'error');
+        showNotification(error.message || 'Failed to delete tag', 'error');
         await loadUserData();
     }
 }
@@ -1135,9 +1433,19 @@ async function confirmDeleteProject() {
 
 function showMoveModal(file) {
     state.fileToMove = file;
-    state.moveTarget = file.tagId || null;
     $('moveFileName').textContent = file.name;
-    renderMoveOptions();
+    if (isMultiTagItem(file)) {
+        // Filebox files/folders: checkbox list over the tag pool.
+        state.moveChecked = new Set(file.tags || []);
+        state.moveTarget = null;
+        $('moveSelect').classList.add('wd-move-multi');
+        renderMoveChecks();
+    } else {
+        state.moveChecked = null;
+        state.moveTarget = file.tagId || null;
+        $('moveSelect').classList.remove('wd-move-multi');
+        renderMoveOptions();
+    }
     closeMoveDropdown();
     $('moveModal').classList.add('active');
 }
@@ -1167,12 +1475,12 @@ function renderMoveOptions() {
     dd.innerHTML = '';
 
     if (state.tags.length === 0) {
-        dd.innerHTML = '<div class="wd-move-empty">No projects yet — create one in the sidebar.</div>';
+        dd.innerHTML = '<div class="wd-move-empty">No tags yet — create one in the sidebar.</div>';
         setMoveTriggerValue(null);
         return;
     }
 
-    const options = [{ id: null, name: 'No project', color: null }].concat(state.tags);
+    const options = [{ id: null, name: 'No tags', color: null }].concat(state.tags);
     options.forEach(function (option) {
         const selected = (state.moveTarget || null) === option.id;
         const row = document.createElement('button');
@@ -1195,16 +1503,97 @@ function renderMoveOptions() {
     setMoveTriggerValue(options.find(function (option) { return (state.moveTarget || null) === option.id; }));
 }
 
+/** Multi-tag checkbox list (Filebox items). The single-select trigger stays
+ *  hidden; the menu renders inline. */
+function renderMoveChecks() {
+    const dd = $('moveDropdown');
+    dd.innerHTML = '';
+    const checked = state.moveChecked || new Set();
+
+    if (state.tags.length === 0) {
+        dd.innerHTML = '<div class="wd-move-empty">No tags yet — create one in the sidebar.</div>';
+        return;
+    }
+
+    state.tags.forEach(function (tag) {
+        const selected = checked.has(tag.id);
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'wd-move-option' + (selected ? ' selected' : '');
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', String(selected));
+        row.innerHTML = '<span class="wd-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
+            + '<span class="wd-move-option-name">' + escapeHtml(tag.name) + '</span>'
+            + CHECK_ICON;
+        row.addEventListener('click', function () {
+            if (checked.has(tag.id)) {
+                checked.delete(tag.id);
+            } else {
+                checked.add(tag.id);
+            }
+            renderMoveChecks();
+        });
+        dd.appendChild(row);
+    });
+
+    if (checked.size === 0) {
+        const none = document.createElement('div');
+        none.className = 'wd-move-empty';
+        none.textContent = 'No tags selected';
+        dd.appendChild(none);
+    }
+}
+
 async function confirmMove() {
     const file = state.fileToMove;
     if (!file) return;
+    if (isMultiTagItem(file)) {
+        const tagIds = Array.from(state.moveChecked || []);
+        hideMoveModal();
+        applyFileTags(file, tagIds);
+        return;
+    }
     const target = state.moveTarget || null;
     hideMoveModal();
     applyFileMove(file, target);
 }
 
+// Optimistic tag write for multi-tag items, shared by the modal confirm and
+// drag-and-drop (full-array replace = one call adds AND removes).
+async function applyFileTags(file, tagIds) {
+    const original = Array.isArray(file.tags) ? file.tags.slice() : [];
+    const unchanged = original.length === tagIds.length && original.every(function (id) {
+        return tagIds.includes(id);
+    });
+    if (unchanged) return;
+
+    file.tags = tagIds.slice();
+    render();
+    try {
+        if (file.kind === 'folder') {
+            await api('setFolderTags', { folderId: file.id, tagIds: tagIds });
+        } else {
+            await api('setFileTags', { fileId: file.id, tagIds: tagIds });
+        }
+        showNotification('Tags updated', 'success');
+        loadUserData();
+    } catch (error) {
+        file.tags = original;
+        render();
+        showNotification(error.message || 'Failed to update tags', 'error');
+    }
+}
+
 // Optimistic move shared by the modal confirm and sidebar drag-and-drop.
 async function applyFileMove(file, target) {
+    if (isMultiTagItem(file)) {
+        // Dropping on a tag row union-adds; dropping on "All files" clears.
+        const current = Array.isArray(file.tags) ? file.tags : [];
+        const next = target && !current.includes(target) ? current.concat([target]) : current;
+        applyFileTags(file, next);
+        return;
+    }
+
     const original = file.tagId || null;
     if (target === original) return;
 
@@ -1212,7 +1601,7 @@ async function applyFileMove(file, target) {
     render();
     try {
         await api('setFileTag', { fileId: file.id, app: file.app, tagId: target });
-        showNotification(target ? 'Moved to project' : 'Removed from project', 'success');
+        showNotification(target ? 'Tag added' : 'Tag removed', 'success');
         loadUserData();
     } catch (error) {
         file.tagId = original;
@@ -1392,7 +1781,7 @@ function setupEventListeners() {
             const q = value.toLowerCase();
             const match = getAllFiles().find(function (file) {
                 return (state.filter === 'all' || file.app === state.filter) &&
-                    (!state.activeTag || file.tagId === state.activeTag) &&
+                    (!state.activeTag || fileMatchesTag(file, state.activeTag)) &&
                     file.name.toLowerCase().startsWith(q) &&
                     file.name.length > value.length;
             });
@@ -1470,12 +1859,15 @@ function setupEventListeners() {
         $('emptyNewBtn').closest('.wd-new-container').classList.toggle('active');
     });
 
-    // App items in both "+ New" menus (delegated — items come from WD_APPS).
+    // App items in both "+ New" menus 
     ['newDropdown', 'emptyNewDropdown'].forEach(function (menuId) {
         $(menuId).addEventListener('click', function (e) {
             const item = e.target.closest('.wd-dropdown-item[data-app]');
             if (!item) return;
             e.stopPropagation();
+            closeDropdown($(menuId));
+            const container = $(menuId).closest('.wd-new-container');
+            if (container) container.classList.remove('active');
             createFile(item.dataset.app);
         });
     });
@@ -1568,6 +1960,12 @@ function setupEventListeners() {
         const item = e.target.closest('.wd-dropdown-item[data-app]');
         if (!item) return;
         e.stopPropagation();
+        const app = getApp(item.dataset.app);
+        if (app.chooserOpensApp) {
+            closeFilterDropdown();
+            openInNewTab(app.route);
+            return;
+        }
         state.filter = item.dataset.app;
         closeFilterDropdown();
         render();

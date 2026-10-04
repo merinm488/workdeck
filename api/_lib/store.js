@@ -3,7 +3,7 @@
  * Shared Storage Layer (Workdeck / Docs / Sheets)
  * ================================================
  *
- * All three API routes share this module so that 
+ * All API routes share this module so that 
  * they operate on the SAME document per user, in both
  * environments:
  *
@@ -18,6 +18,9 @@
  *     sheets:       [ ...sheets... ],
  *     forms:        [ ...forms... ],
  *     slides:       [ ...slide decks... ],
+ *     draws:        [ ...drawings... ],
+ *     files:        [ ...Filebox file metadata (bytes live in raw docs below) ],
+ *     folders:      [ ...Filebox folders... ],
  *     settings:     { theme, viewMode, lastOpened, createdAt, ... }
  *   }
  *
@@ -181,7 +184,7 @@ async function postTextdbDoc(id, value) {
 // User documents
 // ================================================
 
-const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'settings'];
+const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders', 'settings'];
 
 /** A stored doc counts as an existing account if it has any known section. */
 export function isValidUserDoc(doc) {
@@ -214,6 +217,8 @@ export async function getUserDoc(hash) {
   if (!Array.isArray(doc.forms)) doc.forms = [];
   if (!Array.isArray(doc.slides)) doc.slides = [];
   if (!Array.isArray(doc.draws)) doc.draws = [];
+  if (!Array.isArray(doc.files)) doc.files = [];
+  if (!Array.isArray(doc.folders)) doc.folders = [];
   if (!doc.settings || typeof doc.settings !== 'object') doc.settings = {};
 
   return doc;
@@ -239,7 +244,7 @@ export async function overwriteDoc(hash, doc) {
  * without clobbering each other.
  *
  * @param {string} hash
- * @param {{docs?:Array, tags?:Array, sheets?:Array, forms?:Array, slides?:Array, settings?:Object}} owned
+ * @param {{docs?:Array, tags?:Array, sheets?:Array, forms?:Array, slides?:Array, draws?:Array, files?:Array, folders?:Array, settings?:Object}} owned
  * @returns {Promise<boolean>}
  */
 export async function saveOwnedSections(hash, owned) {
@@ -256,7 +261,7 @@ export async function saveOwnedSections(hash, owned) {
 
   const next = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : {};
 
-  for (const key of ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws']) {
+  for (const key of ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders']) {
     if (owned[key] !== undefined) next[key] = owned[key];
   }
 
@@ -279,6 +284,8 @@ export async function createUserDoc(hash, defaults = {}) {
     forms: [],
     slides: [],
     draws: [],
+    files: [],
+    folders: [],
     settings: {
       theme: 'dark',
       viewMode: 'grid',
@@ -347,6 +354,57 @@ export async function deleteSharedDoc(shareId) {
     return await postTextdbDoc(`shared_${shareId}`, null);
   } catch (error) {
     console.error('[STORE] Error deleting shared doc:', error);
+    return false;
+  }
+}
+
+// ================================================
+// Raw documents (Filebox file bytes)
+// ================================================
+
+function getRawFilePath(key) {
+  return path.join(DB_DIR, `${key}.json`);
+}
+
+/** Store an arbitrary JSON value under `key` exactly as given. */
+export async function putRawDoc(key, value) {
+  try {
+    if (IS_DEVELOPMENT) {
+      return writeLocalDoc(getRawFilePath(key), value);
+    }
+    return await postTextdbDoc(key, value);
+  } catch (error) {
+    console.error('[STORE] Error saving raw doc:', error);
+    return false;
+  }
+}
+
+/** Read the raw document stored under `key`, or null. */
+export async function getRawDoc(key) {
+  try {
+    const doc = IS_DEVELOPMENT
+      ? readLocalDoc(getRawFilePath(key))
+      : await getTextdbDoc(key);
+    if (doc === null || doc === undefined) return null;
+    return doc;
+  } catch (error) {
+    console.error('[STORE] Error reading raw doc:', error);
+    return null;
+  }
+}
+
+/** Delete the raw document stored under `key`. */
+export async function deleteRawDoc(key) {
+  try {
+    if (IS_DEVELOPMENT) {
+      const filePath = getRawFilePath(key);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      return true;
+    }
+    // textdb.dev has no delete; writing null empties the document.
+    return await postTextdbDoc(key, null);
+  } catch (error) {
+    console.error('[STORE] Error deleting raw doc:', error);
     return false;
   }
 }

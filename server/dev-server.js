@@ -12,6 +12,7 @@
  *   /forms/*       -> Forms app (static)
  *   /slides/*      -> Slides app (static)
  *   /draw/*        -> Draw app (static)
+ *   /filebox/*     -> Filebox app (static)
  *   /docs/*        -> Docs build (static, vite base '/docs/')
  *   /api/workdeck  -> api/workdeck.js     (Workdeck API)
  *   /api/docs      -> api/docs.js         (Docs API, fetch-style handler)
@@ -19,6 +20,7 @@
  *   /api/forms     -> api/forms.js        (Forms API)
  *   /api/slides    -> api/slides.js       (Slides API)
  *   /api/draw      -> api/draw.js         (Draw API)
+ *   /api/filebox   -> api/filebox.js      (Filebox bytes API)
  *
  * Storage: local JSON files under db/users/ (NODE_ENV=development).
  * Run with:  npm run dev   (port 4000)
@@ -55,6 +57,7 @@ const { default: usersHandler } = await import('../api/users.js');
 const { default: formsHandler } = await import('../api/forms.js');
 const { default: slidesHandler } = await import('../api/slides.js');
 const { default: drawHandler } = await import('../api/draw.js');
+const { default: fileboxHandler } = await import('../api/filebox.js');
 
 const app = express();
 const PORT = 4000;
@@ -111,6 +114,7 @@ app.all('/api/users', (req, res) => usersHandler(req, res));
 app.all('/api/forms', (req, res) => formsHandler(req, res));
 app.all('/api/slides', (req, res) => slidesHandler(req, res));
 app.all('/api/draw', (req, res) => drawHandler(req, res));
+app.all('/api/filebox', (req, res) => fileboxHandler(req, res));
 
 // ---------- Static apps ----------
 // Workdeck landing page + assets
@@ -134,6 +138,9 @@ app.use('/slides', express.static(path.join(ROOT_DIR, 'slides'), { index: 'index
 // Draw (plain static)
 app.use('/draw', express.static(path.join(ROOT_DIR, 'draw'), { index: 'index.html' }));
 
+// Filebox (plain static)
+app.use('/filebox', express.static(path.join(ROOT_DIR, 'filebox'), { index: 'index.html' }));
+
 // Root redirect to the Workdeck landing page
 app.get('/', (req, res) => {
   res.sendFile(path.join(ROOT_DIR, 'public', 'index.html'));
@@ -148,7 +155,8 @@ app.listen(PORT, () => {
   console.log(`📋 Forms:      http://localhost:${PORT}/forms/`);
   console.log(`🎬 Slides:     http://localhost:${PORT}/slides/`);
   console.log(`✏️  Draw:       http://localhost:${PORT}/draw/`);
-  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw`);
+  console.log(`🗂️  Filebox:    http://localhost:${PORT}/filebox/`);
+  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw, /api/filebox`);
   console.log(`📁 Local DB:   ${path.join(ROOT_DIR, 'db')}`);
   console.log('\nPress Ctrl+C to stop\n');
 });

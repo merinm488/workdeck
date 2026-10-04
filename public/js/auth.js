@@ -26,7 +26,9 @@ const WD_AUTH_CONFIG = {
         slidesHash: 'slides_user_hash',
         slidesKey: 'slides_user_key',
         drawHash: 'draw_user_hash',
-        drawKey: 'draw_user_key'
+        drawKey: 'draw_user_key',
+        fileboxHash: 'filebox_user_hash',
+        fileboxKey: 'filebox_user_key'
     }
 };
 
@@ -46,9 +48,26 @@ class WdAuthManager {
         if (hash && key) {
             this.userHash = hash;
             this.userKey = key;
+            // Heal mirrors for sessions created before an app's keys existed
+            // (otherwise its new-tab guard bounces to '/').
+            this.seedMirrors(hash, key);
             return { hash, key };
         }
         return null;
+    }
+
+    seedMirrors(hash, key) {
+        const s = WD_AUTH_CONFIG.storageKeys;
+        try {
+            localStorage.setItem(s.slidesHash, hash);
+            localStorage.setItem(s.slidesKey, key);
+            localStorage.setItem(s.drawHash, hash);
+            localStorage.setItem(s.drawKey, key);
+            localStorage.setItem(s.fileboxHash, hash);
+            localStorage.setItem(s.fileboxKey, key);
+        } catch (err) {
+            console.warn('[AUTH] localStorage seed failed (private mode?):', err);
+        }
     }
 
     /**
@@ -132,19 +151,10 @@ class WdAuthManager {
         sessionStorage.setItem(s.slidesKey, key);
         sessionStorage.setItem(s.drawHash, hash);
         sessionStorage.setItem(s.drawKey, key);
+        sessionStorage.setItem(s.fileboxHash, hash);
+        sessionStorage.setItem(s.fileboxKey, key);
 
-        // Safari doesn't copy sessionStorage into a newly
-        // opened tab, so a fresh-tab Slides editor used to find no session
-        // and bounce back to '/'. The localStorage mirror lets it recover;
-        // clearSession() removes it so logout still sticks.
-        try {
-            localStorage.setItem(s.slidesHash, hash);
-            localStorage.setItem(s.slidesKey, key);
-            localStorage.setItem(s.drawHash, hash);
-            localStorage.setItem(s.drawKey, key);
-        } catch (err) {
-            console.warn('[AUTH] localStorage seed failed (private mode?):', err);
-        }
+        this.seedMirrors(hash, key);
 
         this.userHash = hash;
         this.userKey = key;

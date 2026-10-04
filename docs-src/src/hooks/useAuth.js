@@ -158,6 +158,8 @@ export function useAuth() {
     sessionStorage.setItem('slides_user_key', key);
     sessionStorage.setItem('draw_user_hash', hash);
     sessionStorage.setItem('draw_user_key', key);
+    sessionStorage.setItem('filebox_user_hash', hash);
+    sessionStorage.setItem('filebox_user_key', key);
   }, []);
 
   /**
@@ -170,7 +172,8 @@ export function useAuth() {
      'sheets_user_hash', 'sheets_user_key',
      'forms_user_hash', 'forms_user_key',
      'slides_user_hash', 'slides_user_key',
-     'draw_user_hash', 'draw_user_key']
+     'draw_user_hash', 'draw_user_key',
+     'filebox_user_hash', 'filebox_user_key']
       .forEach(name => sessionStorage.removeItem(name));
   }, []);
 
@@ -199,7 +202,8 @@ export function useAuth() {
        'sheets_user_hash', 'sheets_user_key',
        'forms_user_hash', 'forms_user_key',
        'slides_user_hash', 'slides_user_key',
-       'draw_user_hash', 'draw_user_key']
+       'draw_user_hash', 'draw_user_key',
+       'filebox_user_hash', 'filebox_user_key']
         .forEach(name => sessionStorage.removeItem(name));
 
       setIsLoading(false);

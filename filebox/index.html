@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+
+    <title>Filebox — Workdeck</title>
+    <meta name="description" content="Filebox — your files, organized in folders. Part of Workdeck.">
+    <meta name="theme-color" content="#0d9488">
+
+    <link rel="icon" type="image/png" sizes="192x192" href="/filebox/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/filebox/icons/icon-192x192.png">
+    <link rel="manifest" href="/filebox/manifest.json">
+
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Vendor libraries (MIT/Apache-2.0, pinned).: CDN bundles exposing
+         globals. pdf.js and PhotoSwipe ship ESM-only and load through
+         js/vendor-esm.js (type=module at the bottom of <body>).
+         highlight.js ships two themes — toggled with the app theme below. -->
+    <link rel="stylesheet" href="https://releases.transloadit.com/uppy/v4.18.3/uppy.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.12.0/styles/github.min.css" id="fbHljsLight">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.12.0/styles/github-dark.min.css" id="fbHljsDark" disabled>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video-js.css">
+
+    <link rel="stylesheet" href="/filebox/styles.css">
+</head>
+<body>
+    <div class="fb-app">
+        <!-- ===== SIDEBAR ===== -->
+        <div id="fbSidebarScrim" class="fb-sidebar-scrim" aria-hidden="true"></div>
+        <aside id="fbSidebar" class="fb-sidebar" aria-label="Folders">
+            <button id="fbSidebarClose" class="fb-side-close" aria-label="Close sidebar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            <a href="/" class="fb-brand">
+                <span class="fb-brand-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                </span>
+                <span class="fb-brand-text">Filebox</span>
+            </a>
+
+            <nav class="fb-sidebar-scroll">
+                <!-- Root: also a drop target (move to root) -->
+                <div id="fbAllFolders" class="fb-side-row fb-side-root" role="button" title="All folders">
+                    <span class="fb-caret invisible"></span>
+                    <svg class="fb-side-root-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H5a2 2 0 0 0-2 2z"></path></svg>
+                    <span class="fb-side-name">All folders</span>
+                </div>
+                <!-- Folder tree rendered by renderSidebar() in main.js -->
+                <div id="fbTree"></div>
+            </nav>
+        </aside>
+
+        <!-- ===== MAIN ===== -->
+        <div class="fb-main">
+            <header class="fb-header">
+                <div class="fb-header-content">
+                    <button id="fbSidebarToggle" class="fb-icon-btn fb-sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="false">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    </button>
+
+                    <!-- Search -->
+                    <div class="fb-search">
+                        <svg class="fb-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" id="fbSearchInput" class="fb-search-input" placeholder="Search files, folders, tags" autocomplete="off">
+                        <button id="fbClearSearch" class="fb-search-clear hidden" aria-label="Clear search">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="fb-actions">
+                        <button id="fbUploadBtn" class="fb-primary-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <span>Upload</span>
+                        </button>
+
+                        <button id="fbNewFolderBtn" class="fb-secondary-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><path d="M12 11v6m-3-3h6"></path></svg>
+                            <span>New folder</span>
+                        </button>
+
+                        <select id="fbSortSelect" class="fb-sort-select" aria-label="Sort by">
+                            <option value="recent">Recent</option>
+                            <option value="name">Name</option>
+                            <option value="size">Size</option>
+                        </select>
+
+                        <div class="fb-view-toggle" role="group" aria-label="Grid or list view">
+                            <button class="fb-view-btn active" data-view="grid" aria-label="Grid view" title="Grid view">
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
+                            </button>
+                            <button class="fb-view-btn" data-view="list" aria-label="List view" title="List view">
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                            </button>
+                        </div>
+
+                        <!-- Settings -->
+                        <div class="fb-settings-container">
+                            <button id="fbSettingsBtn" class="fb-icon-btn" aria-label="Settings">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                            </button>
+                            <div id="fbSettingsDropdown" class="fb-dropdown">
+                                <div class="fb-theme-container">
+                                    <button class="fb-dropdown-item" id="fbThemeToggleBtn">
+                                        <span class="fb-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></span>
+                                        <span id="fbThemeText">Theme: Light</span>
+                                        <svg class="fb-dropdown-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                    </button>
+                                    <div id="fbThemeSubmenu" class="fb-theme-submenu">
+                                        <button class="fb-theme-option" data-theme="light"><span>Light</span></button>
+                                        <button class="fb-theme-option" data-theme="dark"><span>Dark</span></button>
+                                        <button class="fb-theme-option" data-theme="system"><span>System</span></button>
+                                    </div>
+                                </div>
+                                <button class="fb-dropdown-item" id="fbViewKeyBtn">
+                                    <span class="fb-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg></span>
+                                    <span>View My Key</span>
+                                </button>
+                                <div class="fb-dropdown-divider"></div>
+                                <button class="fb-dropdown-item" id="fbLogoutBtn">
+                                    <span class="fb-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></span>
+                                    <span>Logout</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Breadcrumb -->
+            <div id="fbBreadcrumb" class="fb-breadcrumb"></div>
+
+            <!-- Dashboard -->
+            <main class="fb-content">
+                <div id="fbGrid" class="fb-grid"></div>
+                <div id="fbList" class="fb-list hidden"></div>
+
+                <div id="fbEmpty" class="fb-empty hidden">
+                    <span class="fb-empty-art">
+                        <svg viewBox="0 0 48 40" aria-hidden="true">
+                            <path d="M2 8a4 4 0 0 1 4-4h11a4 4 0 0 1 3.2 1.6L23 10h19a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" fill="#0f766e"/>
+                            <path d="M2 14h44v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V14z" fill="#0d9488"/>
+                        </svg>
+                    </span>
+                    <h3 id="fbEmptyTitle">This folder is empty</h3>
+                    <p id="fbEmptyDesc">Upload files or create a folder to get started</p>
+                    <div class="fb-empty-actions">
+                        <button class="fb-primary-btn" onclick="window.fileboxUploads && window.fileboxUploads.openPicker()">Upload files</button>
+                        <button class="fb-secondary-btn" onclick="document.getElementById('fbNewFolderBtn').click()">New folder</button>
+                    </div>
+                </div>
+            </main>
+
+            <footer class="fb-footer">
+                <span id="fbFooterStats" class="fb-footer-stats"></span>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ===== OVERLAYS ===== -->
+    <!-- Full-window file drop -->
+    <div id="fbDropOverlay" class="fb-drop-overlay">
+        <div class="fb-drop-box">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <span>Drop files to upload</span>
+        </div>
+    </div>
+
+    <!-- Floating ⋮ action menu (no .fb-item-menu class — that styles the
+         card/row trigger buttons; #fbItemMenu in styles.css styles this) -->
+    <div id="fbItemMenu"></div>
+
+    <!-- Notification -->
+    <div id="fbNotification" class="fb-notification hidden"></div>
+
+    <!-- ===== MODALS ===== -->
+    <!-- New / rename folder -->
+    <div id="fbFolderModal" class="fb-modal">
+        <div class="fb-modal-content">
+            <div class="fb-modal-header">
+                <h3 id="fbFolderModalTitle">New folder</h3>
+                <button class="fb-modal-close" onclick="document.getElementById('fbFolderModal').classList.remove('active')">&times;</button>
+            </div>
+            <form id="fbFolderForm" class="fb-modal-body">
+                <label class="fb-label" for="fbFolderNameInput">Name</label>
+                <input type="text" id="fbFolderNameInput" class="fb-input" placeholder="Folder name" maxlength="60" autocomplete="off">
+                <label class="fb-label">Color</label>
+                <div id="fbFolderColorPicker" class="fb-color-picker"></div>
+                <div class="fb-modal-actions">
+                    <button type="button" id="fbFolderCancel" class="fb-secondary-btn">Cancel</button>
+                    <button type="submit" id="fbFolderSubmit" class="fb-primary-btn">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete confirm (folders show the destructive cascade count) -->
+    <div id="fbDeleteModal" class="fb-modal">
+        <div class="fb-modal-content">
+            <div class="fb-modal-header">
+                <h3 id="fbDeleteTitle">Delete</h3>
+                <button class="fb-modal-close" onclick="document.getElementById('fbDeleteModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="fb-modal-body">
+                <p id="fbDeleteText" class="fb-modal-text"></p>
+                <div class="fb-modal-actions">
+                    <button id="fbDeleteCancel" class="fb-secondary-btn">Cancel</button>
+                    <button id="fbDeleteConfirm" class="fb-danger-btn">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename file -->
+    <div id="fbRenameModal" class="fb-modal">
+        <div class="fb-modal-content">
+            <div class="fb-modal-header">
+                <h3>Rename</h3>
+                <button class="fb-modal-close" onclick="document.getElementById('fbRenameModal').classList.remove('active')">&times;</button>
+            </div>
+            <form id="fbRenameForm" class="fb-modal-body">
+                <label class="fb-label" for="fbRenameInput">New name</label>
+                <input type="text" id="fbRenameInput" class="fb-input" placeholder="Enter new name" maxlength="255" autocomplete="off">
+                <div class="fb-modal-actions">
+                    <button type="button" id="fbRenameCancel" class="fb-secondary-btn">Cancel</button>
+                    <button type="submit" class="fb-primary-btn">Rename</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Move to folder (tree picker) -->
+    <div id="fbMoveModal" class="fb-modal">
+        <div class="fb-modal-content">
+            <div class="fb-modal-header">
+                <h3>Move to folder</h3>
+                <button class="fb-modal-close" onclick="document.getElementById('fbMoveModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="fb-modal-body">
+                <p class="fb-modal-text">Choose where "<span id="fbMoveFileName" class="fb-strong"></span>" lives.</p>
+                <div id="fbMoveTree" class="fb-move-tree"></div>
+                <div class="fb-modal-actions">
+                    <button id="fbMoveCancel" class="fb-secondary-btn">Cancel</button>
+                    <button id="fbMoveConfirm" class="fb-primary-btn">Move</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit tags (multi-select over the shared suite tag pool) -->
+    <div id="fbTagsModal" class="fb-modal">
+        <div class="fb-modal-content">
+            <div class="fb-modal-header">
+                <h3>Edit tags</h3>
+                <button class="fb-modal-close" onclick="document.getElementById('fbTagsModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="fb-modal-body">
+                <p class="fb-modal-text">Tags for "<span id="fbTagsItemName" class="fb-strong"></span>".</p>
+                <div id="fbTagChecks" class="fb-tag-checks"></div>
+                <form id="fbNewTagForm" class="fb-new-tag">
+                    <input type="text" id="fbNewTagName" class="fb-input" placeholder="New tag name" maxlength="60" autocomplete="off">
+                    <button type="submit" class="fb-secondary-btn">Create tag</button>
+                </form>
+                <div class="fb-modal-actions">
+                    <button id="fbTagsCancel" class="fb-secondary-btn">Cancel</button>
+                    <button id="fbTagsConfirm" class="fb-primary-btn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Viewer (?id= deep link) -->
+    <div id="fbViewer" class="fb-modal fb-modal-wide">
+        <div class="fb-modal-content">
+            <div class="fb-modal-header">
+                <div class="fb-viewer-heading">
+                    <h3 id="fbViewerTitle">File</h3>
+                    <span id="fbViewerMeta" class="fb-viewer-meta"></span>
+                </div>
+                <div class="fb-viewer-header-actions">
+                    <button id="fbViewerDownload" class="fb-secondary-btn">Download</button>
+                    <button id="fbViewerClose" class="fb-modal-close">&times;</button>
+                </div>
+            </div>
+            <div id="fbViewerBody" class="fb-viewer-body"></div>
+        </div>
+    </div>
+
+    <!-- Access key -->
+    <div id="fbKeyModal" class="fb-modal">
+        <div class="fb-modal-content">
+            <div class="fb-modal-header">
+                <h3>Your Access Key</h3>
+                <button class="fb-modal-close" onclick="document.getElementById('fbKeyModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="fb-modal-body">
+                <div class="fb-key-display">
+                    <span id="fbKeyText" class="fb-key-text">-</span>
+                    <button id="fbKeyCopyBtn" class="fb-key-copy-btn" title="Copy key">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                </div>
+                <p id="fbKeyCopyFeedback" class="fb-key-feedback">Copied!</p>
+                <button id="fbKeyClose" class="fb-secondary-btn fb-key-close">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Entry guard — Filebox has NO login page of its own: Workdeck's login
+         wrote the session mirrors. No session -> back to '/'. main.js's
+         config.js helpers repeat the check once scripts load. -->
+    <script>
+        (function () {
+            function readSession(name) {
+                try {
+                    return sessionStorage.getItem(name) || localStorage.getItem(name) || null;
+                } catch (err) {
+                    return null;
+                }
+            }
+            if (!readSession('filebox_user_hash') || !readSession('filebox_user_key')) {
+                window.location.href = '/';
+            }
+        })();
+    </script>
+
+    <!-- Vendor libraries (see <head> note). UMD tags expose globals:
+         Uppy, imageCompression, docx, XLSX, Papa, marked, DOMPurify,
+         hljs, videojs. -->
+    <script src="https://releases.transloadit.com/uppy/v4.18.3/uppy.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.4.1/dist/docx-preview.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.7.0/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@18.0.14/lib/marked.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.12.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video.min.js"></script>
+
+    <!-- Custom JavaScript (plain script tags, no modules).
+         Load order matters: config -> auth -> storage -> themes ->
+         uploads -> viewer -> main. vendor-esm.js is a module script: it
+         executes after the classics above but before DOMContentLoaded, so
+         pdfjsLib/PhotoSwipe globals exist before init() runs. -->
+    <script src="config/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/themes.js"></script>
+    <script type="module" src="js/vendor-esm.js"></script>
+    <script src="js/uploads.js"></script>
+    <script src="js/viewer.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/pwa.js"></script>
+</body>
+</html>

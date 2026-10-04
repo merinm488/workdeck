@@ -2141,3 +2141,102 @@ body.wd-sidebar-open .wd-sidebar-scrim {
         display: none;
     }
 }
+
+/* ---------- Filebox (teal) ---------- */
+:root {
+    --filebox-accent: #0d9488;                  /* Filebox teal */
+    --filebox-accent-soft: rgba(13, 148, 136, 0.14);
+}
+
+.wd-app-icon-filebox {
+    background: var(--filebox-accent-soft);
+    color: var(--filebox-accent);
+}
+
+.wd-file-icon-filebox {
+    background: var(--filebox-accent-soft);
+    color: var(--filebox-accent);
+}
+
+.wd-file-app-badge.filebox {
+    background: var(--filebox-accent-soft);
+    color: var(--filebox-accent);
+}
+
+/* Folder card tile — a Drive-style colored folder instead of a preview */
+.wd-file-card--folder .wd-file-preview {
+    background: var(--bg-input);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wd-folder-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-tertiary);
+}
+
+.wd-folder-tile-glyph svg {
+    width: 72px;
+    height: 60px;
+    display: block;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+}
+
+.wd-folder-tile-count {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.wd-folder-row-count {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Filebox file extension tile when no thumbnail was generated */
+.wd-preview-filebox-tile {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+}
+
+.wd-preview-filebox-ext {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--filebox-accent);
+    background: var(--filebox-accent-soft);
+    padding: 6px 12px;
+    border-radius: 8px;
+}
+
+/* Multi-tag chips (Filebox cards) — generalize the single .wd-file-project */
+.wd-file-card .wd-file-project,
+.wd-file-row .wd-file-project {
+    max-width: 120px;
+}
+
+.wd-file-project-more {
+    flex-shrink: 0;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    background: transparent;
+}
+
+/* Multi-tag modal variant: no single-select trigger, list renders open */
+.wd-move-select.wd-move-multi .wd-move-select-trigger {
+    display: none;
+}
+
+.wd-move-select.wd-move-multi .wd-move-menu {
+    display: block;
+    margin-top: 0;
+    max-height: 220px;
+}
