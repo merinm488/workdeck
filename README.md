@@ -115,6 +115,15 @@ forms, Slides only writes slides, Draw only writes draws, Workdeck writes
 docs/tags/sheets/forms/slides/draws/settings etc — so no app can wipe another's
 data.
 
+### Hard links & mentions (interlinking)
+
+Every file is addressable by a clean URL, and files can reference each
+other file.
+
+**Mentions.** Type `@` in Docs (or use the `@ Link` / "Link file" /
+"Insert reference" toolbar buttons anywhere) to open a fuzzy picker of
+every file across every app. 
+
 ## 🗃️ Filebox
 
 A Drive-style file manager at `/filebox/` — upload via picker or full-window

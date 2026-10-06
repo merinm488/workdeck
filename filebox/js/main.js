@@ -39,6 +39,7 @@ const FB_ICONS = {
     tags: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>',
     check: '<svg class="fb-check" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
     open: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>',
+    link: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>',
     key: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>',
     logout: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>',
     sun: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>'
@@ -96,8 +97,10 @@ const state = {
     files: [],
     folders: [],
     tags: [],
+    rawDoc: null,                   
     settings: {},
     currentFolderId: null,          // null = root ("All folders")
+    activeTag: null,               
     view: localStorage.getItem(FB_VIEW_KEY) || 'grid',
     sort: localStorage.getItem(FB_SORT_KEY) || 'recent',
     searchQuery: '',
@@ -109,6 +112,8 @@ const state = {
     folderFormId: null,             // null = create, folderId = rename
     folderFormParent: null,
     folderFormColor: APP_CONFIG.folderColors[0],
+    tagFormId: null,                // null = create, tagId = edit
+    tagFormColor: APP_CONFIG.folderColors[0],
     moveFileId: null,
     moveTarget: null,
     tagsTarget: null,               // {kind: 'file'|'folder', id}
@@ -159,6 +164,25 @@ function formatRelativeDate(iso) {
 
 function getTag(tagId) {
     return state.tags.find(function (t) { return t.id === tagId; }) || null;
+}
+
+
+function fileboxTags() {
+    return state.tags.filter(function (t) { return t.origin === 'filebox'; });
+}
+
+/** Filebox items (files + folders, any depth) carrying a tag. */
+function tagItemCount(tagId) {
+    return state.files.filter(function (f) { return (f.tags || []).includes(tagId); }).length
+        + state.folders.filter(function (f) { return (f.tags || []).includes(tagId); }).length;
+}
+
+/** #rrggbb -> rgba(), so active tag rows tint with the tag color. */
+function hexToRgba(hex, alpha) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!match) return '';
+    const n = parseInt(match[1], 16);
+    return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
 }
 
 function getFolder(id) {
@@ -273,6 +297,7 @@ function applyUserData(data) {
     state.folders = data.folders || [];
     state.tags = data.tags || [];
     state.settings = data.settings || {};
+    state.rawDoc = data;    // docs/sheets/... counts for the delete-tag warning
     render();
 }
 
@@ -297,7 +322,8 @@ function syncUrl() {
     history.replaceState(null, '', '/filebox/' + (qs ? '?' + qs : ''));
 }
 
-/** Apply ?folder= / ?id= / ?upload=1 after data has loaded. */
+/** Apply the hard link (/filebox/<id>), ?folder= / ?tag= / ?id= /
+ *  ?upload=1 after data has loaded. */
 function applyUrlState() {
     const params = new URLSearchParams(window.location.search);
 
@@ -307,7 +333,19 @@ function applyUrlState() {
         ancestorsOf(folderId).forEach(function (f) { state.expanded.add(f.id); });
     }
 
-    const fileId = params.get('id');
+    // Deep link from a Workdeck tag view: open in that tag's scope so the
+    // picker's uploads land pre-tagged (uploads read state.activeTag).
+    const tagId = params.get('tag');
+    if (tagId && getTag(tagId)) {
+        state.activeTag = tagId;
+        state.currentFolderId = null;
+    }
+
+    // Hard link /filebox/<id> first (the browser URL carries no query —
+    // the server rewrite targets the file invisibly), legacy ?id= second.
+    // ?folder= ids are handled above, not here.
+    const loc = window.WDLinks ? WDLinks.parseLocation() : null;
+    const fileId = (loc && loc.kind !== 'folder' && loc.id) || params.get('id');
     if (fileId) {
         const file = getFile(fileId);
         if (file) {
@@ -340,6 +378,7 @@ function applySidebarDrawer(open) {
 
 function openFolder(folderId) {
     state.currentFolderId = folderId || null;
+    state.activeTag = null;         // navigating to a folder leaves the tag view
     state.searchQuery = '';
     $('fbSearchInput').value = '';
     $('fbClearSearch').classList.add('hidden');
@@ -348,6 +387,22 @@ function openFolder(folderId) {
         ancestorsOf(folderId).forEach(function (f) { state.expanded.add(f.id); });
         fileboxStorage.recordOpen(folderId).catch(function () {});
     }
+    syncUrl();
+    closeItemMenu();
+    render();
+}
+
+/**
+ * Sidebar tag filter: shows every file/folder carrying the tag across all
+ * folders (like search does), regardless of where the user was.
+ */
+function selectTag(tagId) {
+    state.activeTag = tagId;
+    state.currentFolderId = null;
+    state.searchQuery = '';
+    $('fbSearchInput').value = '';
+    $('fbClearSearch').classList.add('hidden');
+    applySidebarDrawer(false);
     syncUrl();
     closeItemMenu();
     render();
@@ -365,10 +420,61 @@ function render() {
 }
 
 function renderSidebar() {
-    $('fbAllFolders').classList.toggle('active', state.currentFolderId === null);
+    $('fbAllFolders').classList.toggle('active', state.currentFolderId === null && !state.activeTag);
     const tree = $('fbTree');
     tree.innerHTML = '';
     buildTreeLevel(tree, null, 0);
+    renderTagSection();
+}
+
+/**
+ * Sidebar tags — the same system as Workdeck's (dot + name + count, click
+ * to filter, drag a file on to tag it, edit/delete on hover), but only
+ * Filebox-born tags list here.
+ */
+function renderTagSection() {
+    const list = $('fbTagList');
+    list.innerHTML = '';
+    const pool = fileboxTags();
+
+    pool.forEach(function (tag) {
+        const active = state.activeTag === tag.id;
+        const row = document.createElement('div');
+        row.className = 'fb-side-row fb-tag-row' + (active ? ' active' : '');
+        row.dataset.tag = tag.id;
+        row.tabIndex = 0;
+        if (active && tag.color) row.style.background = hexToRgba(tag.color, 0.14);
+
+        row.innerHTML = '<span class="fb-tag-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
+            + '<span class="fb-side-name">' + escapeHtml(tag.name) + '</span>'
+            + '<span class="fb-side-count">' + tagItemCount(tag.id) + '</span>'
+            + '<span class="fb-side-actions">'
+            + '<button data-action="edit" title="Edit tag">' + FB_ICONS.rename + '</button>'
+            + '<button data-action="delete" class="danger" title="Delete tag">' + FB_ICONS.trash + '</button>'
+            + '</span>';
+
+        row.addEventListener('click', function (e) {
+            const actionEl = e.target.closest('[data-action]');
+            if (actionEl) {
+                e.stopPropagation();
+                if (actionEl.dataset.action === 'edit') openTagForm(tag);
+                else confirmDeleteTag(tag);
+                return;
+            }
+            selectTag(tag.id);
+        });
+        row.addEventListener('keydown', function (e) {
+            if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('[data-action]')) {
+                e.preventDefault();
+                selectTag(tag.id);
+            }
+        });
+        makeTagDropTarget(row, tag.id);
+
+        list.appendChild(row);
+    });
+
+    $('fbTagEmpty').classList.toggle('hidden', pool.length > 0);
 }
 
 function buildTreeLevel(container, parentId, depth) {
@@ -430,6 +536,17 @@ function buildTreeLevel(container, parentId, depth) {
 
 function renderBreadcrumb() {
     const el = $('fbBreadcrumb');
+    if (state.activeTag) {
+        const tag = getTag(state.activeTag);
+        el.innerHTML = '<button class="fb-crumb" data-id="">All folders</button>'
+            + '<span class="fb-crumb-sep">›</span>'
+            + '<span class="fb-crumb-current"><span class="fb-dot" style="background:' + escapeHtml(tag ? tag.color : '#94a3b8') + '"></span> '
+            + escapeHtml(tag ? tag.name : 'Tag') + '</span>';
+        el.querySelector('.fb-crumb').addEventListener('click', function () {
+            openFolder(null);
+        });
+        return;
+    }
     if (state.searchQuery.trim()) {
         el.innerHTML = '<span class="fb-crumb-current">Search results</span>';
         return;
@@ -450,13 +567,25 @@ function renderBreadcrumb() {
 }
 
 function visibleFolders() {
-    if (state.searchQuery.trim()) return searchFolders();
-    return sortBy(childFolders(state.currentFolderId), function (f) { return f.childCount || 0; });
+    // Tag view spans every folder (like search); plain view is per-folder.
+    let folders;
+    if (state.searchQuery.trim()) folders = searchFolders();
+    else if (state.activeTag) folders = state.folders;
+    else folders = childFolders(state.currentFolderId);
+    if (state.activeTag) {
+        folders = folders.filter(function (f) { return (f.tags || []).includes(state.activeTag); });
+    }
+    return sortBy(folders, function (f) { return f.childCount || 0; });
 }
 
 function visibleFiles() {
-    if (state.searchQuery.trim()) return searchFiles();
-    const files = childFiles(state.currentFolderId);
+    let files;
+    if (state.searchQuery.trim()) files = searchFiles();
+    else if (state.activeTag) files = state.files;
+    else files = childFiles(state.currentFolderId);
+    if (state.activeTag) {
+        files = files.filter(function (f) { return (f.tags || []).includes(state.activeTag); });
+    }
     return sortBy(files, function (f) { return f.size || 0; });
 }
 
@@ -502,10 +631,14 @@ function renderContent() {
         empty.classList.remove('hidden');
         $('fbEmptyTitle').textContent = state.searchQuery.trim()
             ? 'No matches found'
-            : 'This folder is empty';
+            : state.activeTag
+                ? 'No items with this tag yet'
+                : 'This folder is empty';
         $('fbEmptyDesc').textContent = state.searchQuery.trim()
             ? 'Try a different search term'
-            : 'Upload files or create a folder to get started';
+            : state.activeTag
+                ? 'Tag a file or folder to see it here'
+                : 'Upload files or create a folder to get started';
         renderFooter();
         return;
     }
@@ -650,6 +783,11 @@ function renderFooter() {
         el.textContent = (visibleFolders().length + visibleFiles().length) + ' results';
         return;
     }
+    if (state.activeTag) {
+        const count = visibleFolders().length + visibleFiles().length;
+        el.textContent = count + (count === 1 ? ' item' : ' items') + ' with this tag';
+        return;
+    }
     const folderCount = state.folders.length;
     const fileCount = state.files.length;
     const used = state.files.reduce(function (sum, f) { return sum + (f.size || 0); }, 0);
@@ -673,6 +811,7 @@ function openItemMenu(anchor, record, kind) {
     if (kind === 'file') {
         actions.push({ action: 'open', label: 'Open', icon: FB_ICONS.open });
         actions.push({ action: 'download', label: 'Download', icon: FB_ICONS.download });
+        actions.push({ action: 'copylink', label: 'Copy link', icon: FB_ICONS.link });
     }
     actions.push({ action: 'rename', label: 'Rename', icon: FB_ICONS.rename });
     if (kind === 'file') {
@@ -717,6 +856,9 @@ function handleItemMenuAction(action) {
         case 'download':
             window.location.href = fileboxStorage.fileUrl(record.id, true);
             break;
+        case 'copylink':
+            copyFileLink(record);
+            break;
         case 'rename':
             if (kind === 'file') {
                 state.renameTarget = { kind: 'file', id: record.id };
@@ -749,6 +891,18 @@ function openViewer(file) {
 
 function closeViewer() {
     fileboxViewer.close();
+}
+
+/** Copy the file's canonical hard link (/filebox/<id>) to the clipboard. */
+function copyFileLink(record) {
+    if (!window.WDLinks) return;
+    const url = window.location.origin + WDLinks.url('filebox', record.id);
+    const done = ok => showNotification(ok ? 'Link copied' : 'Could not copy link', ok ? 'success' : 'error');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () { done(true); }, function () { done(false); });
+    } else {
+        done(false);
+    }
 }
 
 // ================================================
@@ -844,6 +998,101 @@ async function submitFolderForm() {
 }
 
 // ================================================
+// Sidebar tags: create / edit form
+// ================================================
+
+function renderTagSwatches() {
+    const picker = $('fbTagColorPicker');
+    picker.innerHTML = '';
+    APP_CONFIG.folderColors.forEach(function (color) {
+        const swatch = document.createElement('button');
+        swatch.type = 'button';
+        swatch.className = 'fb-swatch' + (color === state.tagFormColor ? ' selected' : '');
+        swatch.style.background = color;
+        swatch.setAttribute('aria-label', 'Pick color ' + color);
+        swatch.addEventListener('click', function () {
+            state.tagFormColor = color;
+            renderTagSwatches();
+        });
+        picker.appendChild(swatch);
+    });
+}
+
+function openTagForm(tag) {
+    state.tagFormId = tag ? tag.id : null;
+    state.tagFormColor = (tag && tag.color) || APP_CONFIG.folderColors[0];
+    $('fbTagNameInput').value = tag ? tag.name : '';
+    $('fbTagSubmit').textContent = tag ? 'Save' : 'Create';
+    renderTagSwatches();
+    $('fbTagForm').classList.remove('hidden');
+    setTimeout(function () { $('fbTagNameInput').focus(); }, 60);
+}
+
+function closeTagForm() {
+    state.tagFormId = null;
+    $('fbTagForm').classList.add('hidden');
+    $('fbTagNameInput').value = '';
+}
+
+async function submitTagForm(e) {
+    e.preventDefault();
+    const name = $('fbTagNameInput').value.trim();
+    if (!name) {
+        $('fbTagNameInput').focus();
+        return;
+    }
+    const editing = state.tagFormId ? getTag(state.tagFormId) : null;
+
+    if (editing) {
+        // Optimistic rename/recolor
+        const before = { name: editing.name, color: editing.color };
+        editing.name = name;
+        editing.color = state.tagFormColor;
+        render();
+        closeTagForm();
+        const data = await fileboxStorage.updateTag(editing.id, { name: name, color: state.tagFormColor });
+        if (data) {
+            applyUserData(data);
+            showNotification('Tag updated', 'success');
+        } else {
+            editing.name = before.name;
+            editing.color = before.color;
+            render();
+            showNotification('Failed to update tag', 'error');
+        }
+    } else {
+        const data = await fileboxStorage.createTag(name, state.tagFormColor);
+        if (data) {
+            applyUserData(data);
+            closeTagForm();
+            showNotification('Tag created', 'success');
+        } else {
+            showNotification('Failed to create tag', 'error');
+        }
+    }
+}
+
+
+function confirmDeleteTag(tag) {
+    state.deleteTarget = { kind: 'tag', id: tag.id };
+    const fbCount = tagItemCount(tag.id);
+    const doc = state.rawDoc || {};
+    const suiteCount = ['docs', 'sheets', 'forms', 'slides', 'draws'].reduce(function (sum, key) {
+        return sum + (doc[key] || []).filter(function (f) { return f && f.tagId === tag.id; }).length;
+    }, 0);
+    $('fbDeleteTitle').textContent = 'Delete tag';
+    let text = 'Delete "<span class="fb-strong">' + escapeHtml(tag.name) + '</span>"? '
+        + fbCount + (fbCount === 1 ? ' Filebox item loses' : ' Filebox items lose') + ' this tag';
+    if (suiteCount) {
+        text += '; ' + suiteCount + (suiteCount === 1 ? ' file' : ' files')
+            + ' in Docs, Sheets, Forms, Slides and Draw will be deleted';
+    }
+    text += '. This cannot be undone.';
+    $('fbDeleteText').innerHTML = text;
+    openModal('fbDeleteModal');
+}
+
+// ================================================
 // Delete folder / file (destructive, count confirm)
 // ================================================
 
@@ -869,6 +1118,37 @@ async function confirmDelete() {
     const target = state.deleteTarget;
     if (!target) return;
     closeModal('fbDeleteModal');
+
+    if (target.kind === 'tag') {
+        const tag = getTag(target.id);
+        if (!tag) { state.deleteTarget = null; return; }
+        const before = { tags: state.tags, files: state.files, folders: state.folders, activeTag: state.activeTag };
+        const strip = function (list) {
+            return list.map(function (f) {
+                if (!Array.isArray(f.tags) || !f.tags.includes(tag.id)) return f;
+                return Object.assign({}, f, { tags: f.tags.filter(function (id) { return id !== tag.id; }) });
+            });
+        };
+        state.tags = state.tags.filter(function (t) { return t.id !== tag.id; });
+        state.files = strip(state.files);
+        state.folders = strip(state.folders);
+        if (state.activeTag === tag.id) state.activeTag = null;
+        render();
+        const data = await fileboxStorage.deleteTag(tag.id);
+        if (data) {
+            applyUserData(data);
+            showNotification('Tag deleted', 'success');
+        } else {
+            state.tags = before.tags;
+            state.files = before.files;
+            state.folders = before.folders;
+            state.activeTag = before.activeTag;
+            render();
+            showNotification('Failed to delete tag', 'error');
+        }
+        state.deleteTarget = null;
+        return;
+    }
 
     if (target.kind === 'folder') {
         const folder = getFolder(target.id);
@@ -1019,13 +1299,16 @@ function openTagsModal(record, kind) {
 function renderTagChecks() {
     const container = $('fbTagChecks');
     container.innerHTML = '';
+    // Same one-way pool as the sidebar: Workdeck-created tags don't offer
+    // themselves here (any already on the record are preserved on save).
+    const pool = fileboxTags();
 
-    if (!state.tags.length) {
+    if (!pool.length) {
         container.innerHTML = '<div class="fb-tags-empty">No tags yet — create one below.</div>';
         return;
     }
 
-    state.tags.forEach(function (tag) {
+    pool.forEach(function (tag) {
         const selected = state.tagSelection.has(tag.id);
         const row = document.createElement('button');
         row.type = 'button';
@@ -1057,20 +1340,13 @@ async function createTagInline() {
     }
 }
 
-async function confirmTags() {
-    const target = state.tagsTarget;
-    if (!target) return;
-    closeModal('fbTagsModal');
-
-    const tagIds = Array.from(state.tagSelection);
-    const record = target.kind === 'file' ? getFile(target.id) : getFolder(target.id);
-    if (!record) return;
+async function applyRecordTags(record, kind, tagIds) {
     const before = Array.isArray(record.tags) ? record.tags.slice() : [];
     if (before.length === tagIds.length && before.every(function (id) { return tagIds.includes(id); })) return;
 
     record.tags = tagIds.slice();
     render();
-    const data = target.kind === 'file'
+    const data = kind === 'file'
         ? await fileboxStorage.setFileTags(record.id, tagIds)
         : await fileboxStorage.setFolderTags(record.id, tagIds);
     if (data) {
@@ -1081,7 +1357,17 @@ async function confirmTags() {
         render();
         showNotification('Failed to update tags', 'error');
     }
+}
+
+async function confirmTags() {
+    const target = state.tagsTarget;
+    if (!target) return;
+    closeModal('fbTagsModal');
     state.tagsTarget = null;
+
+    const record = target.kind === 'file' ? getFile(target.id) : getFolder(target.id);
+    if (!record) return;
+    await applyRecordTags(record, target.kind, Array.from(state.tagSelection));
 }
 
 // ================================================
@@ -1120,6 +1406,33 @@ function makeSidebarDropTarget(row, folderId) {
         row.classList.remove('drop-target');
         if (state.dragFileId) moveFileToFolder(state.dragFileId, folderId);
     });
+}
+
+/** Drop a dragged file/folder card on a tag row*/
+function makeTagDropTarget(row, tagId) {
+    row.addEventListener('dragover', function (e) {
+        if (!state.dragFileId) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        row.classList.add('drop-target');
+    });
+    row.addEventListener('dragleave', function (e) {
+        if (!row.contains(e.relatedTarget)) row.classList.remove('drop-target');
+    });
+    row.addEventListener('drop', function (e) {
+        e.preventDefault();
+        row.classList.remove('drop-target');
+        if (state.dragFileId) addTagToRecord(state.dragFileId, tagId);
+    });
+}
+
+async function addTagToRecord(recordId, tagId) {
+    const isFolder = state.folders.some(function (f) { return f.id === recordId; });
+    const record = isFolder ? getFolder(recordId) : getFile(recordId);
+    if (!record || !getTag(tagId)) return;
+    const current = Array.isArray(record.tags) ? record.tags : [];
+    if (current.includes(tagId)) return;
+    await applyRecordTags(record, isFolder ? 'folder' : 'file', current.concat([tagId]));
 }
 
 async function moveFileToFolder(fileId, folderId) {
@@ -1297,6 +1610,17 @@ function setupEventListeners() {
         closeModal('fbFolderModal');
     });
 
+    // ----- Sidebar tags: create / edit form -----
+    $('fbNewTagBtn').addEventListener('click', function () {
+        if ($('fbTagForm').classList.contains('hidden')) openTagForm(null);
+        else closeTagForm();
+    });
+    $('fbTagForm').addEventListener('submit', submitTagForm);
+    $('fbTagCancel').addEventListener('click', closeTagForm);
+    $('fbTagNameInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeTagForm();
+    });
+
     // ----- Item action menu (delegated: buttons are re-rendered per open) -----
     $('fbItemMenu').addEventListener('click', function (e) {
         const btn = e.target.closest('button[data-action]');
@@ -1427,6 +1751,7 @@ async function init() {
     fileboxUploads.init({
         theme: function () { return fileboxThemeManager.getPreference(); },
         currentFolderId: function () { return state.currentFolderId; },
+        activeTagId: function () { return state.activeTag; },
         notify: showNotification,
         onFileUploaded: function (record) {
             // Show it immediately; the batch reconcile corrects the rest.

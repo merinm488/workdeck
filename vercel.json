@@ -7,6 +7,34 @@
     {
       "source": "/api/:path*",
       "destination": "/api/:path*"
+    },
+    {
+      "source": "/docs/:id([a-z0-9]{14,})",
+      "destination": "/docs/index.html?doc=:id"
+    },
+    {
+      "source": "/sheets/:id([a-z0-9]{14,})",
+      "destination": "/sheets/editor.html?id=:id"
+    },
+    {
+      "source": "/forms/:id([a-z0-9]{14,})",
+      "destination": "/forms/editor.html?id=:id"
+    },
+    {
+      "source": "/slides/:id([a-z0-9]{14,})",
+      "destination": "/slides/editor.html?id=:id"
+    },
+    {
+      "source": "/draw/:id([a-z0-9]{14,})",
+      "destination": "/draw/editor.html?id=:id"
+    },
+    {
+      "source": "/filebox/:id([a-z0-9]{14,})",
+      "destination": "/filebox/index.html?id=:id"
+    },
+    {
+      "source": "/f/:id([a-z0-9]{14,})",
+      "destination": "/f.html?id=:id"
     }
   ],
   "headers": [

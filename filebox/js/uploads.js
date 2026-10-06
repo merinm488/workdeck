@@ -110,6 +110,10 @@ class FileboxJsonUploader extends Uppy.BasePlugin {
         try {
             const thumbnail = await makeThumbnail(file);
             const base64 = await blobToBase64(file.data, false);
+            // Uploading inside a tag view files the new record under it
+            // (same idea as currentFolderId). The server drops tag ids it
+            // doesn't recognize, so a just-deleted tag can't break this.
+            const tagId = this.opts.activeTagId ? this.opts.activeTagId() : null;
             const response = await fetch(this.opts.endpoint, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -121,7 +125,7 @@ class FileboxJsonUploader extends Uppy.BasePlugin {
                         mime: file.type || 'application/octet-stream',
                         base64: base64,
                         folderId: this.opts.currentFolderId() || null,
-                        tags: [],
+                        tags: tagId ? [tagId] : [],
                         thumbnail: thumbnail
                     }
                 })
@@ -157,8 +161,9 @@ class FileboxUploads {
     }
 
     /**
-     * @param {object} opts - { theme(), currentFolderId(), notify(),
-     *                          onFileUploaded(record), onComplete(result) }
+     * @param {object} opts - { theme(), currentFolderId(), activeTagId(),
+     *                          notify(), onFileUploaded(record),
+     *                          onComplete(result) }
      */
     init(opts) {
         this.opts = opts;
@@ -188,6 +193,7 @@ class FileboxUploads {
         this.uppy.use(FileboxJsonUploader, {
             endpoint: APP_CONFIG.apiEndpoint,
             currentFolderId: opts.currentFolderId,
+            activeTagId: opts.activeTagId,
             onFileUploaded: opts.onFileUploaded
         });
 

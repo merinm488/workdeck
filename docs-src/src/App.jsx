@@ -68,15 +68,17 @@ function App() {
     refreshData
   } = useDocs(userHash);
 
-  // Doc detail view state - simplified from separate editing/viewing/creating states
-  // Workdeck deep links (?doc=<id>) open the doc on the very first paint:
-  // view links start the preview immediately from a stub { id } (real
-  // title/content fill in once the docs fetch resolves), so the state is
-  // parsed synchronously here rather than in an effect (effects run after
-  // the first paint and would flash the home page for a frame).
+  const parseDocLink = () => {
+    if (window.WDLinks) {
+      const loc = WDLinks.parseLocation();
+      if (loc && loc.app === 'docs') return loc.id;
+    }
+    return new URLSearchParams(window.location.search).get('doc');
+  };
+
   const [activeDoc, setActiveDoc] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    const id = params.get('doc');
+    const id = parseDocLink();
     if (id && params.get('edit') !== '1') {
       return { id, mode: 'view', doc: { id }, isStub: true };
     }
@@ -84,7 +86,7 @@ function App() {
   });
   const [isDocViewOpen, setIsDocViewOpen] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return Boolean(params.get('doc')) && params.get('edit') !== '1';
+    return Boolean(parseDocLink()) && params.get('edit') !== '1';
   });
 
   // Share state
@@ -143,26 +145,18 @@ function App() {
     }
   }, []);
 
-  // Workdeck deep links: /docs/?doc=<id> opens that doc on the very first
-  // paint — no home-page or login flash in between. &edit=1 (sent when the
-  // file was just created) opens the editor; without it the preview opens.
-  // Both start from a stub { id }: the doc already exists server-side (the
-  // workdeck created it before redirecting / it was fetched when the file
-  // was listed), and edit mode only needs the id to save. The preview fills
-  // in the real title/content as soon as the docs fetch resolves (see the
-  // stub fill-in effect below).
   const [pendingDocLink] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('doc');
-    return id ? { id, edit: params.get('edit') === '1' } : null;
+    const id = parseDocLink();
+    return id ? { id, edit: new URLSearchParams(window.location.search).get('edit') === '1' } : null;
   });
 
   const [editLinkDoc, setEditLinkDoc] = useState(null);
 
   useEffect(() => {
     if (!pendingDocLink) return;
-    // Clean the URL so refresh/back don't re-trigger the deep link
-    window.history.replaceState({}, '', window.location.pathname);
+    // Keep the canonical hard link in the address bar (/docs/<id>) so the
+    // open doc stays pasteable; drop the consumed query params.
+    window.history.replaceState({}, '', '/docs/' + pendingDocLink.id);
 
     if (pendingDocLink.edit) {
       // Editor on first paint: DocDetailView only needs the id in edit mode
@@ -232,15 +226,48 @@ function App() {
   /**
    * Handle doc card click - open full-screen doc view (or straight into
    * the editor when the caller requests it, e.g. workdeck-created docs).
+   * The address bar tracks the open doc's hard link.
    */
   const handleDocClick = useCallback((doc, initialMode = 'view') => {
     setActiveDoc({ id: doc.id, mode: initialMode, doc });
     setIsDocViewOpen(true);
+    window.history.pushState({}, '', '/docs/' + doc.id);
     // Close sidebar on mobile after selecting a doc
     if (window.innerWidth < 1024) {
       setShowSidebar(false);
     }
   }, []);
+
+  /**
+   * Open a doc mentioned by another doc (mention chip / backlink click)
+   */
+  const handleOpenDocLink = useCallback((docId) => {
+    const doc = docs.find(n => n.id === docId);
+    setActiveDoc(doc
+      ? { id: docId, mode: 'view', doc }
+      : { id: docId, mode: 'view', doc: { id: docId }, isStub: true });
+    setIsDocViewOpen(true);
+    window.history.pushState({}, '', '/docs/' + docId);
+  }, [docs]);
+
+  // Browser back/forward syncs the doc view to the address bar.
+  useEffect(() => {
+    const onPopState = () => {
+      const id = window.WDLinks ? (WDLinks.parseLocation() || {}).app === 'docs' && WDLinks.parseLocation().id : null;
+      if (id) {
+        const doc = docs.find(n => n.id === id);
+        setActiveDoc(doc
+          ? { id, mode: 'view', doc }
+          : { id, mode: 'view', doc: { id }, isStub: true });
+        setIsDocViewOpen(true);
+      } else {
+        setIsDocViewOpen(false);
+        setActiveDoc(null);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [docs]);
 
   /**
    * Handle creating a new doc
@@ -284,6 +311,7 @@ function App() {
       return createDoc(docData).then((createdDoc) => {
         // Switch to view mode after creating with the returned doc
         setActiveDoc({ id: createdDoc.id, mode: 'view', doc: createdDoc });
+        window.history.pushState({}, '', '/docs/' + createdDoc.id);
         return createdDoc;
       });
     }
@@ -304,6 +332,8 @@ function App() {
   const handleBackDocView = useCallback(() => {
     setIsDocViewOpen(false);
     setActiveDoc(null);
+    // Track the closed state in history so Back reopens the doc.
+    window.history.pushState({}, '', '/docs/');
   }, []);
 
   /**
@@ -764,6 +794,7 @@ function App() {
           onDelete={handleDeleteDoc}
           onUpdateDoc={handleSaveDoc}
           onShare={handleShare}
+          onOpenDocLink={handleOpenDocLink}
           onCreateTag={createTag}
           theme={theme}
           systemTheme={systemTheme}

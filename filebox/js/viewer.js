@@ -87,8 +87,9 @@ class FileboxViewer {
         this.teardown();
         closeModal('fbViewer');
 
+        const loc = window.WDLinks ? WDLinks.parseLocation() : null;
         const params = new URLSearchParams(window.location.search);
-        if (params.get('id')) {
+        if ((loc && loc.id) || params.get('id')) {
             params.delete('id');
             const qs = params.toString();
             history.replaceState(null, '', '/filebox/' + (qs ? '?' + qs : ''));
@@ -108,9 +109,10 @@ class FileboxViewer {
 
     syncUrlWithId(fileId) {
         const params = new URLSearchParams(window.location.search);
-        params.set('id', fileId);
         if (this.state && this.state.currentFolderId) params.set('folder', this.state.currentFolderId);
-        history.replaceState(null, '', '/filebox/?' + params.toString());
+        const qs = params.toString();
+        // Canonical hard link in the address bar while the viewer is open.
+        history.replaceState(null, '', '/filebox/' + encodeURIComponent(fileId) + (qs ? '?' + qs : ''));
     }
 
     // ================================================
@@ -192,8 +194,9 @@ class FileboxViewer {
                 });
             });
             pswp.on('destroy', function () {
+                const loc = window.WDLinks ? WDLinks.parseLocation() : null;
                 const params = new URLSearchParams(window.location.search);
-                if (params.get('id')) {
+                if ((loc && loc.id) || params.get('id')) {
                     params.delete('id');
                     const qs = params.toString();
                     history.replaceState(null, '', '/filebox/' + (qs ? '?' + qs : ''));

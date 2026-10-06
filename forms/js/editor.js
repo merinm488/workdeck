@@ -150,6 +150,20 @@ class FormsEditorApp {
                 this.formRecord = form;
             }
 
+            if (this.parseURL('fill') === '1') {
+                const shared = await formsStorage.shareForm(this.formId);
+                if (shared && shared.shareId) {
+                    window.location.replace('/forms/shared.html?shared=' + encodeURIComponent(shared.shareId));
+                    return true;
+                }
+                this.showNotification('Could not open the fill view — share the form first', 'error');
+            }
+
+            // Address bar shows the canonical hard link (/forms/<id>).
+            if (window.WDLinks) {
+                window.history.replaceState(null, '', '/forms/' + this.formId);
+            }
+
             // 7. Show the saved name in nav + browser tab
             this.updateFormTitle(this.formRecord.name);
 
@@ -295,6 +309,9 @@ class FormsEditorApp {
         // re-render steals focus mid-typing (see setupFocusPreservation).
         this.setupFocusPreservation();
 
+        // "@" typing in properties-panel fields (see setupMentionTyping).
+        this.setupMentionTyping();
+
         // On touchscreens dragula (form-js's DnD engine) starts a drag on
         // the first few pixels of movement, so every scroll swipe across
         // the canvas grabbed a field. Gate it behind a long press.
@@ -303,7 +320,7 @@ class FormsEditorApp {
 
     /**
      * Add a field of the given type (tap-to-add + the palette drawer's
-     * entry point). 
+     * entry point).
      * @param {string} type - form-js field type, e.g. 'textfield'
      */
     addPaletteField(type) {
@@ -317,6 +334,203 @@ class FormsEditorApp {
         }
         modeling.addFormField({ type }, current, index);
         this.closePaletteDrawer();
+    }
+
+    // ================================================
+    // File references (@Link)
+    // ================================================
+
+    /** Cross-app file picker anchored to the toolbar button. */
+    openMentionPicker(anchorEl) {
+        if (!window.WDMentions) {
+            this.showNotification('File links unavailable (libraries failed to load)', 'error');
+            return;
+        }
+        WDMentions.open({
+            anchor: anchorEl.getBoundingClientRect(),
+            excludeIds: this.formId ? [this.formId] : [],
+            onPick: (entry) => this.insertReferenceComponent(entry)
+        });
+    }
+
+    /**
+     * "Insert reference": adds a text component whose content links to the
+     * picked file. form-js text components render a small HTML/markdown
+     * subset, so [@Name](/sheets/<id>) shows as a clickable link in the
+     * preview pane and on the public fill page (the builder canvas keeps
+     * it inert, like every other control there).
+     */
+    insertReferenceComponent(entry) {
+        if (!this.builderInstance) return;
+        const modeling = this.builderInstance.get('modeling');
+        const { schema: current } = this.builderInstance._getState();
+        const comps = current.components || [];
+        let index = comps.length;
+        if (comps.length > 0 && comps[comps.length - 1].type === 'button') {
+            index -= 1;
+        }
+
+        const beforeIds = comps.map(c => c && c.id);
+        modeling.addFormField({ type: 'text' }, current, index);
+
+        const { schema: updated } = this.builderInstance._getState();
+        const added = (updated.components || []).find(
+            c => c && c.type === 'text' && !beforeIds.includes(c.id)
+        );
+        if (added && typeof modeling.editFormField === 'function') {
+            modeling.editFormField(added, 'text',
+                WDMentions.mentionMarkdown(entry.app, entry.id, entry.name));
+        }
+        this.markAsChanged();
+    }
+
+
+    setupMentionTyping() {
+        if (!window.WDMentions || this.mentionSession) return;
+        const ALLOWED_LABELS = new Set([
+            'text', 'label', 'description', 'prefix', 'suffix',
+            'html', 'placeholder', 'title', 'alt text', 'image source'
+        ]);
+        this._mentionHost = null;
+
+        const session = WDMentions.createMentionSession({
+            isActive: () => !!this._mentionHost,
+            getText: () => this._mentionHost ? this.editableTextAndCaret(this._mentionHost).text : '',
+            getCaret: () => this._mentionHost ? this.editableTextAndCaret(this._mentionHost).caret : null,
+            getAnchor: () => {
+                const sel = window.getSelection();
+                if (!sel || !sel.rangeCount) return null;
+                const rect = sel.getRangeAt(0).getBoundingClientRect();
+                if (!rect || (!rect.width && !rect.height)) {
+                    return this._mentionHost ? this._mentionHost.getBoundingClientRect() : null;
+                }
+                return rect;
+            },
+            excludeIds: () => this.formId ? [this.formId] : [],
+            onPick: (entry, range) => this.insertEditableMention(entry, range)
+        });
+        this.mentionSession = session;
+
+        const hostOf = (e) => {
+            const el = e.target;
+            if (!(el instanceof HTMLElement) || (el.closest && el.closest('.wdm-pop'))) return null;
+            if (el instanceof HTMLTextAreaElement) return el;
+            if (el instanceof HTMLInputElement) {
+                return el.type === 'text' && el.closest('.fjs-properties-panel') ? el : null;
+            }
+            if (el.isContentEditable && el.closest('.fjs-properties-panel')) {
+                const field = el.closest('.bio-properties-panel-entry');
+                const label = field ? field.querySelector('.bio-properties-panel-label') : null;
+                return label && ALLOWED_LABELS.has(label.textContent.trim().toLowerCase()) ? el : null;
+            }
+            return null;
+        };
+
+        this.mentionKeydown = (e) => { if (hostOf(e)) session.keydown(e); };
+        this.mentionSync = (e) => {
+            const host = hostOf(e);
+            if (!host) return;
+            this._mentionHost = host;
+            session.sync();
+        };
+        this.mentionFocus = (e) => {
+            const host = hostOf(e);
+            this._mentionHost = host || null;
+        };
+
+        document.addEventListener('keydown', this.mentionKeydown, true);
+        document.addEventListener('input', this.mentionSync, true);
+        document.addEventListener('keyup', this.mentionSync, true);
+        document.addEventListener('focusin', this.mentionFocus, true);
+    }
+
+    editableTextAndCaret(el) {
+        if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+            return { text: el.value, caret: typeof el.selectionStart === 'number' ? el.selectionStart : null };
+        }
+        const sel = window.getSelection();
+        const anchorNode = sel && sel.rangeCount ? sel.anchorNode : null;
+        const anchorOffset = sel ? sel.anchorOffset : 0;
+        let text = '';
+        let caret = null;
+        const walk = (line, separator) => {
+            text += separator;
+            const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+            let n;
+            while ((n = w.nextNode())) {
+                if (caret == null && n === anchorNode) caret = text.length + anchorOffset;
+                text += n.textContent;
+            }
+        };
+        const lines = el.querySelectorAll('.cm-line');
+        if (lines.length) {
+            lines.forEach((line, i) => walk(line, i ? '\n' : ''));
+        } else {
+            walk(el, '');
+        }
+        return { text: text, caret: caret };
+    }
+
+    /** DOM position (text node + offset) of a joined-text offset. */
+    locateOffset(el, target) {
+        const lines = el.querySelectorAll('.cm-line');
+        let pos = 0;
+        const advance = (line) => {
+            const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+            let n;
+            while ((n = w.nextNode())) {
+                const len = n.textContent.length;
+                if (pos + len >= target) return { node: n, offset: target - pos };
+                pos += len;
+            }
+            return null;
+        };
+        if (lines.length) {
+            for (let i = 0; i < lines.length; i++) {
+                if (i > 0) {
+                    if (pos === target) pos += 1;   // the stitched newline
+                    else pos += 1;
+                }
+                const hit = advance(lines[i]);
+                if (hit) return hit;
+            }
+        } else {
+            return advance(el);
+        }
+        return null;
+    }
+
+    /** Splice the markdown mention into the field the picker came from. */
+    insertEditableMention(entry, range) {
+        const el = this._mentionHost;
+        if (!el || !window.WDMentions) return;
+        const markdown = WDMentions.mentionMarkdown(entry.app, entry.id, entry.name);
+
+        if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+            // The user may have kept typing since the last sync — re-derive.
+            const hit = WDMentions.mentionAt(el.value, el.selectionStart) || range;
+            if (typeof el.setRangeText === 'function') {
+                el.setRangeText(markdown, hit.from, hit.to, 'end');
+            } else {
+                el.value = el.value.slice(0, hit.from) + markdown + el.value.slice(hit.to);
+            }
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.focus();
+            return;
+        }
+
+        const { text, caret } = this.editableTextAndCaret(el);
+        const hit = WDMentions.mentionAt(text, caret) || range;
+        const start = this.locateOffset(el, hit.from);
+        const end = this.locateOffset(el, hit.to);
+        const sel = window.getSelection();
+        if (!start || !end || !sel) return;
+        const rg = document.createRange();
+        rg.setStart(start.node, start.offset);
+        rg.setEnd(end.node, end.offset);
+        sel.removeAllRanges();
+        sel.addRange(rg);
+        document.execCommand('insertText', false, markdown);
     }
 
     /**
@@ -961,6 +1175,27 @@ class FormsEditorApp {
             saveBtn.addEventListener('click', () => this.save());
         }
 
+        // @ Link: insert a reference component pointing at any Workdeck file
+        const mentionBtn = document.getElementById('mentionBtn');
+        if (mentionBtn) {
+            mentionBtn.addEventListener('click', () => this.openMentionPicker(mentionBtn));
+        }
+
+        // Settings > Copy link: the form's canonical hard link
+        const copyLinkBtn = document.getElementById('copyLinkBtn');
+        if (copyLinkBtn) {
+            copyLinkBtn.addEventListener('click', async () => {
+                if (!window.WDLinks || !this.formId) return;
+                try {
+                    await navigator.clipboard.writeText(window.location.origin + WDLinks.url('forms', this.formId));
+                    this.showNotification('Link copied', 'success');
+                } catch (err) {
+                    this.showNotification('Copy failed — copy the URL from the address bar', 'error');
+                }
+                document.getElementById('settingsDropdown')?.classList.remove('open');
+            });
+        }
+
         // Rename reminder modal (untitled explicit saves)
         this.setupRenamePrompt();
 
@@ -1550,6 +1785,11 @@ class FormsEditorApp {
      * @returns {string|null}
      */
     parseURL(name) {
+        // Hard link (/forms/<id>) first, legacy ?id= second.
+        if (name === 'id' && window.WDLinks) {
+            const loc = WDLinks.parseLocation();
+            if (loc && loc.app === 'forms' && loc.id) return loc.id;
+        }
         return new URLSearchParams(window.location.search).get(name);
     }
 

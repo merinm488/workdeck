@@ -2240,3 +2240,16 @@ body.wd-sidebar-open .wd-sidebar-scrim {
     margin-top: 0;
     max-height: 220px;
 }
+
+/* Backlink warning inside the delete confirmation */
+.wd-delete-backlinks {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-align: left;
+}

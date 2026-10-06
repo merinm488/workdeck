@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { MarkdownEditor } from './DocEditor';
 import MarkdownPreview from './MarkdownPreview';
 import { SettingsDropdown } from './SettingsDropdown';
+import { BacklinksPanel } from './BacklinksPanel';
 import { useDebounce } from '../hooks/useDebounce';
+import { useUnifiedDoc } from '../hooks/useUnifiedDoc';
 import { htmlToMarkdown } from '../utils/htmlToMarkdown';
 
 /**
@@ -28,6 +30,7 @@ export function DocDetailView({
   onDelete,
   onUpdateDoc,
   onShare,
+  onOpenDocLink,
   onCreateTag,
   theme,
   systemTheme,
@@ -70,6 +73,28 @@ export function DocDetailView({
   // Debounce content changes for auto-save (1000ms delay)
   const debouncedContent = useDebounce(content, 1000);
   const debouncedTitle = useDebounce(title, 1000);
+
+  // Every app's files (mention picker, chip names, backlinks).
+  const unifiedDoc = useUnifiedDoc(userHash);
+  const handleInternalNavigate = useCallback((ref) => {
+    if (ref.app === 'docs') {
+      if (onOpenDocLink) onOpenDocLink(ref.id);
+      return;
+    }
+    if (window.WDLinks) WDLinks.open(ref.app, ref.id);
+  }, [onOpenDocLink]);
+
+  /** Copy this doc's canonical hard link. */
+  const handleCopyLink = useCallback(() => {
+    if (!doc?.id || !window.WDLinks) return;
+    const url = window.location.origin + WDLinks.url('docs', doc.id);
+    const done = (ok) => window.alert(ok ? 'Link copied to clipboard' : 'Could not copy link');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => done(true), () => done(false));
+    } else {
+      done(false);
+    }
+  }, [doc?.id]);
 
   /**
    * Update lastSavedValues when doc changes (e.g., switching docs)
@@ -389,6 +414,7 @@ export function DocDetailView({
           onTagSelect={setTagId}
           onCreateTag={onCreateTag}
           onShare={handleShare}
+          onCopyLink={handleCopyLink}
           onDelete={handleDelete}
           hasDoc={!!doc?.id}
           doc={doc}
@@ -435,6 +461,7 @@ export function DocDetailView({
             onTagSelect={setTagId}
             onCreateTag={onCreateTag}
             onShare={handleShare}
+            onCopyLink={handleCopyLink}
             onDelete={handleDelete}
             hasDoc={!!doc?.id}
             doc={doc}
@@ -494,8 +521,17 @@ export function DocDetailView({
           <MarkdownPreview
             content={content}
             readOnly={true}
+            userData={unifiedDoc}
+            onInternalNavigate={handleInternalNavigate}
           />
         </div>
+
+        {/* Files that mention this doc */}
+        <BacklinksPanel
+          targetId={doc?.id}
+          userData={unifiedDoc}
+          onOpen={handleInternalNavigate}
+        />
       </div>
     </div>
   );
@@ -505,11 +541,14 @@ export function DocDetailView({
    */
   const renderEditContent = () => (
     <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-      {/* Editor with built-in preview toggle */}
+      {/* Editor with built-in preview toggle. Mentions are enabled for every
+          doc — the launcher's createDoc defaults to contentType 'plain-text',
+          but the app renders all docs as markdown, so links display fine. */}
       <MarkdownEditor
         value={content}
         onChange={handleContentChange}
         placeholder="Start writing your doc..."
+        mentionExcludeId={doc?.id || null}
       />
     </div>
   );
@@ -528,6 +567,14 @@ export function DocDetailView({
         <span className="text-[11.5px] leading-none text-gray-400 dark:text-gray-500 tabular-nums select-none truncate">
           {wordCount.toLocaleString()} words · {charCount.toLocaleString()} characters{readMinutes ? ` · ${readMinutes} min read` : ''}
         </span>
+
+        {/* Backlinks pill (edit mode) */}
+        <BacklinksPanel
+          compact
+          targetId={doc?.id}
+          userData={unifiedDoc}
+          onOpen={handleInternalNavigate}
+        />
 
         {/* Save button (right) */}
         <div className="flex items-center gap-3 flex-shrink-0">

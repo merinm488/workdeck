@@ -123,6 +123,9 @@ class SheetsApp {
         // Settings menu toggle
         this.setupSettingsMenu();
 
+        // File mentions (toolbar button + footer hint)
+        this.setupMentionTools();
+
         // Editable title
         this.setupEditableTitle();
 
@@ -134,6 +137,74 @@ class SheetsApp {
 
         // Beforeunload for unsaved changes
         window.addEventListener('beforeunload', (e) => this.handleBeforeUnload(e));
+    }
+
+    setupMentionTools() {
+        spreadsheetManager.setupMentionTyping();
+
+        const mentionBtn = document.getElementById('mentionBtn');
+
+        if (mentionBtn) {
+            mentionBtn.addEventListener('click', () => {
+                if (!window.WDMentions) {
+                    this.showError('File links unavailable (libraries failed to load)');
+                    return;
+                }
+                WDMentions.open({
+                    anchor: mentionBtn.getBoundingClientRect(),
+                    excludeIds: this.spreadsheetId ? [this.spreadsheetId] : [],
+                    onPick: (entry) => {
+                        const ok = spreadsheetManager.setCellMention({
+                            app: entry.app, id: entry.id, name: entry.name
+                        });
+                        if (!ok) {
+                            this.showError('Select a cell first');
+                            return;
+                        }
+                        this.markAsChanged();
+                        // Silent save — the explicit path would nag about
+                        // the spreadsheet's name mid-edit.
+                        this.save({ explicit: false });
+                        this.updateMentionHint();
+                    }
+                });
+            });
+        }
+
+        const mentionHint = document.getElementById('mentionHint');
+        if (mentionHint) {
+            mentionHint.addEventListener('click', () => {
+                const ref = spreadsheetManager.getActiveCellMention();
+                if (ref && window.WDLinks) WDLinks.open(ref.app, ref.id);
+            });
+        }
+    }
+
+    /**
+     * Show the footer hint when the selected cell carries a file mention.
+     * Names resolve live from the unified doc, so renames propagate.
+     */
+    updateMentionHint() {
+        const hint = document.getElementById('mentionHint');
+        if (!hint || !window.WDMentions || !window.WDLinks) return;
+
+        const ref = spreadsheetManager.getActiveCellMention();
+        if (!ref) {
+            hint.classList.add('hidden');
+            hint.innerHTML = '';
+            return;
+        }
+
+        WDMentions.getUnifiedDoc().then((data) => {
+            const hit = WDLinks.resolve(ref.id, data);
+            const name = hit ? hit.name : 'File no longer exists';
+            hint.innerHTML = '<span class="wdm-app-icon wdm-app-' + ref.app + '">'
+                + WDLinks.icon(ref.app, 13) + '</span>'
+                + '<span class="mention-hint-name"></span>'
+                + '<span class="mention-hint-open">Open</span>';
+            hint.querySelector('.mention-hint-name').textContent = name;
+            hint.classList.remove('hidden');
+        }).catch(() => { /* offline: leave any existing hint as-is */ });
     }
 
     /**
@@ -721,12 +792,16 @@ class SheetsApp {
         const fWorkbook = spreadsheetManager.fWorkbook;
         if (fWorkbook && typeof fWorkbook.onSelectionChange === 'function') {
             try {
-                fWorkbook.onSelectionChange(() => this.queueSheetFooterUpdate());
+                fWorkbook.onSelectionChange(() => {
+                    this.queueSheetFooterUpdate();
+                    this.updateMentionHint();
+                });
             } catch (err) {
                 console.warn('[APP] Footer selection hook unavailable:', err);
             }
         }
         this.updateSheetFooter();
+        this.updateMentionHint();
     }
 
     /**
@@ -1106,31 +1181,29 @@ class SheetsApp {
 
     /**
      * Parse URL for spreadsheet ID
-     * Get ID from URL query params
+     * Hard link (/sheets/<id>) first, legacy ?id= second.
      * @returns {string|null} Spreadsheet ID or null
      */
     parseURL() {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('id');
+        const loc = window.WDLinks ? WDLinks.parseLocation() : null;
+        if (loc && loc.app === 'sheets' && loc.id) return loc.id;
+        return new URLSearchParams(window.location.search).get('id');
     }
 
-    /**
-     * Update URL with spreadsheet ID
-     * Update browser URL without reload
-     * @param {string} id - Spreadsheet ID
-     */
+    
     updateURL(id) {
-        window.history.pushState(null, '', `?id=${id}`);
+        window.history.replaceState(null, '', `/sheets/${id}`);
     }
 
     /**
-     * Strip the query string from the URL once the deep link has been
-     * consumed, leaving the bare editor URL.
+     * Normalize the address bar to the open spreadsheet's hard link
+     * (/sheets/<id>) once the deep-link query has been consumed.
      * @returns {void}
      */
     cleanURL() {
-        if (window.location.search) {
-            window.history.replaceState(null, '', window.location.pathname);
+        const target = this.spreadsheetId ? `/sheets/${this.spreadsheetId}` : '/sheets/';
+        if (window.location.pathname + window.location.search !== target) {
+            window.history.replaceState(null, '', target);
         }
     }
 

@@ -41,7 +41,7 @@ const editorState = {
 
 let undoSnapshotTimer = null;
 let notificationTimer = null;
-const EXTRA_SERIALIZED_PROPS = ['from', 'to'];
+const EXTRA_SERIALIZED_PROPS = ['from', 'to', 'wdRef'];
 
 // ================================================
 // Boot
@@ -50,7 +50,10 @@ const EXTRA_SERIALIZED_PROPS = ['from', 'to'];
 async function init() {
     setLoading(true);
 
-    editorState.drawingId = new URLSearchParams(location.search).get('id');
+    // Hard link (/draw/<id>) first, legacy ?id= second.
+    const loc = window.WDLinks ? WDLinks.parseLocation() : null;
+    editorState.drawingId = (loc && loc.app === 'draw' && loc.id) ||
+        new URLSearchParams(location.search).get('id');
     if (!drawAuth.getSession() || !editorState.drawingId) {
         goToWorkdeck();
         return;
@@ -79,6 +82,13 @@ async function init() {
     }
     updateDrawFooter();
 
+    // Mentions refresh their labels from the current file names (renames
+    // propagate; deleted targets go muted). Address bar shows the hard link.
+    refreshMentionTexts();
+    if (window.WDLinks && editorState.drawingId) {
+        window.history.replaceState(null, '', '/draw/' + editorState.drawingId);
+    }
+
     editorState.canvas.backgroundColor = drawing.background || APP_CONFIG.canvas.defaultBackground;
     if (/^#[0-9a-f]{6}$/i.test(editorState.canvas.backgroundColor)) {
         $('canvasColorInput').value = editorState.canvas.backgroundColor;   // picker reflects the saved board
@@ -92,6 +102,7 @@ async function init() {
     bindKeyboard();
     bindTouchGestures();
     bindBeforeUnload();
+    setupMentionTyping();
     startAutoSave();
 
     setLoading(false);
@@ -149,6 +160,31 @@ function initCanvas() {
     editorState.canvas.on('mouse:down', onCanvasMouseDown);
     editorState.canvas.on('mouse:move', onCanvasMouseMove);
     editorState.canvas.on('mouse:up', onCanvasMouseUp);
+
+    // Mentions: pointer cursor on hover; clicking an already-selected
+    // mention (no drag) opens the target — the first click selects/moves
+    // it like any object.
+    let mentionPress = null;
+    editorState.canvas.on('mouse:down', (opt) => {
+        const t = opt.target;
+        mentionPress = (t && t.wdRef && editorState.activeTool === 'select')
+            ? { target: t, x: opt.viewportPoint.x, y: opt.viewportPoint.y }
+            : null;
+    });
+    editorState.canvas.on('mouse:up', (opt) => {
+        if (!mentionPress) return;
+        const press = mentionPress;
+        mentionPress = null;
+        const moved = Math.hypot(opt.viewportPoint.x - press.x, opt.viewportPoint.y - press.y);
+        if (moved > 4 || press.target !== editorState.canvas.getActiveObject() || press.target.isEditing) return;
+        if (window.WDLinks) WDLinks.open(press.target.wdRef.app, press.target.wdRef.id);
+    });
+    editorState.canvas.on('mouse:over', (opt) => {
+        if (opt.target && opt.target.wdRef) editorState.canvas.hoverCursor = 'pointer';
+    });
+    editorState.canvas.on('mouse:out', (opt) => {
+        if (opt.target && opt.target.wdRef) editorState.canvas.hoverCursor = 'default';
+    });
     
     window.addEventListener('resize', debounce(resizeCanvasToStage, 150));
 }
@@ -412,6 +448,146 @@ function configureFreehandBrush() {
         }
     }
     editorState.canvas.freeDrawingBrush = brush;
+}
+
+
+// ================================================
+// File mentions (@Link)
+// ================================================
+
+const MENTION_COLOR = '#4285f4';
+
+function insertMentionObject(entry) {
+    const canvas = editorState.canvas;
+    const vp = getViewport();
+    const center = {
+        x: (canvas.getWidth() / 2 - vp.panX) / vp.zoom,
+        y: (canvas.getHeight() / 2 - vp.panY) / vp.zoom
+    };
+    const obj = new fabric.IText('@' + entry.name, {
+        left: center.x - 50,
+        top: center.y - 12,
+        fontFamily: APP_CONFIG.tools.fontFamily,
+        fontSize: (APP_CONFIG.tools.fontSize || 16) + 2,
+        fill: MENTION_COLOR,
+        underline: true,
+        wdRef: { app: entry.app, id: entry.id }
+    });
+    canvas.add(obj);
+    canvas.setActiveObject(obj);
+    canvas.requestRenderAll();
+    saveDrawing();   // mentions are deliberate acts — persist right away
+}
+
+function openMentionPicker(anchorEl) {
+    if (!window.WDMentions) {
+        showNotification('File links unavailable (libraries failed to load)', true);
+        return;
+    }
+    WDMentions.open({
+        anchor: anchorEl.getBoundingClientRect(),
+        excludeIds: editorState.drawingId ? [editorState.drawingId] : [],
+        onPick: insertMentionObject
+    });
+}
+
+// ================================================
+// "@" typing inside a text object
+// ================================================
+
+let typingMentionSession = null;
+
+function setupMentionTyping() {
+    if (!window.WDMentions || typingMentionSession) return;
+    typingMentionSession = WDMentions.createMentionSession({
+        isActive: () => !!mentionEditHost(),
+        getText: () => {
+            const host = mentionEditHost();
+            return host ? host.textarea.value : '';
+        },
+        getCaret: () => {
+            const host = mentionEditHost();
+            return host && typeof host.textarea.selectionStart === 'number'
+                ? host.textarea.selectionStart : null;
+        },
+        getAnchor: () => {
+            const host = mentionEditHost();
+            if (!host) return null;
+            try {
+                const br = host.obj.getBoundingRect(true);
+                const cr = editorState.canvas.getElement().getBoundingClientRect();
+                return {
+                    left: cr.left + br.left, right: cr.left + br.left,
+                    top: cr.top + br.top, bottom: cr.top + br.top + 20
+                };
+            } catch (err) { return null; }
+        },
+        excludeIds: () => editorState.drawingId ? [editorState.drawingId] : [],
+        onPick: insertTypedMention
+    });
+
+    const onKey = (e) => { if (mentionEditHost(e.target)) typingMentionSession.keydown(e); };
+    const onSync = (e) => { if (mentionEditHost(e.target)) typingMentionSession.sync(); };
+    document.addEventListener('keydown', onKey, true);
+    ['input', 'keyup', 'click'].forEach((type) => document.addEventListener(type, onSync, true));
+}
+
+/** The hidden textarea Fabric uses while a text object is in edit mode. */
+function mentionEditHost(target) {
+    const obj = editorState.canvas && editorState.canvas.getActiveObject
+        ? editorState.canvas.getActiveObject() : null;
+    if (!obj || !obj.isEditing || !obj.hiddenTextarea) return null;
+    if (target && target !== obj.hiddenTextarea) return null;
+    return { obj: obj, textarea: obj.hiddenTextarea };
+}
+
+/** Splice the mention into the object's text via the hidden textarea. */
+function insertTypedMention(entry, range) {
+    const host = mentionEditHost();
+    if (!host) return;
+    const name = String(entry.name || '').replace(/[\r\n@]/g, ' ').trim() || 'Untitled';
+    const label = '@' + name;
+    // The user may have kept typing since the last sync — re-derive.
+    const hit = WDMentions.mentionAt(host.textarea.value, host.textarea.selectionStart) || range;
+    const next = host.textarea.value.slice(0, hit.from) + label + host.textarea.value.slice(hit.to);
+    host.textarea.value = next;
+    const caret = hit.from + label.length;
+    host.textarea.setSelectionRange(caret, caret);
+    host.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+    if (next === label) {
+        host.obj.set({
+            wdRef: { app: entry.app, id: entry.id },
+            fill: MENTION_COLOR,
+            underline: true
+        });
+        editorState.canvas.requestRenderAll();
+        saveDrawing();   // mentions are deliberate acts — persist right away
+    }
+}
+
+/**
+ * Mention labels follow their target's current name; deleted targets turn
+ * muted with a " (deleted)" suffix. Rendering-only: no dirty flag, so the
+ * refresh never triggers an autosave on its own.
+ */
+async function refreshMentionTexts() {
+    if (!window.WDMentions || !window.WDLinks) return;
+    const data = await WDMentions.getUnifiedDoc().catch(() => null);
+    if (!data) return;
+    let changed = false;
+    editorState.canvas.getObjects().forEach((obj) => {
+        if (!obj.wdRef) return;
+        const hit = WDLinks.resolve(obj.wdRef.id, data);
+        const base = obj.text.replace(/\s*\(deleted\)$/, '').replace(/^@/, '');
+        const desired = hit ? '@' + hit.name : '@' + base + ' (deleted)';
+        if (obj.text !== desired) {
+            obj.set('text', desired);
+            changed = true;
+        }
+        obj.set('opacity', hit ? 1 : 0.5);
+    });
+    if (changed) editorState.canvas.requestRenderAll();
 }
 
 
@@ -1121,6 +1297,18 @@ async function openShareModal() {
     $('shareModal').classList.add('open');
 }
 
+/** Settings > Copy link: the drawing's canonical hard link. */
+async function copyDrawingLink() {
+    if (!window.WDLinks || !editorState.drawingId) return;
+    const url = window.location.origin + WDLinks.url('draw', editorState.drawingId);
+    try {
+        await navigator.clipboard.writeText(url);
+        showNotification('Link copied');
+    } catch (err) {
+        showNotification('Copy failed — copy the URL from the address bar', true);
+    }
+}
+
 /** View My Key modal: #keyText = drawAuth.getUserKey() (or session helper). */
 function openKeyModal() {
     $('keyText').textContent = drawAuth.getUserKey() || '-';
@@ -1200,6 +1388,7 @@ function bindTopNav() {
 
     $('viewKeyBtn').addEventListener('click', openKeyModal);
     $('shareBtn').addEventListener('click', openShareModal);
+    $('copyLinkBtn').addEventListener('click', copyDrawingLink);
     $('deleteAccountBtn').addEventListener('click', () => openModal($('deleteAccountModal')));
 
     $('logoutBtn').addEventListener('click', () => {
@@ -1528,6 +1717,12 @@ function toggleItalic() {
 function bindToolbar() {
     Object.keys(TOOL_BUTTON_IDS).forEach((name) => {
         $(TOOL_BUTTON_IDS[name]).addEventListener('click', () => setActiveTool(name));
+    });
+
+    // @ Link file mention
+    $('toolMentionBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openMentionPicker(e.currentTarget);
     });
 
     // --- Shapes dropdown ---

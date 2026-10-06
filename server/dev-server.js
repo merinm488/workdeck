@@ -60,7 +60,7 @@ const { default: drawHandler } = await import('../api/draw.js');
 const { default: fileboxHandler } = await import('../api/filebox.js');
 
 const app = express();
-const PORT = 4000;
+const PORT = Number(process.env.PORT) || 4000;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -115,6 +115,36 @@ app.all('/api/forms', (req, res) => formsHandler(req, res));
 app.all('/api/slides', (req, res) => slidesHandler(req, res));
 app.all('/api/draw', (req, res) => drawHandler(req, res));
 app.all('/api/filebox', (req, res) => fileboxHandler(req, res));
+
+// ---------- Pretty file URLs ----------
+const WD_ID_RE = /^[a-z0-9]{14,}$/;
+const WD_PRETTY_PAGES = {
+  docs: '/docs/index.html',
+  sheets: '/sheets/editor.html',
+  forms: '/forms/editor.html',
+  slides: '/slides/editor.html',
+  draw: '/draw/editor.html',
+  filebox: '/filebox/index.html'
+};
+
+Object.keys(WD_PRETTY_PAGES).forEach((prettyApp) => {
+  app.get('/' + prettyApp + '/:id', (req, res, next) => {
+    if (!WD_ID_RE.test(req.params.id)) return next();
+    // Carry extra query params through (?edit=1 from create flows).
+    const params = new URLSearchParams(req.url.split('?')[1] || '');
+    params.set(prettyApp === 'docs' ? 'doc' : 'id', req.params.id);
+    req.url = WD_PRETTY_PAGES[prettyApp] + '?' + params.toString();
+    next();
+  });
+});
+
+// Universal resolver /f/<id> -> public/f.html (looks up the owning app with
+// the user's unified doc, then redirects to the canonical pretty URL).
+app.get('/f/:id', (req, res, next) => {
+  if (!WD_ID_RE.test(req.params.id)) return next();
+  req.url = '/f.html?id=' + encodeURIComponent(req.params.id);
+  next();
+});
 
 // ---------- Static apps ----------
 // Workdeck landing page + assets

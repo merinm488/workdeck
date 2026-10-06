@@ -271,6 +271,109 @@ input, select {
     color: var(--danger);
 }
 
+/* ---------- Sidebar tags (Filebox-born; also listed in Workdeck) ---------- */
+
+.fb-side-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 10px 6px;
+}
+
+.fb-side-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+}
+
+.fb-side-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--text-tertiary);
+}
+
+.fb-side-add:hover {
+    background: var(--bg-input);
+    color: var(--text);
+}
+
+.fb-tag-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.fb-side-count {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Hover swaps the count for the row actions */
+.fb-side-row:hover .fb-side-count,
+.fb-side-row:focus-within .fb-side-count {
+    display: none;
+}
+
+/* Tag rows tint with their own color, so keep the label neutral */
+.fb-side-row.fb-tag-row.active {
+    color: var(--text);
+}
+
+.fb-side-empty {
+    padding: 8px 10px 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-tertiary);
+}
+
+/* Inline create / edit tag form */
+.fb-tag-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 6px 0 10px;
+    padding: 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.fb-tag-form .fb-input {
+    padding: 7px 10px;
+    font-size: 13px;
+}
+
+.fb-tag-form .fb-color-picker {
+    gap: 7px;
+    margin-bottom: 0;
+}
+
+.fb-tag-form .fb-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+}
+
+.fb-tag-form-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.fb-tag-form-actions .fb-primary-btn,
+.fb-tag-form-actions .fb-secondary-btn {
+    flex: 1;
+    padding: 7px 10px;
+    font-size: 12.5px;
+}
+
 /* ================================================
    Header
    ================================================ */
@@ -591,6 +694,14 @@ input, select {
 
 .fb-crumb-sep {
     color: var(--text-tertiary);
+}
+
+/* "Search results" and the active tag crumb; flex so the tag dot aligns */
+.fb-crumb-current {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text);
 }
 
 /* ================================================

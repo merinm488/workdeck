@@ -18,7 +18,8 @@
  *               storage: 'textdb', storageKey: 'file_<id>',
  *               createdAt, updatedAt }]
  *   folders: [{ id, name, color, parentId, tags, createdAt, updatedAt }]
- *   tags:    [{ id, name, color }]        // shared with the whole suite
+ *   tags:    [{ id, name, color, origin? }]  // shared with the whole suite;
+ *                                            // origin 'filebox' = born here
  *   settings.lastOpened[id]               // recency, shared map
  */
 
@@ -200,9 +201,19 @@ class FileboxStorage {
         return this.workdeckAction('recordOpen', { fileId: id, app: 'filebox' });
     }
 
-    /** Create a shared tag (used by the edit-tags modal's inline create). */
+    
     createTag(name, color) {
-        return this.workdeckAction('createTag', { name, color });
+        return this.workdeckAction('createTag', { name, color, origin: 'filebox' });
+    }
+
+    /** Rename / recolor a tag (the tag is shared with Workdeck). */
+    updateTag(tagId, updates) {
+        return this.workdeckAction('updateTag', { tagId, updates });
+    }
+
+  
+    deleteTag(tagId) {
+        return this.workdeckAction('deleteTag', { tagId });
     }
 
     /** Update user settings (theme, etc.). */

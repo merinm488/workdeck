@@ -1,0 +1,174 @@
+/**
+ * WDMentions picker styles.
+ */
+
+.wdm-pop {
+    --wdm-bg: var(--bg-elevated, #ffffff);
+    --wdm-text: var(--text, #1b1d21);
+    --wdm-text-dim: #6f7480;
+    --wdm-border: rgba(15, 18, 25, 0.14);
+    --wdm-hover: rgba(15, 18, 25, 0.06);
+    --wdm-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    position: fixed;
+    z-index: 100000;
+    min-width: 260px;
+    max-width: 340px;
+    max-height: 320px;
+    display: none;
+    flex-direction: column;
+    background: var(--wdm-bg);
+    border: 1px solid var(--wdm-border);
+    border-radius: 10px;
+    box-shadow: var(--wdm-shadow);
+    overflow: hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
+    color: var(--wdm-text);
+}
+
+/* Dark: Sheets/Forms/Slides/Draw ([data-theme="dark"]) and Docs (html.dark).
+   The launcher is dark by default and inherits --bg-elevated/--text above,
+   which are already the dark pair there. */
+[data-theme="dark"] .wdm-pop,
+.dark .wdm-pop {
+    --wdm-bg: #17181c;
+    --wdm-text: #f2f2f2;
+    --wdm-text-dim: #a3a3a8;
+    --wdm-border: rgba(255, 255, 255, 0.16);
+    --wdm-hover: rgba(255, 255, 255, 0.08);
+    --wdm-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.wdm-pop.active {
+    display: flex;
+    animation: wdm-in 90ms ease-out;
+}
+
+@keyframes wdm-in {
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: none; }
+}
+
+.wdm-search {
+    padding: 8px;
+    border-bottom: 1px solid var(--wdm-border);
+}
+
+.wdm-search-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 10px;
+    border: 1px solid var(--wdm-border);
+    border-radius: 7px;
+    background: var(--wdm-hover);
+    color: var(--wdm-text);
+    font: inherit;
+    outline: none;
+}
+
+.wdm-search-input:focus {
+    border-color: #facc15;
+}
+
+[data-theme="dark"] .wdm-search-input:focus,
+.dark .wdm-search-input:focus {
+    border-color: var(--accent, #facc15);
+}
+
+.wdm-list {
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.wdm-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--wdm-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.wdm-item:hover,
+.wdm-item-active {
+    background: var(--wdm-hover);
+}
+
+.wdm-item-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    flex: none;
+}
+
+.wdm-item-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wdm-item-app {
+    flex: none;
+    font-size: 11px;
+    color: var(--wdm-text-dim);
+}
+
+.wdm-empty {
+    padding: 16px 14px;
+    color: var(--wdm-text-dim);
+    text-align: center;
+}
+
+/* Suite accents as literals — host tokens like Docs' --accent arrive as
+   invalid "R G B" channel triples and would fall through to unset. */
+.wdm-app-docs   { color: #4285f4; background: rgba(66, 133, 244, 0.15); }
+.wdm-app-sheets { color: #22c55e; background: rgba(34, 197, 94, 0.15); }
+.wdm-app-forms  { color: #7248b9; background: rgba(114, 72, 185, 0.18); }
+.wdm-app-slides { color: #ea580c; background: rgba(234, 88, 12, 0.15); }
+.wdm-app-draw   { color: #e11d48; background: rgba(225, 29, 72, 0.12); }
+.wdm-app-filebox { color: #ca8a04; background: rgba(250, 204, 21, 0.18); }
+
+[data-theme="dark"] .wdm-app-filebox,
+.dark .wdm-app-filebox { color: #facc15; background: rgba(250, 204, 21, 0.12); }
+
+/* Inline mention chips rendered by apps (markdown previews, backlinks). */
+.wd-mention-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 7px 1px 4px;
+    border-radius: 6px;
+    background: var(--wdm-hover, rgba(128, 128, 128, 0.14));
+    border: 1px solid transparent;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    line-height: 1.5;
+}
+
+.wd-mention-chip:hover {
+    border-color: var(--wdm-border, rgba(128, 128, 128, 0.28));
+    text-decoration: none;
+}
+
+.wd-mention-chip .wdm-app-icon {
+    display: inline-flex;
+    flex: none;
+}
+
+.wd-mention-chip.missing {
+    opacity: 0.55;
+    text-decoration: line-through;
+    cursor: default;
+}

@@ -21,6 +21,7 @@ export function SettingsDropdown({
   onTagSelect,
   onCreateTag,
   onShare,
+  onCopyLink,
   onDelete,
   hasDoc,
   doc
@@ -136,6 +137,13 @@ export function SettingsDropdown({
   const handleShare = () => {
     if (onShare && doc) {
       onShare(doc);
+      setIsOpen(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (onCopyLink) {
+      onCopyLink();
       setIsOpen(false);
     }
   };
@@ -468,6 +476,31 @@ export function SettingsDropdown({
                     />
                   </svg>
                   Share
+                </button>
+              </div>
+            )}
+
+            {/* Copy Link Section */}
+            {onCopyLink && hasDoc && (
+              <div className="border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={handleCopyLink}
+                  className="w-full px-4 py-2 text-left text-sm flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-gray-100"
+                >
+                  <svg
+                    className="w-4 h-4 text-gray-600 dark:text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m5.656-5.656l1.5-1.5a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656 0"
+                    />
+                  </svg>
+                  Copy link
                 </button>
               </div>
             )}

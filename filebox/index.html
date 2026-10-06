@@ -53,6 +53,28 @@
                 </div>
                 <!-- Folder tree rendered by renderSidebar() in main.js -->
                 <div id="fbTree"></div>
+
+                
+                <div class="fb-side-header">
+                    <span class="fb-side-title">Tags</span>
+                    <button id="fbNewTagBtn" class="fb-side-add" aria-label="New tag" title="New tag">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16m8-8H4"></path></svg>
+                    </button>
+                </div>
+
+                <!-- Create / edit tag form (swatches rendered by JS) -->
+                <form id="fbTagForm" class="fb-tag-form hidden">
+                    <input type="text" id="fbTagNameInput" class="fb-input" placeholder="Tag name" maxlength="60" autocomplete="off">
+                    <div id="fbTagColorPicker" class="fb-color-picker"></div>
+                    <div class="fb-tag-form-actions">
+                        <button type="submit" id="fbTagSubmit" class="fb-primary-btn">Create</button>
+                        <button type="button" id="fbTagCancel" class="fb-secondary-btn">Cancel</button>
+                    </div>
+                </form>
+
+                <!-- Tag rows rendered by renderTagSection() in main.js -->
+                <div id="fbTagList"></div>
+                <div id="fbTagEmpty" class="fb-side-empty hidden">No tags yet. Create one to group files and folders.</div>
             </nav>
         </aside>
 
@@ -348,6 +370,9 @@
          uploads -> viewer -> main. vendor-esm.js is a module script: it
          executes after the classics above but before DOMContentLoaded, so
          pdfjsLib/PhotoSwipe globals exist before init() runs. -->
+    <link rel="stylesheet" href="/js/wd-mentions.css">
+    <script src="/js/wd-links.js"></script>
+    <script src="/js/wd-mentions.js"></script>
     <script src="config/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/storage.js"></script>

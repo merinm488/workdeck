@@ -35,6 +35,12 @@ class SpreadsheetManager {
         this.legacyNoticeShown = false;
         this.darkModeOn = false;
 
+        // "@" typing in the cell editor (setupMentionTyping)
+        this.mentionSession = null;
+        this.editorCaret = null;        // keyboard-tracked caret offset
+        this.pendingMentions = [];      // mentions awaiting linkify-on-commit
+        this.mentionLinkifyTimer = null;
+
         // Default grid dimensions (kept from previous version)
         this.defaultRowCount = APP_CONFIG.spreadsheet.default.row;
         this.defaultColumnCount = APP_CONFIG.spreadsheet.default.column;
@@ -129,6 +135,19 @@ class SpreadsheetManager {
             console.warn('[SPREADSHEET] Sort preset not loaded - sort unavailable');
         }
 
+        // Hyperlinks (cell mentions)
+        if (typeof UniverPresetSheetsHyperLink !== 'undefined' &&
+            typeof UniverSheetsHyperLinkEnUS !== 'undefined') {
+            presets.push(UniverPresetSheetsHyperLink.UniverSheetsHyperLinkPreset({
+                urlHandler: {
+                    navigateToOtherWebsite: (url) => this.handleLinkClick(url)
+                }
+            }));
+            locales.push(UniverSheetsHyperLinkEnUS);
+        } else {
+            console.warn('[SPREADSHEET] Hyperlink preset not loaded - cell links unavailable');
+        }
+
         const { univerAPI } = createUniver({
             locale: LocaleType.EN_US,
             locales: { [LocaleType.EN_US]: mergeLocales(...locales) },
@@ -151,6 +170,394 @@ class SpreadsheetManager {
             this.fWorkbook = null;
         }
         this.stopChangeTracking();
+    }
+
+    /**
+     * Clicks on hyperlink cells land here (preset urlHandler). Workdeck
+     * hard links open in-tab; everything else opens a new tab.
+     */
+    handleLinkClick(url) {
+        if (window.WDLinks) {
+            const ref = WDLinks.parseHref(url);
+            if (ref) {
+                WDLinks.open(ref.app, ref.id);
+                return;
+            }
+        }
+        window.open(url, '_blank');
+    }
+
+    /** The active cell as an FRange (Facade), or null. */
+    getActiveRange() {
+        const fWorkbook = this.fWorkbook;
+        if (!fWorkbook) return null;
+        try {
+            const ws = fWorkbook.getActiveSheet();
+            const range = ws && typeof ws.getActiveRange === 'function' ? ws.getActiveRange() : null;
+            if (range) return range;
+            const sel = typeof fWorkbook.getSelection === 'function' ? fWorkbook.getSelection() : null;
+            return sel && typeof sel.getActiveRange === 'function' ? sel.getActiveRange() : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    setCellMention(mention) {
+        const range = this.getActiveRange();
+        if (!range || !window.WDLinks || !this.univerAPI) return false;
+        try {
+            // The hyper-link plugin stores links as a custom range inside the
+            // cell's rich text and renders/clicks them itself (routed through
+            // urlHandler -> handleLinkClick). Its command writes the display
+            // text AND the link in one go.
+            this.univerAPI.executeCommand('sheets.command.add-hyper-link', {
+                unitId: this.fWorkbook.getId(),
+                subUnitId: this.fWorkbook.getActiveSheet().getSheetId(),
+                link: {
+                    payload: window.location.origin + WDLinks.url(mention.app, mention.id),
+                    display: '@' + mention.name,
+                    row: range.getRow(),
+                    column: range.getColumn()
+                }
+            });
+            return true;
+        } catch (error) {
+            console.error('[SPREADSHEET] setCellMention failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * The active cell's mention target ({ app, id }) when it links to a
+     * Workdeck file, else null.
+     */
+    getActiveCellMention() {
+        const range = this.getActiveRange();
+        if (!range || !window.WDLinks) return null;
+        try {
+            const cell = typeof range.getValue === 'function' ? range.getValue() : null;
+            const urls = [];
+            if (cell && cell.p && cell.p.body && cell.p.body.customRanges) {
+                cell.p.body.customRanges.forEach(function (cr) {
+                    if (cr && cr.properties && cr.properties.url) urls.push(cr.properties.url);
+                });
+            }
+            if (cell && cell.hyperlink) {
+                urls.push(typeof cell.hyperlink === 'string' ? cell.hyperlink : cell.hyperlink.url);
+            }
+            for (var i = 0; i < urls.length; i++) {
+                const ref = WDLinks.parseHref(urls[i]);
+                if (ref) return ref;
+            }
+            return null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    // ================================================
+    // "@" typing in the cell editor
+    // ================================================
+
+    getEditorDoc() {
+        if (!this.univerAPI || !this.fWorkbook) return null;
+        try {
+            if (typeof this.fWorkbook.isCellEditing !== 'function' || !this.fWorkbook.isCellEditing()) return null;
+            return this.univerAPI.getUniverDoc('__INTERNAL_EDITOR__DOCS_NORMAL') || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /** Live text of the open cell editor (trailing paragraph break stripped). */
+    getEditorText() {
+        const doc = this.getEditorDoc();
+        if (!doc) return null;
+        try {
+            const body = doc.getSnapshot().body;
+            if (!body || typeof body.dataStream !== 'string') return null;
+            return body.dataStream.replace(/\r\n$/, '');
+        } catch (error) {
+            return null;
+        }
+    }
+
+    getEditorAnchor() {
+        try {
+            const range = this.getActiveRange();
+            if (!range) return null;
+            const snapshot = this.fWorkbook.getSnapshot();
+            const sheetSnap = snapshot && snapshot.sheets && snapshot.sheets[this.fWorkbook.getActiveSheet().getSheetId()];
+            const canvas = document.querySelector('canvas[id^="univer-sheet-main-canvas"]');
+            const box = canvas ? canvas.getBoundingClientRect()
+                : (this.container ? this.container.getBoundingClientRect() : null);
+            if (!sheetSnap || !box) return null;
+
+            const row = range.getRow();
+            const col = range.getColumn();
+            const zoom = sheetSnap.zoomRatio || 1;
+            const rowHeaderW = (sheetSnap.rowHeader && sheetSnap.rowHeader.width) || 46;
+            const colHeaderH = (sheetSnap.columnHeader && sheetSnap.columnHeader.height) || 20;
+
+            let x = rowHeaderW;
+            for (let c = 0; c < col; c++) {
+                const cfg = sheetSnap.columnData && sheetSnap.columnData[c];
+                if (cfg && cfg.hidden) continue;
+                x += (cfg && typeof cfg.width === 'number') ? cfg.width : (sheetSnap.defaultColumnWidth || 73);
+            }
+            let y = colHeaderH;
+            for (let r = 0; r < row; r++) {
+                const cfg = sheetSnap.rowData && sheetSnap.rowData[r];
+                if (cfg && cfg.hidden) continue;
+                y += (cfg && typeof cfg.height === 'number') ? cfg.height : (sheetSnap.defaultRowHeight || 19);
+            }
+
+            const left = box.left + (x - (sheetSnap.scrollLeft || 0)) * zoom;
+            const top = box.top + (y - (sheetSnap.scrollTop || 0)) * zoom;
+
+            let caretX = 0;
+            const text = this.getEditorText() || '';
+            const caret = this.editorCaret == null ? text.length : Math.min(this.editorCaret, text.length);
+            try {
+                const mctx = document.createElement('canvas').getContext('2d');
+                mctx.font = this.getEditorFont(range);
+                caretX = mctx.measureText(text.slice(0, caret)).width * zoom;
+            } catch (err) { /* anchor at the cell's left edge */ }
+
+            return {
+                left: left + caretX,
+                right: left + caretX,
+                top: top,
+                bottom: top + 18 * zoom
+            };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /** CSS font string for the cell being edited (defaults mirror Univer's). */
+    getEditorFont(range) {
+        try {
+            const family = range.getFontFamily() || 'Arial';
+            const size = range.getFontSize() || 14;
+            const style = range.getFontStyle();
+            const weight = range.getFontWeight();
+            return (style === 'italic' ? 'italic ' : '')
+                + (weight && weight !== 'normal' ? weight + ' ' : '')
+                + size + 'px ' + family;
+        } catch (error) {
+            return '14px Arial';
+        }
+    }
+
+    insertEditorMention(from, to, entry) {
+        const doc = this.getEditorDoc();
+        const range = this.getActiveRange();
+        if (!doc || !range || !window.WDLinks) return false;
+        const name = String(entry.name || '').replace(/[\r\n@]/g, ' ').trim() || 'Untitled';
+        try {
+            doc.insertText('@' + name, {
+                startOffset: from,
+                endOffset: to,
+                segmentId: '',
+                cursorOffset: from + name.length + 1
+            });
+        } catch (error) {
+            console.error('[SPREADSHEET] Mention insert failed:', error);
+            return false;
+        }
+        this.editorCaret = from + name.length + 1;
+        this.pendingMentions.push({
+            name: name,
+            url: window.location.origin + WDLinks.url(entry.app, entry.id),
+            row: range.getRow(),
+            column: range.getColumn()
+        });
+        return true;
+    }
+
+  
+    flushPendingMentions() {
+        if (!this.pendingMentions.length) return;
+        clearTimeout(this.mentionLinkifyTimer);
+        this.mentionLinkifyTimer = setTimeout(() => this.linkifyPendingMentions(), 300);
+    }
+
+    linkifyPendingMentions() {
+        const pending = this.pendingMentions;
+        this.pendingMentions = [];
+        if (!pending.length || !this.univerAPI || !this.fWorkbook) return;
+
+        pending.forEach((m) => {
+            try {
+                const ws = this.fWorkbook.getActiveSheet();
+                const cell = ws.getRange(m.row, m.column).getCellData();
+                if (!cell) return;
+
+                // Committed text: plain value or rich-text data stream.
+                let body = null;
+                let text = null;
+                if (cell.p && cell.p.body && typeof cell.p.body.dataStream === 'string') {
+                    body = JSON.parse(JSON.stringify(cell.p.body));
+                    text = body.dataStream;
+                } else if (typeof cell.v === 'string') {
+                    text = cell.v + '\r\n';
+                    body = { dataStream: text, textRuns: [] };
+                } else {
+                    return;
+                }
+                const plain = text.replace(/\r\n$/, '');
+                if (plain.indexOf('@' + m.name) === -1) return;   // e.g. edit was cancelled
+
+                const existing = (body.customRanges || []).filter((cr) => cr && cr.properties && cr.properties.url !== m.url);
+                const covered = (body.customRanges || []).some((cr) => cr && cr.properties && cr.properties.url === m.url);
+                if (!covered) {
+                    const escaped = m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const re = new RegExp('(^|\\s)@' + escaped + '(?=\\s|$)', 'g');
+                    let match;
+                    while ((match = re.exec(plain)) !== null) {
+                        const start = match.index + match[1].length;
+                        existing.push({
+                            startIndex: start,
+                            endIndex: start + m.name.length,   // inclusive, per Univer custom ranges
+                            rangeType: (typeof UniverCore !== 'undefined' && UniverCore.CustomRangeType)
+                                ? UniverCore.CustomRangeType.HYPERLINK : 0,
+                            rangeId: 'wdm_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8),
+                            properties: { url: m.url, refId: 'wdm_' + m.row + '_' + m.column }
+                        });
+                    }
+                }
+                if (!existing.length) return;
+
+                body.dataStream = plain + '\r\n';
+                if (!body.textRuns) body.textRuns = [];
+                if (!body.paragraphs || !body.paragraphs.length) {
+                    body.paragraphs = [{ startIndex: plain.length, paragraphStyle: { horizontalAlign: 0 } }];
+                }
+                body.sectionBreaks = [{ startIndex: plain.length + 1 }];
+                body.customDecorations = [];
+                body.customRanges = existing;
+
+                // `p` mirrors the exact shape the hyper-link plugin writes
+                // (a cell document snapshot), so rendering and click-through
+                // treat it natively.
+                const p = {
+                    id: 'd',
+                    documentStyle: {
+                        pageSize: { width: null, height: null },
+                        documentFlavor: 0,
+                        marginTop: 0,
+                        marginBottom: 2,
+                        marginRight: 2,
+                        marginLeft: 2,
+                        paragraphLineGapDefault: 0,
+                        renderConfig: { horizontalAlign: 0, verticalAlign: 0, centerAngle: 0, vertexAngle: 0, wrapStrategy: 0 }
+                    },
+                    body: body,
+                    drawings: {},
+                    drawingsOrder: []
+                };
+
+                const valueType = (typeof UniverCore !== 'undefined' && UniverCore.CellValueType)
+                    ? UniverCore.CellValueType.STRING : 1;
+                this.univerAPI.executeCommand('sheet.mutation.set-range-values', {
+                    unitId: this.fWorkbook.getId(),
+                    subUnitId: this.fWorkbook.getActiveSheet().getSheetId(),
+                    cellValue: {
+                        [m.row]: {
+                            [m.column]: { p: p, t: valueType }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.warn('[SPREADSHEET] Mention linkify failed:', error);
+            }
+        });
+    }
+
+    setupMentionTyping() {
+        if (!window.WDMentions || !window.WDLinks || this.mentionSession) return;
+        this.editorCaret = null;
+        this.pendingMentions = [];
+
+        this.mentionSession = WDMentions.createMentionSession({
+            isActive: () => !!this.getEditorDoc(),
+            getText: () => this.getEditorText() || '',
+            getCaret: () => this.editorCaret,
+            getAnchor: () => this.getEditorAnchor(),
+            excludeIds: () => this.currentSheetId ? [this.currentSheetId] : [],
+            onPick: (entry, range) => {
+                if (!this.insertEditorMention(range.from, range.to, entry)) {
+                    // Editor gone between keystroke and pick — nothing to do
+                }
+            }
+        });
+
+        this.mentionKeydown = (e) => {
+            if (!this.getEditorDoc()) return;
+            // Picker first: while it is open it eats Arrow/Enter/Tab/Escape,
+            // so the sheet never sees them (Escape must not cancel editing).
+            if (this.mentionSession.keydown(e)) {
+                this.syncMentionTrigger();
+                return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                this.flushPendingMentions();
+                this.mentionSession.close(false);
+            } else if (e.key === 'Escape') {
+                // Real cancel: Univer reverts the text, so drop the links.
+                this.pendingMentions = [];
+            } else {
+                this.trackCaretForKey(e);
+            }
+        };
+        this.mentionKeyup = () => this.syncMentionTrigger();
+        this.mentionPointerdown = (e) => {
+            if (!this.getEditorDoc()) return;
+            if (e.target && e.target.closest && e.target.closest('.wdm-pop')) return;
+            this.editorCaret = null;
+            this.flushPendingMentions();
+        };
+
+        window.addEventListener('keydown', this.mentionKeydown, true);
+        window.addEventListener('keyup', this.mentionKeyup, true);
+        window.addEventListener('pointerdown', this.mentionPointerdown, true);
+    }
+
+    /** Nudge the caret model for a key, then sync the picker. */
+    trackCaretForKey(e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const text = this.getEditorText();
+        if (text == null) return;
+        const caret = this.editorCaret == null ? text.length : this.editorCaret;
+        if (e.key.length === 1) this.editorCaret = caret + 1;
+        else if (e.key === 'Backspace') this.editorCaret = Math.max(0, caret - 1);
+        else if (e.key === 'ArrowLeft') this.editorCaret = Math.max(0, caret - 1);
+        else if (e.key === 'ArrowRight') this.editorCaret = Math.min(text.length, caret + 1);
+        else if (e.key === 'Home') this.editorCaret = 0;
+        else if (e.key === 'End') this.editorCaret = text.length;
+    }
+
+    syncMentionTrigger() {
+        if (!this.mentionSession) return;
+        const text = this.getEditorText();
+        if (text == null) {
+            this.mentionSession.close(false);
+            return;
+        }
+        if (this.editorCaret == null) this.editorCaret = text.length;
+        this.editorCaret = Math.max(0, Math.min(this.editorCaret, text.length));
+        this.mentionSession.sync();
+    }
+
+    /** Remove the "@" trigger listeners (manager teardown). */
+    teardownMentionTyping() {
+        if (this.mentionKeydown) window.removeEventListener('keydown', this.mentionKeydown, true);
+        if (this.mentionKeyup) window.removeEventListener('keyup', this.mentionKeyup, true);
+        if (this.mentionPointerdown) window.removeEventListener('pointerdown', this.mentionPointerdown, true);
+        if (this.mentionSession) this.mentionSession.close(false);
+        clearTimeout(this.mentionLinkifyTimer);
+        this.mentionKeydown = this.mentionKeyup = this.mentionPointerdown = this.mentionSession = null;
     }
 
     /**
@@ -1230,6 +1637,7 @@ class SpreadsheetManager {
      * Tear down Univer instance and references
      */
     destroy() {
+        this.teardownMentionTyping();
         this.disposeCurrentWorkbook();
         this.isInitialized = false;
         this.container = null;

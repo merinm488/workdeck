@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Opening… — Workdeck</title>
+    <meta name="robots" content="noindex">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/js/wd-links.js"></script>
+    <style>
+        :root {
+            color-scheme: dark;
+            --wd-bg: #0a0a0a;
+            --wd-card: #141414;
+            --wd-border: #2a2a2a;
+            --wd-text: #f5f5f5;
+            --wd-dim: #a3a3a3;
+            --wd-accent: #facc15;
+            --wd-danger: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--wd-bg);
+            color: var(--wd-text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 24px;
+        }
+        .card {
+            width: 100%;
+            max-width: 380px;
+            background: var(--wd-card);
+            border: 1px solid var(--wd-border);
+            border-radius: 14px;
+            padding: 28px 26px;
+            text-align: center;
+        }
+        .glyph {
+            width: 44px;
+            height: 44px;
+            margin: 0 auto 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: rgba(250, 204, 21, 0.12);
+            color: var(--wd-accent);
+        }
+        h1 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+        p { margin: 0 0 18px; font-size: 13px; line-height: 1.5; color: var(--wd-dim); word-break: break-all; }
+        .id-chip {
+            display: inline-block;
+            margin: 0 0 18px;
+            padding: 3px 9px;
+            border: 1px solid var(--wd-border);
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 12px;
+            color: var(--wd-dim);
+        }
+        a.btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: var(--wd-accent);
+            color: #0a0a0a;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .spinner {
+            width: 22px;
+            height: 22px;
+            margin: 0 auto 14px;
+            border: 2px solid var(--wd-border);
+            border-top-color: var(--wd-accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div id="stateOpening">
+            <div class="spinner"></div>
+            <h1>Opening file…</h1>
+        </div>
+        <div id="stateSignin" class="hidden">
+            <div class="glyph">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <h1>Sign in first</h1>
+            <p>This link points to a private file. Sign in on the Workdeck home page, then reopen it.</p>
+            <a class="btn" href="/">Go to Workdeck</a>
+        </div>
+        <div id="stateMissing" class="hidden">
+            <div class="glyph" style="color: var(--wd-danger); background: rgba(239, 68, 68, 0.12);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            </div>
+            <h1>File not found</h1>
+            <p>This link points to a file that doesn't exist (it may have been deleted), or it belongs to a different account.</p>
+            <span id="missingId" class="id-chip hidden"></span><br>
+            <a class="btn" href="/">Go to Workdeck</a>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        'use strict';
+        // /f/<id> is a server-internal rewrite: the browser URL carries the
+        // id in the PATH, not the query — parse both.
+        var loc = window.WDLinks ? WDLinks.parseLocation() : null;
+        var id = (loc && loc.id) || new URLSearchParams(window.location.search).get('id') || '';
+
+        function show(stateId) {
+            ['stateOpening', 'stateSignin', 'stateMissing'].forEach(function (s) {
+                document.getElementById(s).classList.toggle('hidden', s !== stateId);
+            });
+            if (stateId === 'stateMissing' && id) {
+                var chip = document.getElementById('missingId');
+                chip.textContent = id;
+                chip.classList.remove('hidden');
+            }
+        }
+
+        if (!id || !WDLinks.ID_RE.test(id)) {
+            show('stateMissing');
+            return;
+        }
+
+        var hash = WDLinks.sessionHash();
+        if (!hash) {
+            show('stateSignin');
+            return;
+        }
+
+        fetch('/api/workdeck?hash=' + encodeURIComponent(hash), { cache: 'no-store' })
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (result) {
+                var hit = result && result.success ? WDLinks.resolve(id, result.data) : null;
+                if (!hit) {
+                    show('stateMissing');
+                    return;
+                }
+                WDLinks.recordOpen(hit.app, id);
+                window.location.replace(hit.url);
+            })
+            .catch(function () { show('stateMissing'); });
+    })();
+    </script>
+</body>
+</html>

@@ -40,6 +40,12 @@
 
     <!-- Custom CSS (after the vendor sheets so app styles win the cascade) -->
     <link rel="stylesheet" href="styles.css">
+
+    <!-- Workdeck hard links + mentions. In <head> because the inline auth
+         guard below parses /forms/<id> via WDLinks. -->
+    <link rel="stylesheet" href="/js/wd-mentions.css">
+    <script src="/js/wd-links.js"></script>
+    <script src="/js/wd-mentions.js"></script>
 </head>
 <body>
     <!-- Top Navigation Bar -->
@@ -66,6 +72,12 @@
 
         <div class="top-nav-right">
             <div class="top-nav-actions">
+                <button id="mentionBtn" class="top-nav-btn" aria-label="Insert reference" title="Insert a reference to another file">
+                    <svg class="top-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                </button>
                 <button id="saveBtn" class="top-nav-btn" aria-label="Save Form" title="Save Form (Ctrl+S)">
                     <svg class="top-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
@@ -145,6 +157,13 @@
                             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                         </svg>
                         <span class="item-text">Share</span>
+                    </button>
+                    <button class="settings-dropdown-item" id="copyLinkBtn">
+                        <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                        <span class="item-text">Copy link</span>
                     </button>
                     <div class="settings-dropdown-divider"></div>
                     <button class="settings-dropdown-item text-red-600" id="deleteAccountBtn">
@@ -541,8 +560,10 @@
         (function() {
             const userHash = sessionStorage.getItem('forms_user_hash');
             const userKey = sessionStorage.getItem('forms_user_key');
-            const urlParams = new URLSearchParams(window.location.search);
-            const formId = urlParams.get('id');
+            // Hard link (/forms/<id>) or legacy ?id= — WDLinks parses both.
+            const loc = window.WDLinks ? WDLinks.parseLocation() : null;
+            const formId = (loc && loc.app === 'forms' && loc.id) ||
+                new URLSearchParams(window.location.search).get('id');
 
             if (!userHash || !userKey) {
                 window.location.href = '/';

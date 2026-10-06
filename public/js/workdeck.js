@@ -784,6 +784,11 @@ const MOVE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" s
     + '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />'
     + '</svg>';
 
+const LINK_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />'
+    + '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />'
+    + '</svg>';
+
 const CHECK_ICON = '<svg class="wd-move-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">'
     + '<polyline points="20 6 9 17 4 12"></polyline>'
     + '</svg>';
@@ -898,6 +903,7 @@ function buildCard(file) {
         + '<div class="wd-file-title">' + escapeHtml(file.name) + '</div>'
         + '<div class="wd-file-actions">'
         + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
+        + '<button class="wd-file-action-btn copylink" title="Copy link">' + LINK_ICON + '</button>'
         + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
         + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
         + '</div>'
@@ -920,6 +926,10 @@ function buildCard(file) {
     card.querySelector('.move').addEventListener('click', function (e) {
         e.stopPropagation();
         showMoveModal(file);
+    });
+    card.querySelector('.copylink').addEventListener('click', function (e) {
+        e.stopPropagation();
+        copyFileLink(file);
     });
     card.querySelector('.rename').addEventListener('click', function (e) {
         e.stopPropagation();
@@ -949,6 +959,7 @@ function buildFolderCard(folder) {
         + '<div class="wd-file-title">' + escapeHtml(folder.name) + '</div>'
         + '<div class="wd-file-actions">'
         + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
+        + '<button class="wd-file-action-btn copylink" title="Copy link">' + LINK_ICON + '</button>'
         + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
         + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
         + '</div>'
@@ -969,6 +980,10 @@ function buildFolderCard(folder) {
     card.querySelector('.move').addEventListener('click', function (e) {
         e.stopPropagation();
         showMoveModal(folder);
+    });
+    card.querySelector('.copylink').addEventListener('click', function (e) {
+        e.stopPropagation();
+        copyFileLink(folder);
     });
     card.querySelector('.rename').addEventListener('click', function (e) {
         e.stopPropagation();
@@ -1003,6 +1018,7 @@ function buildListRow(file) {
         + '<div class="wd-file-row-meta">' + formatRelativeDate(when) + '</div>'
         + '<div class="wd-file-actions">'
         + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
+        + '<button class="wd-file-action-btn copylink" title="Copy link">' + LINK_ICON + '</button>'
         + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
         + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
         + '</div>';
@@ -1013,6 +1029,10 @@ function buildListRow(file) {
     row.querySelector('.move').addEventListener('click', function (e) {
         e.stopPropagation();
         showMoveModal(file);
+    });
+    row.querySelector('.copylink').addEventListener('click', function (e) {
+        e.stopPropagation();
+        copyFileLink(file);
     });
     row.querySelector('.rename').addEventListener('click', function (e) {
         e.stopPropagation();
@@ -1047,6 +1067,7 @@ function buildFolderRow(folder) {
         + '<div class="wd-file-row-meta">' + formatRelativeDate(when) + '</div>'
         + '<div class="wd-file-actions">'
         + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
+        + '<button class="wd-file-action-btn copylink" title="Copy link">' + LINK_ICON + '</button>'
         + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
         + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
         + '</div>';
@@ -1057,6 +1078,10 @@ function buildFolderRow(folder) {
     row.querySelector('.move').addEventListener('click', function (e) {
         e.stopPropagation();
         showMoveModal(folder);
+    });
+    row.querySelector('.copylink').addEventListener('click', function (e) {
+        e.stopPropagation();
+        copyFileLink(folder);
     });
     row.querySelector('.rename').addEventListener('click', function (e) {
         e.stopPropagation();
@@ -1109,18 +1134,39 @@ function openInNewTab(url) {
  * (?id=); folder cards open Filebox inside that folder (?folder=).
  */
 function openFile(file) {
-    let url;
-    if (file.kind === 'folder') {
-        url = '/filebox/?folder=' + encodeURIComponent(file.id);
-    } else if (file.app === 'filebox') {
-        url = '/filebox/?id=' + encodeURIComponent(file.id);
-    } else {
-        const app = getApp(file.app);
-        url = app.route + '?' + app.editorParam + '=' + encodeURIComponent(file.id);
-    }
+    // Canonical hard link (/sheets/<id>, /filebox/?folder=<id>, ...).
+    const url = file.kind === 'folder'
+        ? WDLinks.url('filebox', file.id, { folder: true })
+        : WDLinks.url(file.app, file.id);
     openInNewTab(url);
     api('recordOpen', { fileId: file.id, app: file.app })
         .catch(function (err) { console.error('[WORKDECK] recordOpen failed:', err); });
+}
+
+/** Copy a file's canonical hard link (absolute URL) to the clipboard. */
+function copyFileLink(file) {
+    const path = file.kind === 'folder'
+        ? WDLinks.url('filebox', file.id, { folder: true })
+        : WDLinks.url(file.app, file.id);
+    const absolute = window.location.origin + path;
+    const done = ok => showNotification(ok ? 'Link copied' : 'Could not copy link', ok ? 'success' : 'error');
+    const fallbackCopy = function () {
+        const ta = document.createElement('textarea');
+        ta.value = absolute;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+        document.body.removeChild(ta);
+        done(ok);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(absolute).then(function () { done(true); }, fallbackCopy);
+    } else {
+        fallbackCopy();
+    }
 }
 
 /**
@@ -1131,7 +1177,8 @@ function openFile(file) {
 async function createFile(appId) {
     const app = getApp(appId);
     if (!app.create) {
-        openInNewTab(app.route + '?upload=1');
+        const tagQs = state.activeTag ? '&tag=' + encodeURIComponent(state.activeTag) : '';
+        openInNewTab(app.route + '?upload=1' + tagQs);
         return;
     }
     showLoading('Creating ' + app.label.toLowerCase() + '...');
@@ -1142,7 +1189,7 @@ async function createFile(appId) {
         const data = await api(app.create.action, payload);
         const file = app.create.pickNewest(data);
         if (!file) throw new Error('File creation failed');
-        openInNewTab(app.route + '?' + app.editorParam + '=' + encodeURIComponent(file.id) + '&edit=1');
+        openInNewTab(WDLinks.url(file.app, file.id, { edit: true }));
         hideLoading();
         loadUserData();  // show the new file in the list right away
     } catch (error) {
@@ -1204,16 +1251,27 @@ async function confirmRename() {
 
 function showDeleteModal(file) {
     state.fileToDelete = file;
+    let text;
     if (file.kind === 'folder') {
         // Destructive cascade: everything inside goes with it.
         const count = folderDeleteCount(file.id);
-        $('deleteModalText').innerHTML = 'Delete "<span class="wd-strong">' + escapeHtml(file.name)
+        text = 'Delete "<span class="wd-strong">' + escapeHtml(file.name)
             + '</span>" and its ' + count + (count === 1 ? ' item' : ' items')
             + '? This cannot be undone.';
     } else {
-        $('deleteModalText').innerHTML = 'Are you sure you want to delete "<span class="wd-strong">'
+        text = 'Are you sure you want to delete "<span class="wd-strong">'
             + escapeHtml(file.name) + '</span>"? This cannot be undone.';
+        // Warn when other files reference this one (@mentions will break).
+        if (window.WDMentions) {
+            const backlinks = WDMentions.findBacklinks(file.id, state);
+            if (backlinks.length) {
+                text += '<div class="wd-delete-backlinks">' + backlinks.length
+                    + (backlinks.length === 1 ? ' file links' : ' files link')
+                    + ' to this — its mentions will show as unavailable.</div>';
+            }
+        }
     }
+    $('deleteModalText').innerHTML = text;
     $('deleteModal').classList.add('active');
 }
 

@@ -77,15 +77,24 @@
     <script src="https://unpkg.com/@univerjs/preset-sheets-core@0.25.1/lib/umd/index.js"></script>
     <script src="https://unpkg.com/@univerjs/preset-sheets-filter@0.25.1/lib/umd/index.js"></script>
     <script src="https://unpkg.com/@univerjs/preset-sheets-sort@0.25.1/lib/umd/index.js"></script>
+    <script src="https://unpkg.com/@univerjs/preset-sheets-hyper-link@0.25.1/lib/umd/index.js"></script>
     <script src="https://unpkg.com/@univerjs/preset-sheets-core@0.25.1/lib/umd/locales/en-US.js"></script>
     <script src="https://unpkg.com/@univerjs/preset-sheets-filter@0.25.1/lib/umd/locales/en-US.js"></script>
     <script src="https://unpkg.com/@univerjs/preset-sheets-sort@0.25.1/lib/umd/locales/en-US.js"></script>
+    <script src="https://unpkg.com/@univerjs/preset-sheets-hyper-link@0.25.1/lib/umd/locales/en-US.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/@univerjs/preset-sheets-core@0.25.1/lib/index.css">
     <link rel="stylesheet" href="https://unpkg.com/@univerjs/presets@0.25.1/lib/styles/preset-sheets-filter.css">
     <link rel="stylesheet" href="https://unpkg.com/@univerjs/presets@0.25.1/lib/styles/preset-sheets-sort.css">
+    <link rel="stylesheet" href="https://unpkg.com/@univerjs/preset-sheets-hyper-link@0.25.1/lib/index.css">
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="styles.css">
+
+    <!-- Workdeck hard links + mentions. In <head> because the inline auth
+         guard below parses /sheets/<id> via WDLinks. -->
+    <link rel="stylesheet" href="/js/wd-mentions.css">
+    <script src="/js/wd-links.js"></script>
+    <script src="/js/wd-mentions.js"></script>
 </head>
 <body>
     <!-- Top Navigation Bar -->
@@ -101,6 +110,12 @@
 
         <div class="top-nav-right">
             <div class="top-nav-actions">
+                <button id="mentionBtn" class="top-nav-btn" aria-label="Link a file" title="Link a file in the selected cell (or type @ in a cell)">
+                    <svg class="top-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                </button>
                 <button id="saveBtn" class="top-nav-btn" aria-label="Save Spreadsheet" title="Save Spreadsheet (Ctrl+S)">
                     <svg class="top-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
@@ -211,6 +226,8 @@
     <!-- Status footer: active cell, used range, sheet count
          (app.js: updateSheetFooter) -->
     <footer class="app-footer">
+        <button id="mentionHint" class="mention-hint hidden" type="button"
+                title="Open this linked file"></button>
         <span id="sheetsFooterStats" class="app-footer-stats"></span>
     </footer>
 
@@ -342,8 +359,10 @@
         (function() {
             const userHash = sessionStorage.getItem('sheets_user_hash');
             const userKey = sessionStorage.getItem('sheets_user_key');
-            const urlParams = new URLSearchParams(window.location.search);
-            const spreadsheetId = urlParams.get('id');
+            // Hard link (/sheets/<id>) or legacy ?id= — WDLinks parses both.
+            const loc = window.WDLinks ? WDLinks.parseLocation() : null;
+            const spreadsheetId = (loc && loc.app === 'sheets' && loc.id) ||
+                new URLSearchParams(window.location.search).get('id');
 
             if (!userHash || !userKey) {
                 // No session found, redirect to login

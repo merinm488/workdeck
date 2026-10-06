@@ -124,10 +124,11 @@ export function SharedDocView({ doc, sharedAt, onClose }) {
             <span>Updated {formatDate(doc.updatedAt)}</span>
           </div>
 
-          {/* Content */}
+          {/* Content. Mention chips render inert on shares — the targets
+              are private to the owner's account. */}
           <div className="prose prose-sm sm:prose dark:prose-invert max-w-none">
             {doc.contentType === 'richtext' || doc.contentType === 'markdown' ? (
-              <MarkdownPreview content={docContent} />
+              <MarkdownPreview content={docContent} inertLinks={true} />
             ) : (
               <pre className="whitespace-pre-wrap font-sans text-gray-700 dark:text-gray-300">
                 {doc.content || 'No content'}

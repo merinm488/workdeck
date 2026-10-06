@@ -313,13 +313,18 @@ export default async function handler(req, res) {
         }
 
         // ---- Projects (tags) ----
+        // origin marks where a tag was born. 'filebox' tags also appear in
+        // Workdeck's list, but Workdeck-created tags (no origin) never show
+        // up in Filebox's sidebar — a one-way sync.
         case 'createTag': {
           if (!Array.isArray(userData.tags)) userData.tags = [];
-          userData.tags.push({
+          const tag = {
             id: generateId(),
             name: data?.name || 'New Project',
             color: data?.color || '#FACC15'
-          });
+          };
+          if (data?.origin === 'filebox') tag.origin = 'filebox';
+          userData.tags.push(tag);
           break;
         }
 
