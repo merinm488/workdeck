@@ -1433,12 +1433,10 @@ function showDeleteProjectModal(tag) {
     // Mixed semantics, stated explicitly: docs/sheets/forms/slides/draws
     // carrying the tag are deleted; Filebox items only lose the tag.
     const files = getAllFiles();
-    const doomedCount = files.filter(function (file) { return file.tagId === tag.id; }).length;
     const fileboxCount = files.filter(function (file) {
         return isMultiTagItem(file) && file.tags.includes(tag.id);
     }).length;
     $('deleteProjectName').textContent = tag.name;
-    $('deleteProjectCount').textContent = doomedCount + (doomedCount === 1 ? ' file' : ' files');
     $('deleteProjectFileboxNote').classList.toggle('hidden', fileboxCount === 0);
     $('deleteProjectFileboxCount').textContent = fileboxCount + (fileboxCount === 1 ? ' item' : ' items');
     $('deleteProjectModal').classList.add('active');

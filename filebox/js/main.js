@@ -169,10 +169,12 @@ function getTag(tagId) {
 
 
 function fileboxTags() {
-    return state.tags.filter(function (t) { return t.origin === 'filebox'; });
+    return state.tags.filter(function (t) {
+        return t.origin === 'filebox' || tagItemCount(t.id) > 0;
+    });
 }
 
-/** Filebox items (files + folders, any depth) carrying a tag. */
+/** Files items (files + folders, any depth) carrying a tag. */
 function tagItemCount(tagId) {
     return state.files.filter(function (f) { return (f.tags || []).includes(tagId); }).length
         + state.folders.filter(function (f) { return (f.tags || []).includes(tagId); }).length;
@@ -452,8 +454,8 @@ function renderSidebar() {
 
 /**
  * Sidebar tags — the same system as Workdeck's (dot + name + count, click
- * to filter, drag a file on to tag it, edit/delete on hover), but only
- * Filebox-born tags list here.
+ * to filter, drag a file on to tag it, edit/delete on hover). Lists
+ * Filebox-born tags plus Workdeck-created tags that are in use here.
  */
 function renderTagSection() {
     const list = $('fbTagList');
@@ -1331,8 +1333,8 @@ function openTagsModal(record, kind) {
 function renderTagChecks() {
     const container = $('fbTagChecks');
     container.innerHTML = '';
-    // Same one-way pool as the sidebar: Workdeck-created tags don't offer
-    // themselves here (any already on the record are preserved on save).
+    // Same pool as the sidebar: Filebox-born tags plus Workdeck tags
+    // already in use here
     const pool = fileboxTags();
 
     if (!pool.length) {
