@@ -1471,6 +1471,7 @@ html.fb-deep-boot .fb-app {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 13px;
     word-break: break-all;
+    text-align: center;
 }
 
 .fb-key-copy-btn {
