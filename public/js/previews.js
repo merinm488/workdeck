@@ -445,55 +445,10 @@
     // ================================================
 
     function frameSrcdoc(kind) {
-        return '<!DOCTYPE html><html><head>'
-            + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">'
-            + '<script src="' + FABRIC_CDN[kind] + '"><\/script></head><body>'
-            + '<script>\n'
-            + 'async function render(job) {\n'
-            + '  try { await document.fonts.load("400 20px Inter"); await document.fonts.load("700 20px Inter"); } catch (e) {}\n'
-            + '  const el = document.createElement("canvas");\n'
-            + '  if (job.kind === "slides") {\n'
-            + '    const canvas = new fabric.StaticCanvas(el, { width: job.w, height: job.h });\n'
-            + '    await canvas.loadFromJSON({ objects: job.objects || [] });\n'
-            + '    canvas.backgroundColor = job.background || "#ffffff";\n'
-            + '    canvas.renderAll();\n'
-            + '    const multiplier = Math.max(0.3, Math.min(2, ((job.outW || 600) * (job.dpr || 1)) / job.w));\n'
-            + '    return canvas.toDataURL({ format: "png", multiplier: multiplier });\n'
-            + '  }\n'
-            + '  const outW = job.outW || 300;\n'
-            + '  const outH = Math.round(outW * 0.625);\n'
-            + '  const canvas = new fabric.StaticCanvas(el, { width: outW, height: outH });\n'
-            + '  await canvas.loadFromJSON({ objects: job.objects || [] });\n'
-            + '  canvas.backgroundColor = job.background || "#ffffff";\n'
-            + '  canvas.renderAll();\n'
-            + '  const objs = canvas.getObjects();\n'
-            + '  if (objs.length) {\n'
-            + '    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;\n'
-            + '    objs.forEach(function (o) {\n'
-            + '      const r = o.getBoundingRect();\n'
-            + '      minX = Math.min(minX, r.left); minY = Math.min(minY, r.top);\n'
-            + '      maxX = Math.max(maxX, r.left + r.width); maxY = Math.max(maxY, r.top + r.height);\n'
-            + '    });\n'
-            + '    const bw = Math.max(maxX - minX, 1), bh = Math.max(maxY - minY, 1);\n'
-            + '    const scale = Math.min((outW * 0.9) / bw, (outH * 0.9) / bh, 2);\n'
-            + '    canvas.setViewportTransform([scale, 0, 0, scale,\n'
-            + '      outW / 2 - (minX + bw / 2) * scale, outH / 2 - (minY + bh / 2) * scale]);\n'
-            + '    canvas.renderAll();\n'
-            + '  }\n'
-            + '  return canvas.toDataURL({ format: "png", multiplier: Math.max(1, Math.min(3, job.dpr || 1)) });\n'
-            + '}\n'
-            + 'window.addEventListener("message", async function (e) {\n'
-            + '  const data = e.data || {};\n'
-            + '  if (!data.jobId) return;\n'
-            + '  try {\n'
-            + '    const dataUrl = await render(data.job);\n'
-            + '    parent.postMessage({ jobId: data.jobId, dataUrl: dataUrl }, "*");\n'
-            + '  } catch (err) {\n'
-            + '    parent.postMessage({ jobId: data.jobId, error: String(err) }, "*");\n'
-            + '  }\n'
-            + '});\n'
-            + 'parent.postMessage({ previewReady: true, kind: "' + kind + '" }, "*");\n'
-            + '<\/script></body></html>';
+        const doc = document.getElementById('wdPreviewFrameDoc').value;
+        return doc
+            .replace('__FABRIC_SRC__', FABRIC_CDN[kind])
+            .replace('__KIND__', kind);
     }
 
     function ensureFrame(kind) {

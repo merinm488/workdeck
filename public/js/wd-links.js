@@ -120,16 +120,7 @@
 
     /** Icon as SVG markup. The docs app embeds this string directly. */
     function icon(appId, size) {
-        var s = size || 16;
-        var body = iconParts(appId).map(function (part) {
-            var attrs = Object.keys(part[1]).map(function (name) {
-                return ' ' + name + '="' + part[1][name] + '"';
-            }).join('');
-            return '<' + part[0] + attrs + '/>';
-        }).join('');
-        return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" '
-            + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-            + body + '</svg>';
+        return iconNode(appId, size).outerHTML;
     }
 
     function isValidId(id) {

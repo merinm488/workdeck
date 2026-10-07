@@ -698,6 +698,66 @@
         </div>
     </template>
 
+    <!-- Offscreen fabric frame doc (verbatim srcdoc text) — previews.js
+         frameSrcdoc() swaps __FABRIC_SRC__ / __KIND__ -->
+    <textarea id="wdPreviewFrameDoc" hidden>
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <script src="__FABRIC_SRC__"></script>
+</head>
+<body>
+    <script>
+async function render(job) {
+  try { await document.fonts.load("400 20px Inter"); await document.fonts.load("700 20px Inter"); } catch (e) {}
+  const el = document.createElement("canvas");
+  if (job.kind === "slides") {
+    const canvas = new fabric.StaticCanvas(el, { width: job.w, height: job.h });
+    await canvas.loadFromJSON({ objects: job.objects || [] });
+    canvas.backgroundColor = job.background || "#ffffff";
+    canvas.renderAll();
+    const multiplier = Math.max(0.3, Math.min(2, ((job.outW || 600) * (job.dpr || 1)) / job.w));
+    return canvas.toDataURL({ format: "png", multiplier: multiplier });
+  }
+  const outW = job.outW || 300;
+  const outH = Math.round(outW * 0.625);
+  const canvas = new fabric.StaticCanvas(el, { width: outW, height: outH });
+  await canvas.loadFromJSON({ objects: job.objects || [] });
+  canvas.backgroundColor = job.background || "#ffffff";
+  canvas.renderAll();
+  const objs = canvas.getObjects();
+  if (objs.length) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    objs.forEach(function (o) {
+      const r = o.getBoundingRect();
+      minX = Math.min(minX, r.left); minY = Math.min(minY, r.top);
+      maxX = Math.max(maxX, r.left + r.width); maxY = Math.max(maxY, r.top + r.height);
+    });
+    const bw = Math.max(maxX - minX, 1), bh = Math.max(maxY - minY, 1);
+    const scale = Math.min((outW * 0.9) / bw, (outH * 0.9) / bh, 2);
+    canvas.setViewportTransform([scale, 0, 0, scale,
+      outW / 2 - (minX + bw / 2) * scale, outH / 2 - (minY + bh / 2) * scale]);
+    canvas.renderAll();
+  }
+  return canvas.toDataURL({ format: "png", multiplier: Math.max(1, Math.min(3, job.dpr || 1)) });
+}
+window.addEventListener("message", async function (e) {
+  const data = e.data || {};
+  if (!data.jobId) return;
+  try {
+    const dataUrl = await render(data.job);
+    parent.postMessage({ jobId: data.jobId, dataUrl: dataUrl }, "*");
+  } catch (err) {
+    parent.postMessage({ jobId: data.jobId, error: String(err) }, "*");
+  }
+});
+parent.postMessage({ previewReady: true, kind: "__KIND__" }, "*");
+    </script>
+</body>
+</html>
+    </textarea>
+
     <!-- Scripts -->
     <link rel="stylesheet" href="/js/wd-mentions.css">
     <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
