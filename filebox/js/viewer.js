@@ -351,6 +351,8 @@ class FileboxViewer {
                 XLSX.utils.sheet_to_html(book.Sheets[name]),
                 { USE_PROFILES: { html: true } }
             );
+            const table = scroller.querySelector('table');
+            if (table) table.className = 'fb-sheet-table';
         }
 
         if (book.SheetNames.length > 1) {
