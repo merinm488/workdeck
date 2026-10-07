@@ -126,6 +126,26 @@
 
     <!-- Univer JS is loaded in <head> (react/rxjs must precede presets) -->
 
+    <!-- Legacy-format notice (shared.js: showLegacyNotice) -->
+    <template id="legacyNoticeTemplate">
+        <div class="legacy-notice">
+            <div class="legacy-notice-card">
+                <div class="legacy-notice-icon">📊</div>
+                <h2>Created with an older version of Sheets</h2>
+                <p>This shared spreadsheet was made with the previous Sheets engine and can no longer be displayed here.</p>
+                <p class="legacy-banner">The owner's data is safe and untouched.</p>
+            </div>
+        </div>
+    </template>
+
+    <!-- Fatal: spreadsheet library failed to load (shared.js entry point) -->
+    <template id="univerFailTemplate">
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
+            <h2>Failed to load spreadsheet library</h2>
+            <p>Please check your internet connection and refresh the page.</p>
+        </div>
+    </template>
+
     <!-- Custom JavaScript -->
     <script src="config/config.js"></script>
     <script src="js/themes.js"></script>

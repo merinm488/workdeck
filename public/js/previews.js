@@ -40,12 +40,6 @@
     // Small helpers
     // ================================================
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text == null ? '' : String(text);
-        return div.innerHTML;
-    }
-
     function pixelRatio() {
         return Math.min(window.devicePixelRatio || 1, 2);
     }
@@ -60,82 +54,119 @@
     }
 
     function setImage(page, dataUrl) {
-        page.innerHTML = '<img class="wd-preview-img" alt="" src="' + dataUrl + '">';
+        const img = document.createElement('img');
+        img.className = 'wd-preview-img';
+        img.alt = '';
+        img.src = dataUrl;
+        page.replaceChildren(img);
     }
 
     // ================================================
     // Markdown (small subset, enough for a thumbnail)
     // ================================================
 
-    function inlineMd(escaped) {
-        return escaped
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-            .replace(/(^|\W)\*([^*\n]+)\*(?=\W|$)/g, '$1<em>$2</em>')
-            .replace(/\[([^\]]+)\]\([^)]*\)/g, '<span class="wd-md-link">$1</span>');
+    /** Inline `code`, **bold**, *em*, [link](url) — that precedence. */
+    function appendInline(parent, text) {
+        const re = /`([^`]+)`|\*\*([^*]+)\*\*|(^|\W)\*([^*\n]+)\*(?=\W|$)|\[([^\]]+)\]\([^)]*\)/g;
+        let last = 0;
+        let m;
+        while ((m = re.exec(text))) {
+            if (m.index > last) parent.append(text.slice(last, m.index));
+            if (m[1] !== undefined) {
+                const code = document.createElement('code');
+                code.textContent = m[1];
+                parent.append(code);
+            } else if (m[2] !== undefined) {
+                const strong = document.createElement('strong');
+                strong.textContent = m[2];
+                parent.append(strong);
+            } else if (m[4] !== undefined) {
+                if (m[3]) parent.append(m[3]);
+                const em = document.createElement('em');
+                em.textContent = m[4];
+                parent.append(em);
+            } else if (m[5] !== undefined) {
+                const link = document.createElement('span');
+                link.className = 'wd-md-link';
+                link.textContent = m[5];
+                parent.append(link);
+            }
+            last = re.lastIndex;
+        }
+        if (last < text.length) parent.append(text.slice(last));
     }
 
-    function markdownToHtml(md) {
+    function appendCodeBlock(frag, lines) {
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.textContent = lines.join('\n');
+        pre.append(code);
+        frag.append(pre);
+    }
+
+    function markdownToFragment(md) {
+        const frag = document.createDocumentFragment();
         const lines = String(md).replace(/\r\n?/g, '\n').split('\n');
-        const out = [];
         let inCode = false;
         let codeBuf = [];
-        let listMode = null;
-
-        function closeList() {
-            if (listMode) {
-                out.push('</' + listMode + '>');
-                listMode = null;
-            }
-        }
+        let listEl = null;
 
         lines.forEach(function (line) {
             if (/^\s*```/.test(line)) {
                 if (inCode) {
-                    out.push('<pre><code>' + codeBuf.join('\n') + '</code></pre>');
+                    appendCodeBlock(frag, codeBuf);
                     codeBuf = [];
                     inCode = false;
                 } else {
-                    closeList();
+                    listEl = null;
                     inCode = true;
                 }
                 return;
             }
             if (inCode) {
-                codeBuf.push(escapeHtml(line));
+                codeBuf.push(line);
                 return;
             }
             const t = line.trim();
-            if (!t) { closeList(); return; }
+            if (!t) { listEl = null; return; }
             const h = t.match(/^(#{1,6})\s+(.*)/);
             if (h) {
-                closeList();
-                const lvl = Math.min(h[1].length, 3);
-                out.push('<h' + lvl + '>' + inlineMd(escapeHtml(h[2])) + '</h' + lvl + '>');
+                listEl = null;
+                const heading = document.createElement('h' + Math.min(h[1].length, 3));
+                appendInline(heading, h[2]);
+                frag.append(heading);
                 return;
             }
-            if (/^(-{3,}|\*{3,})$/.test(t)) { closeList(); out.push('<hr>'); return; }
+            if (/^(-{3,}|\*{3,})$/.test(t)) { listEl = null; frag.append(document.createElement('hr')); return; }
             const q = t.match(/^>\s?(.*)/);
             if (q) {
-                closeList();
-                out.push('<blockquote>' + inlineMd(escapeHtml(q[1])) + '</blockquote>');
+                listEl = null;
+                const quote = document.createElement('blockquote');
+                appendInline(quote, q[1]);
+                frag.append(quote);
                 return;
             }
             const ul = t.match(/^[-*+]\s+(.*)/);
             const ol = t.match(/^(\d+)[.)]\s+(.*)/);
             if (ul || ol) {
                 const mode = ul ? 'ul' : 'ol';
-                if (listMode !== mode) { closeList(); out.push('<' + mode + '>'); listMode = mode; }
-                out.push('<li>' + inlineMd(escapeHtml(ul ? ul[1] : ol[2])) + '</li>');
+                if (!listEl || listEl.tagName.toLowerCase() !== mode) {
+                    listEl = document.createElement(mode);
+                    frag.append(listEl);
+                }
+                const li = document.createElement('li');
+                appendInline(li, ul ? ul[1] : ol[2]);
+                listEl.append(li);
                 return;
             }
-            closeList();
-            out.push('<p>' + inlineMd(escapeHtml(t)) + '</p>');
+            listEl = null;
+            const p = document.createElement('p');
+            appendInline(p, t);
+            frag.append(p);
         });
 
-        if (inCode && codeBuf.length) out.push('<pre><code>' + codeBuf.join('\n') + '</code></pre>');
-        closeList();
-        return out.join('');
+        if (inCode && codeBuf.length) appendCodeBlock(frag, codeBuf);
+        return frag;
     }
 
     // ================================================
@@ -153,16 +184,31 @@
         inner.style.transform = 'scale(' + (boxW / virtualWidth) + ')';
     }
 
-    function markdownBody(content) {
+    function sanitizeFragment(html) {
+        const tpl = document.createElement('template');
+        tpl.innerHTML = html;
+        tpl.content.querySelectorAll('script,iframe,object,embed,link,style,meta').forEach(function (el) {
+            el.remove();
+        });
+        tpl.content.querySelectorAll('*').forEach(function (el) {
+            Array.from(el.attributes).forEach(function (attr) {
+                const name = attr.name.toLowerCase();
+                if (name.indexOf('on') === 0) el.removeAttribute(attr.name);
+                else if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(attr.value)) {
+                    el.removeAttribute(attr.name);
+                }
+            });
+        });
+        return tpl.content;
+    }
+
+    function markdownFragment(content) {
         try {
             if (window.marked && typeof window.marked.parse === 'function') {
-                return window.marked.parse(content)
-                    .replace(/<script[\s\S]*?<\/script>/gi, '')
-                    .replace(/\son\w+="[^"]*"/gi, '')
-                    .replace(/\son\w+='[^']*'/gi, '');
+                return sanitizeFragment(window.marked.parse(content));
             }
         } catch (err) { /* fall through */ }
-        return markdownToHtml(content);
+        return markdownToFragment(content);
     }
 
     function renderDocs(page, file) {
@@ -171,9 +217,11 @@
         if (!content) return;
 
         const isMd = raw.contentType === 'markdown';
-        const body = isMd ? markdownBody(content) : escapeHtml(content);
-        page.innerHTML = '<div class="wd-preview-doc' + (isMd ? ' wd-preview-md' : ' wd-preview-plain') + '">'
-            + body + '</div>';
+        const doc = document.createElement('div');
+        doc.className = 'wd-preview-doc' + (isMd ? ' wd-preview-md' : ' wd-preview-plain');
+        if (isMd) doc.append(markdownFragment(content));
+        else doc.textContent = content;
+        page.replaceChildren(doc);
 
         registerScaledPage(page.firstChild, VIRTUAL_WIDTH.docs);
     }
@@ -194,30 +242,52 @@
         });
     }
 
-    function formRowHtml(c) {
-        const label = escapeHtml(String(c.label || c.title || c.content || '').replace(/<[^>]*>/g, ''));
+    function formEl(className, text) {
+        const el = document.createElement('div');
+        el.className = className;
+        if (text !== undefined) el.textContent = text;
+        return el;
+    }
+
+    function appendFormRow(parent, c) {
+        const label = String(c.label || c.title || c.content || '').replace(/<[^>]*>/g, '');
         switch (c.type) {
             case 'header':
-                return '<div class="wd-form-heading">' + label + '</div>';
+                parent.append(formEl('wd-form-heading', label));
+                return;
             case 'paragraph':
-                return '<div class="wd-form-text">' + label + '</div>';
+                parent.append(formEl('wd-form-text', label));
+                return;
             case 'button':
-                return '<div class="wd-form-btn">' + (label || 'Submit') + '</div>';
+                parent.append(formEl('wd-form-btn', label || 'Submit'));
+                return;
             case 'checkbox':
-            case 'radio':
-                return '<div class="wd-form-check"><span class="wd-form-box"></span>' + label + '</div>';
-            case 'select':
-                return '<div class="wd-form-field"><div class="wd-form-label">' + label + '</div>'
-                    + '<div class="wd-form-input wd-form-select">▾</div></div>';
-            case 'textarea':
-                return '<div class="wd-form-field"><div class="wd-form-label">' + label + '</div>'
-                    + '<div class="wd-form-input wd-form-area"></div></div>';
+            case 'radio': {
+                const check = formEl('wd-form-check');
+                check.append(formEl('wd-form-box'), label);
+                parent.append(check);
+                return;
+            }
+            case 'select': {
+                const field = formEl('wd-form-field');
+                field.append(formEl('wd-form-label', label), formEl('wd-form-input wd-form-select', '▾'));
+                parent.append(field);
+                return;
+            }
+            case 'textarea': {
+                const field = formEl('wd-form-field');
+                field.append(formEl('wd-form-label', label), formEl('wd-form-input wd-form-area'));
+                parent.append(field);
+                return;
+            }
             case 'hidden':
-                return '';
-            default:
-                if (!label) return '';
-                return '<div class="wd-form-field"><div class="wd-form-label">' + label + '</div>'
-                    + '<div class="wd-form-input"></div></div>';
+                return;
+            default: {
+                if (!label) return;
+                const field = formEl('wd-form-field');
+                field.append(formEl('wd-form-label', label), formEl('wd-form-input'));
+                parent.append(field);
+            }
         }
     }
 
@@ -225,9 +295,11 @@
         const components = (file.raw && file.raw.components) || [];
         const flat = [];
         flattenFormComponents(components, flat);
-        const rows = flat.map(formRowHtml).filter(Boolean);
-        if (!rows.length) return;
-        page.innerHTML = '<div class="wd-preview-form">' + rows.join('') + '</div>';
+        if (!flat.length) return;
+        const wrap = formEl('wd-preview-form');
+        flat.forEach(function (c) { appendFormRow(wrap, c); });
+        if (!wrap.children.length) return;
+        page.replaceChildren(wrap);
         registerScaledPage(page.firstChild, VIRTUAL_WIDTH.forms);
     }
 
@@ -563,9 +635,13 @@
 
     function renderFilebox(page, file) {
         const raw = file.raw || {};
-        page.innerHTML = '<div class="wd-preview-filebox-tile">'
-            + '<span class="wd-preview-filebox-ext">' + escapeHtml(fileExtension(raw.name || file.name)) + '</span>'
-            + '</div>';
+        const tile = document.createElement('div');
+        tile.className = 'wd-preview-filebox-tile';
+        const ext = document.createElement('span');
+        ext.className = 'wd-preview-filebox-ext';
+        ext.textContent = fileExtension(raw.name || file.name);
+        tile.append(ext);
+        page.replaceChildren(tile);
     }
 
     // ================================================

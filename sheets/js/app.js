@@ -198,11 +198,12 @@ class SheetsApp {
         WDMentions.getUnifiedDoc().then((data) => {
             const hit = WDLinks.resolve(ref.id, data);
             const name = hit ? hit.name : 'File no longer exists';
-            hint.innerHTML = '<span class="wdm-app-icon wdm-app-' + ref.app + '">'
-                + WDLinks.icon(ref.app, 13) + '</span>'
-                + '<span class="mention-hint-name"></span>'
-                + '<span class="mention-hint-open">Open</span>';
-            hint.querySelector('.mention-hint-name').textContent = name;
+            const frag = document.getElementById('mentionHintTemplate').content.cloneNode(true);
+            const iconSpan = frag.querySelector('.wdm-app-icon');
+            iconSpan.classList.add('wdm-app-' + ref.app);
+            iconSpan.append(WDLinks.iconNode(ref.app, 13));
+            frag.querySelector('.mention-hint-name').textContent = name;
+            hint.replaceChildren(frag);
             hint.classList.remove('hidden');
         }).catch(() => { /* offline: leave any existing hint as-is */ });
     }
@@ -1515,13 +1516,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (typeof UniverPresets === 'undefined') {
             console.error('[APP] Univer failed to load from CDN');
-            document.body.innerHTML = `
-                <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
-                    <h2>Failed to load spreadsheet library</h2>
-                    <p>Please check your internet connection and refresh the page.</p>
-                    <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">Refresh</button>
-                </div>
-            `;
+            document.body.replaceChildren(
+                document.getElementById('univerFailTemplate').content.cloneNode(true));
             return;
         }
 

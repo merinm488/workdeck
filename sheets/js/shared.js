@@ -151,18 +151,10 @@ class SharedSpreadsheet {
      */
     showLegacyNotice() {
         const container = document.getElementById('univer');
-        if (!container) return;
+        const tpl = document.getElementById('legacyNoticeTemplate');
+        if (!container || !tpl) return;
 
-        container.innerHTML = `
-            <div class="legacy-notice">
-                <div class="legacy-notice-card">
-                    <div class="legacy-notice-icon">📊</div>
-                    <h2>Created with an older version of Sheets</h2>
-                    <p>This shared spreadsheet was made with the previous Sheets engine and can no longer be displayed here.</p>
-                    <p class="legacy-banner">The owner's data is safe and untouched.</p>
-                </div>
-            </div>
-        `;
+        container.replaceChildren(tpl.content.cloneNode(true));
     }
 
     /**
@@ -259,12 +251,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (typeof UniverPresets === 'undefined') {
         console.error('[SHARED] Univer failed to load');
-        document.body.innerHTML = `
-            <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
-                <h2>Failed to load spreadsheet library</h2>
-                <p>Please check your internet connection and refresh the page.</p>
-            </div>
-        `;
+        document.body.replaceChildren(
+            document.getElementById('univerFailTemplate').content.cloneNode(true));
         return;
     }
 

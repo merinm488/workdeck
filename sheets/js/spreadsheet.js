@@ -566,18 +566,12 @@ class SpreadsheetManager {
      */
     showError(message) {
         const container = document.getElementById(APP_CONFIG.spreadsheet.container);
-        if (container) {
-            container.innerHTML = `
-                <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; color: var(--text-primary); text-align: center; padding: 20px;">
-                    <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
-                    <h2 style="margin-bottom: 10px;">Spreadsheet Error</h2>
-                    <p style="margin-bottom: 20px; color: var(--text-secondary);">${message}</p>
-                    <button onclick="location.reload()" style="padding: 10px 20px; background: var(--accent-color); color: white; border: none; border-radius: 6px; cursor: pointer;">
-                        Refresh Page
-                    </button>
-                </div>
-            `;
-        }
+        const tpl = document.getElementById('errorPanelTemplate');
+        if (!container || !tpl) return;
+
+        const panel = tpl.content.firstElementChild.cloneNode(true);
+        panel.querySelector('.error-panel-message').textContent = message;
+        container.replaceChildren(panel);
     }
 
     /**
@@ -589,29 +583,19 @@ class SpreadsheetManager {
         this.legacyNoticeShown = true;
 
         const container = document.getElementById(APP_CONFIG.spreadsheet.container);
-        if (!container) return;
+        const tpl = document.getElementById('legacyNoticeTemplate');
+        if (!container || !tpl) return;
 
         const isSharedView = !document.getElementById('saveBtn');
-        container.innerHTML = `
-            <div class="legacy-notice">
-                <div class="legacy-notice-card">
-                    <div class="legacy-notice-icon">📊</div>
-                    <h2>Created with an older version of Sheets</h2>
-                    <p>This spreadsheet was made with the previous Sheets engine and can no longer be opened here.</p>
-                    <p class="legacy-banner">Your data is safe and untouched in your account.</p>
-                    ${isSharedView
-                        ? '<button class="home-cancel-btn" id="legacyCloseBtn">Close</button>'
-                        : '<button class="home-cancel-btn" id="legacyHomeBtn">Back to Home</button>'}
-                </div>
-            </div>
-        `;
-
-        const homeBtn = document.getElementById('legacyHomeBtn');
-        if (homeBtn) {
-            homeBtn.addEventListener('click', () => {
+        const notice = tpl.content.firstElementChild.cloneNode(true);
+        const btn = notice.querySelector('#legacyNoticeBtn');
+        btn.textContent = isSharedView ? 'Close' : 'Back to Home';
+        if (!isSharedView) {
+            btn.addEventListener('click', () => {
                 window.location.href = '/sheets/home.html';
             });
         }
+        container.replaceChildren(notice);
     }
 
     /**

@@ -366,6 +366,182 @@
         })();
     </script>
 
+    <!-- ===== TEMPLATES (cloned by main.js / viewer.js) ===== -->
+    <!-- Icons — fbIcon(name) clones #fb-icon-<name> -->
+    <template id="fb-icon-open">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+    </template>
+    <template id="fb-icon-download">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+    </template>
+    <template id="fb-icon-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+    </template>
+    <template id="fb-icon-rename">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+    </template>
+    <template id="fb-icon-move">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
+    </template>
+    <template id="fb-icon-tags">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+    </template>
+    <template id="fb-icon-trash">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+    </template>
+    <template id="fb-icon-check">
+        <svg class="fb-check" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </template>
+
+    <!-- Sidebar tag row (main.js: renderTagSection) -->
+    <template id="fbTagRowTemplate">
+        <div class="fb-side-row fb-tag-row">
+            <span class="fb-tag-dot"></span>
+            <span class="fb-side-name"></span>
+            <span class="fb-side-count"></span>
+            <span class="fb-side-actions">
+                <button data-action="edit" title="Edit tag">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                </button>
+                <button data-action="delete" class="danger" title="Delete tag">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            </span>
+        </div>
+    </template>
+
+    <!-- Sidebar folder tree row (main.js: buildTreeLevel) -->
+    <template id="fbFolderRowTemplate">
+        <div class="fb-side-row">
+            <span class="fb-caret" data-action="toggle">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </span>
+            <span class="fb-side-dot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            </span>
+            <span class="fb-side-name"></span>
+            <span class="fb-side-actions">
+                <button data-action="add" title="New subfolder">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16m8-8H4"></path></svg>
+                </button>
+                <button data-action="rename" title="Rename">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                </button>
+                <button data-action="delete" class="danger" title="Delete">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            </span>
+        </div>
+    </template>
+
+    <!-- Breadcrumbs (main.js: renderBreadcrumb) -->
+    <template id="fbCrumbTagTemplate">
+        <button class="fb-crumb" data-id="">All folders</button>
+        <span class="fb-crumb-sep">›</span>
+        <span class="fb-crumb-current"><span class="fb-dot"></span> <span class="fb-crumb-tag-name"></span></span>
+    </template>
+    <template id="fbCrumbSearchTemplate">
+        <span class="fb-crumb-current">Search results</span>
+    </template>
+
+    <!-- Folder card, grid view (main.js: buildFolderCard) -->
+    <template id="fbFolderCardTemplate">
+        <div class="fb-card fb-card-folder">
+            <div class="fb-card-top">
+                <span class="fb-card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                </span>
+                <div class="fb-card-title"></div>
+                <span class="fb-item-menu" title="More actions">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg>
+                </span>
+            </div>
+            <div class="fb-card-preview fb-card-preview-folder">
+                <span class="fb-folder-glyph"></span>
+                <span class="fb-folder-count"></span>
+            </div>
+            <div class="fb-card-meta">
+                <span class="fb-type-badge fb-type-badge-folder">Folder</span>
+                <span class="fb-card-date"></span>
+            </div>
+        </div>
+    </template>
+
+    <!-- File card, grid view (main.js: buildFileCard) -->
+    <template id="fbFileCardTemplate">
+        <div class="fb-card fb-card-file">
+            <div class="fb-card-top">
+                <span class="fb-card-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                </span>
+                <div class="fb-card-title"></div>
+                <span class="fb-item-menu" title="More actions">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg>
+                </span>
+            </div>
+            <div class="fb-card-preview">
+                <span class="fb-ext-pill"></span>
+            </div>
+            <div class="fb-card-meta">
+                <span class="fb-type-badge"></span>
+                <span class="fb-card-date"></span>
+            </div>
+        </div>
+    </template>
+
+    <!-- Folder row, list view (main.js: buildFolderRow) -->
+    <template id="fbFolderListRowTemplate">
+        <div class="fb-row">
+            <span class="fb-row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            </span>
+            <div class="fb-row-main">
+                <div class="fb-row-title"></div>
+            </div>
+            <span class="fb-row-meta fb-row-count"></span>
+            <span class="fb-row-meta fb-row-date"></span>
+            <button class="fb-item-menu" title="More actions">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg>
+            </button>
+        </div>
+    </template>
+
+    <!-- File row, list view (main.js: buildFileRow) -->
+    <template id="fbFileListRowTemplate">
+        <div class="fb-row">
+            <span class="fb-row-icon fb-row-ext"></span>
+            <div class="fb-row-main">
+                <div class="fb-row-title"></div>
+            </div>
+            <span class="fb-row-meta fb-row-size"></span>
+            <span class="fb-row-meta fb-row-date"></span>
+            <button class="fb-item-menu" title="More actions">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg>
+            </button>
+        </div>
+    </template>
+
+    <!-- PDF toolbar (viewer.js: renderPdf) -->
+    <template id="fbPdfToolbarTemplate">
+        <div class="fb-pdf-toolbar">
+            <button type="button" data-a="prev" title="Previous page">‹</button>
+            <span class="fb-pdf-pageinfo">Page <span data-r="page">1</span> / <span data-r="pages"></span></span>
+            <button type="button" data-a="next" title="Next page">›</button>
+            <span class="fb-pdf-sep"></span>
+            <button type="button" data-a="out" title="Zoom out">−</button>
+            <span data-r="zoom">100%</span>
+            <button type="button" data-a="in" title="Zoom in">+</button>
+        </div>
+    </template>
+
+    <!-- No-preview fallback (viewer.js: renderFallback) -->
+    <template id="fbViewerFallbackTemplate">
+        <div class="fb-viewer-fallback">
+            <span class="fb-file-tile fb-viewer-tile"><span></span></span>
+            <p>No inline preview for this file type — use Download.</p>
+        </div>
+    </template>
+
     <!-- Vendor libraries (see <head> note). UMD tags expose globals:
          Uppy, imageCompression, docx, XLSX, Papa, marked, DOMPurify,
          hljs, videojs. -->

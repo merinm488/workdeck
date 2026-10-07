@@ -23,35 +23,37 @@
  */
 
 // ================================================
-// Icons (inline SVG, feather-style)
+// Icons 
 // ================================================
 
-const FB_ICONS = {
-    folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
-    file: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>',
-    upload: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>',
-    plus: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16m8-8H4"></path></svg>',
-    caret: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>',
-    dots: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="12" cy="19" r="1.8"></circle></svg>',
-    rename: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>',
-    trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>',
-    download: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>',
-    move: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>',
-    tags: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>',
-    check: '<svg class="fb-check" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
-    open: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>',
-    link: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>',
-    key: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>',
-    logout: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>',
-    sun: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>'
-};
+/** Clone icon #fb-icon-<name> from index.html. */
+function fbIcon(name) {
+    const tpl = document.getElementById('fb-icon-' + name);
+    return tpl
+        ? tpl.content.firstElementChild.cloneNode(true)
+        : document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+}
+
+function fbDot(color) {
+    const dot = document.createElement('span');
+    dot.className = 'fb-dot';
+    dot.style.background = color;
+    return dot;
+}
 
 function folderArt(color) {
     const dark = shadeColor(color, -18);
-    return '<svg viewBox="0 0 48 40" aria-hidden="true">'
-        + '<path d="M2 8a4 4 0 0 1 4-4h11a4 4 0 0 1 3.2 1.6L23 10h19a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" fill="' + dark + '"/>'
-        + '<path d="M2 14h44v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V14z" fill="' + color + '"/>'
-        + '</svg>';
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 48 40');
+    svg.setAttribute('aria-hidden', 'true');
+    [['M2 8a4 4 0 0 1 4-4h11a4 4 0 0 1 3.2 1.6L23 10h19a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z', dark],
+     ['M2 14h44v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V14z', color]].forEach(function (part) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', part[0]);
+        path.setAttribute('fill', part[1]);
+        svg.appendChild(path);
+    });
+    return svg;
 }
 
 function shadeColor(hex, percent) {
@@ -129,12 +131,6 @@ const state = {
 
 function $(id) {
     return document.getElementById(id);
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text == null ? '' : String(text);
-    return div.innerHTML;
 }
 
 function formatBytes(bytes) {
@@ -257,38 +253,58 @@ function sortBy(list, keyFn) {
     });
 }
 
-function tagChipsHtml(record) {
+/** Dot+name tag chips for list rows. */
+function tagChipsFragment(record) {
+    const frag = document.createDocumentFragment();
     const tags = (record.tags || []).map(getTag).filter(Boolean);
-    if (!tags.length) return '';
+    if (!tags.length) return frag;
     const shown = tags.slice(0, 3);
+    const chips = document.createElement('span');
+    chips.className = 'fb-chips';
+    shown.forEach(function (tag) {
+        const chip = document.createElement('span');
+        chip.className = 'fb-chip';
+        chip.title = tag.name;
+        chip.append(fbDot(tag.color), document.createTextNode(tag.name));
+        chips.append(chip);
+    });
     const overflow = tags.length - shown.length;
-    return '<span class="fb-chips">'
-        + shown.map(function (tag) {
-            return '<span class="fb-chip" title="' + escapeHtml(tag.name) + '">'
-                + '<span class="fb-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
-                + escapeHtml(tag.name) + '</span>';
-        }).join('')
-        + (overflow > 0 ? '<span class="fb-chip fb-chip-more" title="'
-            + tags.slice(3).map(function (t) { return escapeHtml(t.name); }).join(', ')
-            + '">+' + overflow + '</span>' : '')
-        + '</span>';
+    if (overflow > 0) {
+        const more = document.createElement('span');
+        more.className = 'fb-chip fb-chip-more';
+        more.title = tags.slice(3).map(function (t) { return t.name; }).join(', ');
+        more.textContent = '+' + overflow;
+        chips.append(more);
+    }
+    frag.append(chips);
+    return frag;
 }
 
 /** Quiet dot+name tags for the card meta row (Workdeck-style). */
-function tagMetaHtml(record) {
+function tagMetaFragment(record) {
+    const frag = document.createDocumentFragment();
     const tags = (record.tags || []).map(getTag).filter(Boolean);
-    if (!tags.length) return '';
+    if (!tags.length) return frag;
     const shown = tags.slice(0, 2);
+    shown.forEach(function (tag) {
+        const wrap = document.createElement('span');
+        wrap.className = 'fb-meta-tag';
+        wrap.title = tag.name;
+        const name = document.createElement('span');
+        name.className = 'fb-meta-tag-name';
+        name.textContent = tag.name;
+        wrap.append(fbDot(tag.color), name);
+        frag.append(wrap);
+    });
     const overflow = tags.length - shown.length;
-    return shown.map(function (tag) {
-        return '<span class="fb-meta-tag" title="' + escapeHtml(tag.name) + '">'
-            + '<span class="fb-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
-            + '<span class="fb-meta-tag-name">' + escapeHtml(tag.name) + '</span>'
-            + '</span>';
-    }).join('')
-        + (overflow > 0 ? '<span class="fb-meta-tag-more" title="'
-            + tags.slice(2).map(function (t) { return escapeHtml(t.name); }).join(', ')
-            + '">+' + overflow + '</span>' : '');
+    if (overflow > 0) {
+        const more = document.createElement('span');
+        more.className = 'fb-meta-tag-more';
+        more.title = tags.slice(2).map(function (t) { return t.name; }).join(', ');
+        more.textContent = '+' + overflow;
+        frag.append(more);
+    }
+    return frag;
 }
 
 // ================================================
@@ -464,19 +480,16 @@ function renderTagSection() {
 
     pool.forEach(function (tag) {
         const active = state.activeTag === tag.id;
-        const row = document.createElement('div');
-        row.className = 'fb-side-row fb-tag-row' + (active ? ' active' : '');
+        const row = $('fbTagRowTemplate').content.firstElementChild.cloneNode(true);
+        if (active) {
+            row.classList.add('active');
+            if (tag.color) row.style.background = hexToRgba(tag.color, 0.14);
+        }
         row.dataset.tag = tag.id;
         row.tabIndex = 0;
-        if (active && tag.color) row.style.background = hexToRgba(tag.color, 0.14);
-
-        row.innerHTML = '<span class="fb-tag-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
-            + '<span class="fb-side-name">' + escapeHtml(tag.name) + '</span>'
-            + '<span class="fb-side-count">' + tagItemCount(tag.id) + '</span>'
-            + '<span class="fb-side-actions">'
-            + '<button data-action="edit" title="Edit tag">' + FB_ICONS.rename + '</button>'
-            + '<button data-action="delete" class="danger" title="Delete tag">' + FB_ICONS.trash + '</button>'
-            + '</span>';
+        row.querySelector('.fb-tag-dot').style.background = tag.color;
+        row.querySelector('.fb-side-name').textContent = tag.name;
+        row.querySelector('.fb-side-count').textContent = tagItemCount(tag.id);
 
         row.addEventListener('click', function (e) {
             const actionEl = e.target.closest('[data-action]');
@@ -508,19 +521,16 @@ function buildTreeLevel(container, parentId, depth) {
         const expanded = state.expanded.has(folder.id);
         const active = state.currentFolderId === folder.id;
 
-        const row = document.createElement('div');
-        row.className = 'fb-side-row' + (active ? ' active' : '');
+        const row = $('fbFolderRowTemplate').content.firstElementChild.cloneNode(true);
+        if (active) row.classList.add('active');
         row.dataset.folder = folder.id;
         row.style.paddingLeft = (10 + depth * 16) + 'px';
 
-        row.innerHTML = '<span class="fb-caret' + (expanded ? ' open' : '') + (kids.length ? '' : ' invisible') + '" data-action="toggle">' + FB_ICONS.caret + '</span>'
-            + '<span class="fb-side-dot" style="color:' + escapeHtml(folder.color || '#FACC15') + '">' + FB_ICONS.folder + '</span>'
-            + '<span class="fb-side-name">' + escapeHtml(folder.name) + '</span>'
-            + '<span class="fb-side-actions">'
-            + '<button data-action="add" title="New subfolder">' + FB_ICONS.plus + '</button>'
-            + '<button data-action="rename" title="Rename">' + FB_ICONS.rename + '</button>'
-            + '<button data-action="delete" class="danger" title="Delete">' + FB_ICONS.trash + '</button>'
-            + '</span>';
+        const caret = row.querySelector('.fb-caret');
+        caret.classList.toggle('open', expanded);
+        caret.classList.toggle('invisible', !kids.length);
+        row.querySelector('.fb-side-dot').style.color = folder.color || '#FACC15';
+        row.querySelector('.fb-side-name').textContent = folder.name;
 
         row.addEventListener('click', function (e) {
             const actionEl = e.target.closest('[data-action]');
@@ -563,27 +573,34 @@ function renderBreadcrumb() {
     const el = $('fbBreadcrumb');
     if (state.activeTag) {
         const tag = getTag(state.activeTag);
-        el.innerHTML = '<button class="fb-crumb" data-id="">All folders</button>'
-            + '<span class="fb-crumb-sep">›</span>'
-            + '<span class="fb-crumb-current"><span class="fb-dot" style="background:' + escapeHtml(tag ? tag.color : '#94a3b8') + '"></span> '
-            + escapeHtml(tag ? tag.name : 'Tag') + '</span>';
-        el.querySelector('.fb-crumb').addEventListener('click', function () {
+        const frag = $('fbCrumbTagTemplate').content.cloneNode(true);
+        frag.querySelector('.fb-dot').style.background = tag ? tag.color : '#94a3b8';
+        frag.querySelector('.fb-crumb-tag-name').textContent = tag ? tag.name : 'Tag';
+        frag.querySelector('.fb-crumb').addEventListener('click', function () {
             openFolder(null);
         });
+        el.replaceChildren(frag);
         return;
     }
     if (state.searchQuery.trim()) {
-        el.innerHTML = '<span class="fb-crumb-current">Search results</span>';
+        el.replaceChildren($('fbCrumbSearchTemplate').content.cloneNode(true));
         return;
     }
     const chain = state.currentFolderId ? ancestorsOf(state.currentFolderId) : [];
-    const parts = ['<button class="fb-crumb' + (chain.length ? '' : ' current') + '" data-id="">All folders</button>'];
+    const root = document.createElement('button');
+    root.className = 'fb-crumb' + (chain.length ? '' : ' current');
+    root.textContent = 'All folders';
+    el.replaceChildren(root);
     chain.forEach(function (folder, i) {
-        parts.push('<span class="fb-crumb-sep">›</span>');
-        parts.push('<button class="fb-crumb' + (i === chain.length - 1 ? ' current' : '') + '" data-id="' + folder.id + '">'
-            + escapeHtml(folder.name) + '</button>');
+        const sep = document.createElement('span');
+        sep.className = 'fb-crumb-sep';
+        sep.textContent = '›';
+        const btn = document.createElement('button');
+        btn.className = 'fb-crumb' + (i === chain.length - 1 ? ' current' : '');
+        btn.textContent = folder.name;
+        btn.dataset.id = folder.id;
+        el.append(sep, btn);
     });
-    el.innerHTML = parts.join('');
     el.querySelectorAll('.fb-crumb').forEach(function (btn) {
         btn.addEventListener('click', function () {
             openFolder(btn.dataset.id || null);
@@ -682,10 +699,6 @@ function renderContent() {
     renderFooter();
 }
 
-function itemMenuButton(record, kind) {
-    return '<button class="fb-item-menu" title="More actions">' + FB_ICONS.dots + '</button>';
-}
-
 function bindItemMenu(el, record, kind) {
     el.querySelector('.fb-item-menu').addEventListener('click', function (e) {
         e.stopPropagation();
@@ -694,27 +707,21 @@ function bindItemMenu(el, record, kind) {
 }
 
 function buildFolderCard(folder) {
-    const card = document.createElement('div');
-    card.className = 'fb-card fb-card-folder';
+    const card = $('fbFolderCardTemplate').content.firstElementChild.cloneNode(true);
     card.dataset.id = folder.id;
 
     const childCount = childFolders(folder.id).length + childFiles(folder.id).length;
     const color = folder.color || '#FACC15';
 
-    card.innerHTML = '<div class="fb-card-top">'
-        + '<span class="fb-card-icon" style="background:' + escapeHtml(shadeColor(color, 82)) + ';color:' + escapeHtml(color) + '">' + FB_ICONS.folder + '</span>'
-        + '<div class="fb-card-title">' + escapeHtml(folder.name) + '</div>'
-        + '<span class="fb-item-menu">' + FB_ICONS.dots + '</span>'
-        + '</div>'
-        + '<div class="fb-card-preview fb-card-preview-folder">'
-        + '<span class="fb-folder-glyph">' + folderArt(color) + '</span>'
-        + '<span class="fb-folder-count">' + childCount + (childCount === 1 ? ' item' : ' items') + '</span>'
-        + '</div>'
-        + '<div class="fb-card-meta">'
-        + '<span class="fb-type-badge fb-type-badge-folder">Folder</span>'
-        + tagMetaHtml(folder)
-        + '<span>' + formatRelativeDate(folder.updatedAt) + '</span>'
-        + '</div>';
+    const icon = card.querySelector('.fb-card-icon');
+    icon.style.background = shadeColor(color, 82);
+    icon.style.color = color;
+    card.querySelector('.fb-card-title').textContent = folder.name;
+    card.querySelector('.fb-folder-glyph').append(folderArt(color));
+    card.querySelector('.fb-folder-count').textContent = childCount + (childCount === 1 ? ' item' : ' items');
+    const date = card.querySelector('.fb-card-date');
+    date.textContent = formatRelativeDate(folder.updatedAt);
+    date.before(tagMetaFragment(folder));
 
     card.addEventListener('click', function (e) {
         if (e.target.closest('.fb-item-menu')) return;
@@ -725,28 +732,39 @@ function buildFolderCard(folder) {
 }
 
 function buildFileCard(file) {
-    const card = document.createElement('div');
-    card.className = 'fb-card fb-card-file';
+    const card = $('fbFileCardTemplate').content.firstElementChild.cloneNode(true);
     card.dataset.id = file.id;
 
     const color = extColor(file.name);
     const ext = fileExt(file.name);
-    const tile = 'background:' + escapeHtml(shadeColor(color, 82)) + ';color:' + escapeHtml(color);
-    const previewHtml = file.thumbnail
-        ? '<span class="fb-card-thumb" style="background-image:url(\'' + escapeHtml(file.thumbnail) + '\')"></span>'
-        : '<span class="fb-ext-pill" style="' + tile + '">' + escapeHtml(ext) + '</span>';
+    const tint = shadeColor(color, 82);
 
-    card.innerHTML = '<div class="fb-card-top">'
-        + '<span class="fb-card-icon" style="' + tile + '">' + FB_ICONS.file + '</span>'
-        + '<div class="fb-card-title">' + escapeHtml(file.name) + '</div>'
-        + '<span class="fb-item-menu">' + FB_ICONS.dots + '</span>'
-        + '</div>'
-        + '<div class="fb-card-preview">' + previewHtml + '</div>'
-        + '<div class="fb-card-meta">'
-        + '<span class="fb-type-badge" style="' + tile + '">' + escapeHtml(ext) + '</span>'
-        + tagMetaHtml(file)
-        + '<span>' + formatBytes(file.size) + ' · ' + formatRelativeDate(file.updatedAt) + '</span>'
-        + '</div>';
+    const icon = card.querySelector('.fb-card-icon');
+    icon.style.background = tint;
+    icon.style.color = color;
+    card.querySelector('.fb-card-title').textContent = file.name;
+
+    const preview = card.querySelector('.fb-card-preview');
+    if (file.thumbnail) {
+        const thumb = document.createElement('span');
+        thumb.className = 'fb-card-thumb';
+        thumb.style.backgroundImage = 'url("' + file.thumbnail + '")';
+        preview.replaceChildren(thumb);
+    } else {
+        const pill = preview.querySelector('.fb-ext-pill');
+        pill.style.background = tint;
+        pill.style.color = color;
+        pill.textContent = ext;
+    }
+
+    const badge = card.querySelector('.fb-type-badge');
+    badge.style.background = tint;
+    badge.style.color = color;
+    badge.textContent = ext;
+
+    const date = card.querySelector('.fb-card-date');
+    date.textContent = formatBytes(file.size) + ' · ' + formatRelativeDate(file.updatedAt);
+    date.before(tagMetaFragment(file));
 
     card.addEventListener('click', function (e) {
         if (e.target.closest('.fb-item-menu')) return;
@@ -758,20 +776,16 @@ function buildFileCard(file) {
 }
 
 function buildFolderRow(folder) {
-    const row = document.createElement('div');
-    row.className = 'fb-row';
+    const row = $('fbFolderListRowTemplate').content.firstElementChild.cloneNode(true);
     row.dataset.id = folder.id;
 
     const childCount = childFolders(folder.id).length + childFiles(folder.id).length;
 
-    row.innerHTML = '<span class="fb-row-icon" style="color:' + escapeHtml(folder.color || '#FACC15') + '">' + FB_ICONS.folder + '</span>'
-        + '<div class="fb-row-main">'
-        + '<div class="fb-row-title">' + escapeHtml(folder.name) + '</div>'
-        + tagChipsHtml(folder)
-        + '</div>'
-        + '<span class="fb-row-meta">' + childCount + (childCount === 1 ? ' item' : ' items') + '</span>'
-        + '<span class="fb-row-meta">' + formatRelativeDate(folder.updatedAt) + '</span>'
-        + itemMenuButton();
+    row.querySelector('.fb-row-icon').style.color = folder.color || '#FACC15';
+    row.querySelector('.fb-row-title').textContent = folder.name;
+    row.querySelector('.fb-row-main').append(tagChipsFragment(folder));
+    row.querySelector('.fb-row-count').textContent = childCount + (childCount === 1 ? ' item' : ' items');
+    row.querySelector('.fb-row-date').textContent = formatRelativeDate(folder.updatedAt);
 
     row.addEventListener('click', function (e) {
         if (e.target.closest('.fb-item-menu')) return;
@@ -782,23 +796,23 @@ function buildFolderRow(folder) {
 }
 
 function buildFileRow(file) {
-    const row = document.createElement('div');
-    row.className = 'fb-row';
+    const row = $('fbFileListRowTemplate').content.firstElementChild.cloneNode(true);
     row.dataset.id = file.id;
 
     const color = extColor(file.name);
-    const iconHtml = file.thumbnail
-        ? '<span class="fb-row-thumb" style="background-image:url(\'' + escapeHtml(file.thumbnail) + '\')"></span>'
-        : '<span class="fb-row-icon fb-row-ext" style="color:' + escapeHtml(color) + '">' + escapeHtml(fileExt(file.name)) + '</span>';
-
-    row.innerHTML = iconHtml
-        + '<div class="fb-row-main">'
-        + '<div class="fb-row-title">' + escapeHtml(file.name) + '</div>'
-        + tagChipsHtml(file)
-        + '</div>'
-        + '<span class="fb-row-meta">' + formatBytes(file.size) + '</span>'
-        + '<span class="fb-row-meta">' + formatRelativeDate(file.updatedAt) + '</span>'
-        + itemMenuButton();
+    const iconSpan = row.querySelector('.fb-row-icon');
+    if (file.thumbnail) {
+        iconSpan.classList.remove('fb-row-ext');
+        iconSpan.classList.add('fb-row-thumb');
+        iconSpan.style.backgroundImage = 'url("' + file.thumbnail + '")';
+    } else {
+        iconSpan.style.color = color;
+        iconSpan.textContent = fileExt(file.name);
+    }
+    row.querySelector('.fb-row-title').textContent = file.name;
+    row.querySelector('.fb-row-main').append(tagChipsFragment(file));
+    row.querySelector('.fb-row-size').textContent = formatBytes(file.size);
+    row.querySelector('.fb-row-date').textContent = formatRelativeDate(file.updatedAt);
 
     row.addEventListener('click', function (e) {
         if (e.target.closest('.fb-item-menu')) return;
@@ -843,21 +857,27 @@ function openItemMenu(anchor, record, kind) {
     const menu = $('fbItemMenu');
     const actions = [];
     if (kind === 'file') {
-        actions.push({ action: 'open', label: 'Open', icon: FB_ICONS.open });
-        actions.push({ action: 'download', label: 'Download', icon: FB_ICONS.download });
-        actions.push({ action: 'copylink', label: 'Copy link', icon: FB_ICONS.link });
+        actions.push({ action: 'open', label: 'Open', icon: 'open' });
+        actions.push({ action: 'download', label: 'Download', icon: 'download' });
+        actions.push({ action: 'copylink', label: 'Copy link', icon: 'link' });
     }
-    actions.push({ action: 'rename', label: 'Rename', icon: FB_ICONS.rename });
+    actions.push({ action: 'rename', label: 'Rename', icon: 'rename' });
     if (kind === 'file') {
-        actions.push({ action: 'move', label: 'Move to folder…', icon: FB_ICONS.move });
+        actions.push({ action: 'move', label: 'Move to folder…', icon: 'move' });
     }
-    actions.push({ action: 'tags', label: 'Edit tags…', icon: FB_ICONS.tags });
-    actions.push({ action: 'delete', label: 'Delete', icon: FB_ICONS.trash, danger: true });
+    actions.push({ action: 'tags', label: 'Edit tags…', icon: 'tags' });
+    actions.push({ action: 'delete', label: 'Delete', icon: 'trash', danger: true });
 
-    menu.innerHTML = actions.map(function (a) {
-        return '<button data-action="' + a.action + '" class="' + (a.danger ? 'danger' : '') + '">'
-            + a.icon + '<span>' + a.label + '</span></button>';
-    }).join('');
+    menu.replaceChildren(...actions.map(function (a) {
+        const btn = document.createElement('button');
+        btn.dataset.action = a.action;
+        if (a.danger) btn.className = 'danger';
+        btn.append(fbIcon(a.icon));
+        const label = document.createElement('span');
+        label.textContent = a.label;
+        btn.append(label);
+        return btn;
+    }));
 
     menu.dataset.kind = kind;
     menu.dataset.id = record.id;
@@ -1107,6 +1127,14 @@ async function submitTagForm(e) {
 }
 
 
+/** Delete-modal copy: 'Delete "<name>"?' with the name emphasized. */
+function setDeleteText(prefix, name, suffix) {
+    const strong = document.createElement('span');
+    strong.className = 'fb-strong';
+    strong.textContent = name;
+    $('fbDeleteText').replaceChildren(prefix, strong, suffix);
+}
+
 function confirmDeleteTag(tag) {
     state.deleteTarget = { kind: 'tag', id: tag.id };
     const fbCount = tagItemCount(tag.id);
@@ -1115,14 +1143,13 @@ function confirmDeleteTag(tag) {
         return sum + (doc[key] || []).filter(function (f) { return f && f.tagId === tag.id; }).length;
     }, 0);
     $('fbDeleteTitle').textContent = 'Delete tag';
-    let text = 'Delete "<span class="fb-strong">' + escapeHtml(tag.name) + '</span>"? '
-        + fbCount + (fbCount === 1 ? ' item in Files loses' : ' items in Files lose') + ' this tag';
+    let suffix = '"? ' + fbCount + (fbCount === 1 ? ' item in Files loses' : ' items in Files lose') + ' this tag';
     if (suiteCount) {
-        text += '; ' + suiteCount + (suiteCount === 1 ? ' file' : ' files')
+        suffix += '; ' + suiteCount + (suiteCount === 1 ? ' file' : ' files')
             + ' in Docs, Sheets, Forms, Slides and Draw will be deleted';
     }
-    text += '. This cannot be undone.';
-    $('fbDeleteText').innerHTML = text;
+    suffix += '. This cannot be undone.';
+    setDeleteText('Delete "', tag.name, suffix);
     openModal('fbDeleteModal');
 }
 
@@ -1134,17 +1161,16 @@ function confirmDeleteFolder(folder) {
     state.deleteTarget = { kind: 'folder', id: folder.id };
     const count = folderItemCount(folder.id);
     $('fbDeleteTitle').textContent = 'Delete folder';
-    $('fbDeleteText').innerHTML = 'Delete "<span class="fb-strong">' + escapeHtml(folder.name)
-        + '</span>" and its ' + count + (count === 1 ? ' item' : ' items')
-        + '? This cannot be undone.';
+    setDeleteText('Delete "', folder.name,
+        '" and its ' + count + (count === 1 ? ' item' : ' items') + '? This cannot be undone.');
     openModal('fbDeleteModal');
 }
 
 function confirmDeleteFile(file) {
     state.deleteTarget = { kind: 'file', id: file.id };
     $('fbDeleteTitle').textContent = 'Delete file';
-    $('fbDeleteText').innerHTML = 'Delete "<span class="fb-strong">' + escapeHtml(file.name)
-        + '</span>"? This permanently removes the file and its contents. This cannot be undone.';
+    setDeleteText('Delete "', file.name,
+        '"? This permanently removes the file and its contents. This cannot be undone.');
     openModal('fbDeleteModal');
 }
 
@@ -1268,7 +1294,10 @@ function renderMoveTree() {
     const rootRow = document.createElement('button');
     rootRow.type = 'button';
     rootRow.className = 'fb-move-option' + (state.moveTarget === null ? ' selected' : '');
-    rootRow.innerHTML = '<span class="fb-dot" style="background:#94a3b8"></span><span>All folders</span>' + FB_ICONS.check;
+    rootRow.append(fbDot('#94a3b8'));
+    const rootLabel = document.createElement('span');
+    rootLabel.textContent = 'All folders';
+    rootRow.append(rootLabel, fbIcon('check'));
     rootRow.addEventListener('click', function () {
         state.moveTarget = null;
         renderMoveTree();
@@ -1282,8 +1311,10 @@ function renderMoveTree() {
             row.type = 'button';
             row.className = 'fb-move-option' + (state.moveTarget === folder.id ? ' selected' : '');
             row.style.paddingLeft = (10 + depth * 18) + 'px';
-            row.innerHTML = '<span class="fb-dot" style="background:' + escapeHtml(folder.color || '#FACC15') + '"></span>'
-                + '<span>' + escapeHtml(folder.name) + '</span>' + FB_ICONS.check;
+            row.append(fbDot(folder.color || '#FACC15'));
+            const label = document.createElement('span');
+            label.textContent = folder.name;
+            row.append(label, fbIcon('check'));
             row.addEventListener('click', function () {
                 state.moveTarget = folder.id;
                 renderMoveTree();
@@ -1338,7 +1369,10 @@ function renderTagChecks() {
     const pool = fileboxTags();
 
     if (!pool.length) {
-        container.innerHTML = '<div class="fb-tags-empty">No tags yet — create one below.</div>';
+        const empty = document.createElement('div');
+        empty.className = 'fb-tags-empty';
+        empty.textContent = 'No tags yet — create one below.';
+        container.replaceChildren(empty);
         return;
     }
 
@@ -1347,8 +1381,10 @@ function renderTagChecks() {
         const row = document.createElement('button');
         row.type = 'button';
         row.className = 'fb-move-option' + (selected ? ' selected' : '');
-        row.innerHTML = '<span class="fb-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
-            + '<span>' + escapeHtml(tag.name) + '</span>' + FB_ICONS.check;
+        row.append(fbDot(tag.color));
+        const label = document.createElement('span');
+        label.textContent = tag.name;
+        row.append(label, fbIcon('check'));
         row.addEventListener('click', function () {
             if (state.tagSelection.has(tag.id)) state.tagSelection.delete(tag.id);
             else state.tagSelection.add(tag.id);

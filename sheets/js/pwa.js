@@ -124,30 +124,33 @@ class PWAManager {
    * Show update notification
    */
   showUpdateNotification() {
-    // Create update notification
     const notification = document.createElement('div');
     notification.className = 'pwa-update-notification';
-    notification.innerHTML = `
-      <div class="notification-content">
-        <span>A new version is available!</span>
-        <div class="notification-actions">
-          <button id="pwa-update-btn" class="update-btn">Update</button>
-          <button id="pwa-dismiss-btn" class="dismiss-btn">Later</button>
-        </div>
-      </div>
-    `;
+
+    const content = document.createElement('div');
+    content.className = 'notification-content';
+    const label = document.createElement('span');
+    label.textContent = 'A new version is available!';
+    const actions = document.createElement('div');
+    actions.className = 'notification-actions';
+    const updateBtn = document.createElement('button');
+    updateBtn.className = 'update-btn';
+    updateBtn.textContent = 'Update';
+    const dismissBtn = document.createElement('button');
+    dismissBtn.className = 'dismiss-btn';
+    dismissBtn.textContent = 'Later';
+    actions.append(updateBtn, dismissBtn);
+    content.append(label, actions);
+    notification.append(content);
 
     document.body.appendChild(notification);
 
-    // Handle buttons
-    document.getElementById('pwa-update-btn').addEventListener('click', () => {
+    updateBtn.addEventListener('click', () => {
       this.activateUpdate();
       notification.remove();
     });
 
-    document.getElementById('pwa-dismiss-btn').addEventListener('click', () => {
-      notification.remove();
-    });
+    dismissBtn.addEventListener('click', () => notification.remove());
 
     // Auto-hide after 30 seconds
     setTimeout(() => notification.remove(), 30000);
@@ -174,11 +177,13 @@ class PWAManager {
   showInstallSuccess() {
     const notification = document.createElement('div');
     notification.className = 'pwa-success-notification';
-    notification.innerHTML = `
-      <div class="notification-content">
-        <span>✓ App installed successfully!</span>
-      </div>
-    `;
+
+    const content = document.createElement('div');
+    content.className = 'notification-content';
+    const label = document.createElement('span');
+    label.textContent = '✓ App installed successfully!';
+    content.append(label);
+    notification.append(content);
 
     document.body.appendChild(notification);
     setTimeout(() => notification.remove(), 5000);

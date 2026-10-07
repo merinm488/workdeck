@@ -41,7 +41,9 @@
     const banner = document.createElement('div');
     banner.id = 'fbPwaBanner';
     banner.className = 'fb-pwa-banner';
-    banner.innerHTML = '<span>A new version is available</span>';
+    const label = document.createElement('span');
+    label.textContent = 'A new version is available';
+    banner.append(label);
 
     const reload = document.createElement('button');
     reload.textContent = 'Reload';

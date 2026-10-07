@@ -216,12 +216,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (typeof FormViewer === 'undefined') {
-            document.body.innerHTML =
-                '<div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;font-family:sans-serif">' +
-                '<h2>Failed to load form library</h2>' +
-                '<p>Please check your internet connection and refresh the page.</p>' +
-                '<button onclick="location.reload()" style="margin-top:20px;padding:10px 20px;cursor:pointer">Refresh</button>' +
-                '</div>';
+            document.body.replaceChildren(
+                document.getElementById('formFailTemplate').content.cloneNode(true));
             return;
         }
 

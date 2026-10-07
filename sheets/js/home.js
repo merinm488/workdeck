@@ -151,42 +151,13 @@ class SheetsHome {
      * Create spreadsheet card element
      */
     createSpreadsheetCard(spreadsheet) {
-        const card = document.createElement('div');
-        card.className = 'spreadsheet-card';
+        const card = document.getElementById('spreadsheetCardTemplate')
+            .content.firstElementChild.cloneNode(true);
         card.dataset.id = spreadsheet.id;
 
-        const updatedAt = new Date(spreadsheet.updatedAt);
-
-        card.innerHTML = `
-            <div class="spreadsheet-card-header">
-                <div class="spreadsheet-icon">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7-6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2z" />
-                    </svg>
-                </div>
-                <div class="spreadsheet-title">${this.escapeHtml(spreadsheet.name || 'Untitled')}</div>
-                <div class="spreadsheet-card-actions">
-                    <button class="spreadsheet-action-btn rename" title="Rename">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                    </button>
-                    <button class="spreadsheet-action-btn delete" title="Delete">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div class="spreadsheet-card-info">
-                <div class="spreadsheet-meta">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>${this.formatDate(updatedAt)}</span>
-                </div>
-            </div>
-        `;
+        card.querySelector('.spreadsheet-title').textContent = spreadsheet.name || 'Untitled';
+        card.querySelector('.spreadsheet-date').textContent =
+            this.formatDate(new Date(spreadsheet.updatedAt));
 
         // Add click event to open spreadsheet
         card.addEventListener('click', (e) => {
@@ -1082,15 +1053,6 @@ class SheetsHome {
 
         // Beyond yesterday - show date
         return date.toLocaleDateString();
-    }
-
-    /**
-     * Escape HTML to prevent XSS
-     */
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 }
 

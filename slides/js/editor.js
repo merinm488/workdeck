@@ -689,21 +689,15 @@ function reorderSlides(fromId, dropIndex) {
  * Render the sorter
  */
 
-//inline SVG icons
-const DUPLICATE_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
-const DELETE_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
-
 function buildThumbs() {
-    $('slideThumbs').innerHTML = editorState.deck.slides.map((slide, i) => `
-          <li class="thumb-card${i === editorState.currentSlideIndex ? ' active' : ''}" data-slide-id="${slide.id}" draggable="true">
-              <img class="thumb-img" alt="" draggable="false">
-              <span class="thumb-num">${i + 1}</span>
-              <div class="thumb-actions">
-                  <button class="thumb-act-btn" data-action="duplicate" title="Duplicate slide">${DUPLICATE_ICON}</button>
-                  <button class="thumb-act-btn" data-action="delete" title="Delete slide">${DELETE_ICON}</button>
-              </div>
-          </li>
-      `).join('');
+    const tpl = document.getElementById('slideThumbTemplate');
+    $('slideThumbs').replaceChildren(...editorState.deck.slides.map((slide, i) => {
+        const card = tpl.content.firstElementChild.cloneNode(true);
+        card.dataset.slideId = slide.id;
+        card.classList.toggle('active', i === editorState.currentSlideIndex);
+        card.querySelector('.thumb-num').textContent = i + 1;
+        return card;
+    }));
       editorState.deck.slides.forEach((slide, i) => renderThumb(i));
 
       document.querySelectorAll('.thumb-card').forEach((card) => {
@@ -925,7 +919,7 @@ function configureFreehandBrush() {
 function mirrorDropdownIcon(dropdownId, selector, holderId) {
     const item = document.querySelector(`#${dropdownId} ${selector}`);
     if (item && item.querySelector('svg')) {
-        $(holderId).innerHTML = item.querySelector('svg').outerHTML;
+        $(holderId).replaceChildren(item.querySelector('svg').cloneNode(true));
     }
 }
 
@@ -2382,13 +2376,15 @@ async function offerTemplatesForNewDeck() {
     if (!index || !Array.isArray(index.templates)) return;
 
     const cards = $('templateCards');
-    cards.innerHTML = index.templates.map((t) => `
-        <button class="template-card" data-template-file="${t.file}">
-            <span class="template-swatch" style="background: ${t.swatch}"></span>
-            <span class="template-card-name">${t.name}</span>
-            <span class="template-card-desc">${t.description}</span>
-        </button>
-    `).join('');
+    const cardTpl = document.getElementById('templateCardTemplate');
+    cards.replaceChildren(...index.templates.map((t) => {
+        const card = cardTpl.content.firstElementChild.cloneNode(true);
+        card.dataset.templateFile = t.file;
+        card.querySelector('.template-swatch').style.background = t.swatch;
+        card.querySelector('.template-card-name').textContent = t.name;
+        card.querySelector('.template-card-desc').textContent = t.description;
+        return card;
+    }));
 
     cards.querySelectorAll('.template-card').forEach((card) => {
         card.addEventListener('click', async () => {

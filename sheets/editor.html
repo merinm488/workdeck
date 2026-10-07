@@ -353,6 +353,47 @@
         </div>
     </div>
 
+    <!-- Error panel (spreadsheet.js: showError) -->
+    <template id="errorPanelTemplate">
+        <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; color: var(--text-primary); text-align: center; padding: 20px;">
+            <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+            <h2 style="margin-bottom: 10px;">Spreadsheet Error</h2>
+            <p class="error-panel-message" style="margin-bottom: 20px; color: var(--text-secondary);"></p>
+            <button onclick="location.reload()" style="padding: 10px 20px; background: var(--accent-color); color: white; border: none; border-radius: 6px; cursor: pointer;">
+                Refresh Page
+            </button>
+        </div>
+    </template>
+
+    <!-- Legacy-format notice (spreadsheet.js: showLegacyNotice) -->
+    <template id="legacyNoticeTemplate">
+        <div class="legacy-notice">
+            <div class="legacy-notice-card">
+                <div class="legacy-notice-icon">📊</div>
+                <h2>Created with an older version of Sheets</h2>
+                <p>This spreadsheet was made with the previous Sheets engine and can no longer be opened here.</p>
+                <p class="legacy-banner">Your data is safe and untouched in your account.</p>
+                <button class="home-cancel-btn" id="legacyNoticeBtn"></button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Footer mention hint (app.js: updateMentionHint) -->
+    <template id="mentionHintTemplate">
+        <span class="wdm-app-icon"></span>
+        <span class="mention-hint-name"></span>
+        <span class="mention-hint-open">Open</span>
+    </template>
+
+    <!-- Fatal: spreadsheet library failed to load (app.js entry point) -->
+    <template id="univerFailTemplate">
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
+            <h2>Failed to load spreadsheet library</h2>
+            <p>Please check your internet connection and refresh the page.</p>
+            <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">Refresh</button>
+        </div>
+    </template>
+
     <!-- Authentication Check Script -->
     <script>
         // Check if user is authenticated before loading the app

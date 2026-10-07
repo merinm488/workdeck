@@ -27,38 +27,19 @@ const WD_SIDEBAR = {
 
 const PROJECT_COLORS = ['#FACC15', '#3B82F6', '#10B981', '#8B5CF6', '#EF4444', '#EC4899', '#06B6D4', '#F97316'];
 
-const DOC_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    + '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>'
-    + '<polyline points="14 2 14 8 20 8"></polyline>'
-    + '<line x1="16" y1="13" x2="8" y2="13"></line>'
-    + '<line x1="16" y1="17" x2="8" y2="17"></line>'
-    + '</svg>';
+function wdIcon(name) {
+    const tpl = document.getElementById('wd-icon-' + name);
+    return tpl
+        ? tpl.content.firstElementChild.cloneNode(true)
+        : document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+}
 
-const SHEET_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    + '<path d="M3 10h18M3 14h18m-9-4v8m-7-6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2z" />'
-    + '</svg>';
-
-const FORM_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    + '<path d="M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"></path>'
-    + '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>'
-    + '<line x1="9" y1="12" x2="15" y2="12"></line>'
-    + '<line x1="9" y1="16" x2="13" y2="16"></line>'
-    + '</svg>';
-
-const SLIDE_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-      + '<rect x="3" y="4" width="18" height="13" rx="2"></rect>'
-      + '<line x1="12" y1="17" x2="12" y2="21"></line>'
-      + '<line x1="8" y1="21" x2="16" y2="21"></line>'
-      + '</svg>';
-
-const DRAW_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-      + '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>'
-      + '<path d="m15 5 4 4"></path>'
-      + '</svg>';
-
-const FILEBOX_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-      + '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>'
-      + '</svg>';
+function wdDot(color) {
+    const dot = document.createElement('span');
+    dot.className = 'wd-dot';
+    dot.style.background = color;
+    return dot;
+}
 
 /** #rrggbb -> darkened/lightened copy, for two-tone folder art. */
 function shadeColor(hex, percent) {
@@ -72,10 +53,17 @@ function shadeColor(hex, percent) {
 
 function folderArt(color) {
     const dark = shadeColor(color, -18);
-    return '<svg viewBox="0 0 48 40" aria-hidden="true">'
-        + '<path d="M2 8a4 4 0 0 1 4-4h11a4 4 0 0 1 3.2 1.6L23 10h19a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" fill="' + dark + '"/>'
-        + '<path d="M2 14h44v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V14z" fill="' + color + '"/>'
-        + '</svg>';
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 48 40');
+    svg.setAttribute('aria-hidden', 'true');
+    [['M2 8a4 4 0 0 1 4-4h11a4 4 0 0 1 3.2 1.6L23 10h19a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z', dark],
+     ['M2 14h44v20a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V14z', color]].forEach(function (part) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', part[0]);
+        path.setAttribute('fill', part[1]);
+        svg.appendChild(path);
+    });
+    return svg;
 }
 
 /**
@@ -88,7 +76,7 @@ const WD_APPS = [
         name: 'Docs',
         label: 'Doc',                       // badge text on file cards
         accent: 'doc',                      // suffix for CSS classes (-icon-doc, --doc-accent, ...)
-        icon: DOC_ICON,
+        icon: 'docs',
         route: '/docs/',
         editorParam: 'doc',
         create: {
@@ -104,7 +92,7 @@ const WD_APPS = [
         name: 'Sheets',
         label: 'Sheet',
         accent: 'sheet',
-        icon: SHEET_ICON,
+        icon: 'sheets',
         route: '/sheets/editor.html',
         editorParam: 'id',
         create: {
@@ -123,7 +111,7 @@ const WD_APPS = [
         name: 'Forms',
         label: 'Form',
         accent: 'form',
-        icon: FORM_ICON,
+        icon: 'forms',
         route: '/forms/editor.html',
         editorParam: 'id',
         create: {
@@ -139,7 +127,7 @@ const WD_APPS = [
         name: 'Slides',
         label: 'Slide',
         accent: 'slide',
-        icon: SLIDE_ICON,
+        icon: 'slides',
         route: '/slides/editor.html',
         editorParam: 'id',
         create: {
@@ -155,7 +143,7 @@ const WD_APPS = [
         name: 'Draw',
         label: 'Drawing',
         accent: 'draw',
-        icon: DRAW_ICON,
+        icon: 'draw',
         route: '/draw/editor.html',
         editorParam: 'id',
         create: {
@@ -171,7 +159,7 @@ const WD_APPS = [
         name: 'Files',
         label: 'File',
         accent: 'filebox',
-        icon: FILEBOX_ICON,
+        icon: 'filebox',
         route: '/filebox/',
         editorParam: 'id',
         create: null,
@@ -247,12 +235,6 @@ const state = {
 
 function $(id) {
     return document.getElementById(id);
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text == null ? '' : String(text);
-    return div.innerHTML;
 }
 
 /**
@@ -633,20 +615,17 @@ function renderSidebar() {
     list.innerHTML = '';
     state.tags.forEach(function (tag) {
         const active = state.activeTag === tag.id;
-        const row = document.createElement('div');
-        row.className = 'wd-side-row wd-project-row' + (active ? ' active' : '');
+        const row = $('wdSideTagRowTemplate').content.firstElementChild.cloneNode(true);
+        if (active) {
+            row.classList.add('active');
+            if (tag.color) row.style.background = hexToRgba(tag.color, 0.14);
+        }
         row.dataset.tag = tag.id;
         row.setAttribute('role', 'button');
         row.tabIndex = 0;
-        if (active && tag.color) row.style.background = hexToRgba(tag.color, 0.14);
-
-        row.innerHTML = '<span class="wd-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
-            + '<span class="wd-side-row-name">' + escapeHtml(tag.name) + '</span>'
-            + '<span class="wd-side-count">' + (counts[tag.id] || 0) + '</span>'
-            + '<span class="wd-side-actions">'
-            + '<button class="wd-side-action edit" title="Edit tag">' + RENAME_ICON + '</button>'
-            + '<button class="wd-side-action danger" title="Delete tag">' + DELETE_ICON + '</button>'
-            + '</span>';
+        row.querySelector('.wd-dot').style.background = tag.color;
+        row.querySelector('.wd-side-row-name').textContent = tag.name;
+        row.querySelector('.wd-side-count').textContent = counts[tag.id] || 0;
 
         row.addEventListener('click', function (e) {
             if (e.target.closest('.wd-side-action')) return;
@@ -712,23 +691,25 @@ function renderViewToggle() {
 }
 
 /**
- * Shared item markup for the app dropdowns ("+ New" menus and the filter
- * chooser): icon chip + app name.
+ * Shared item for the app dropdowns ("+ New" menus and the filter chooser):
+ * icon chip + app name.
  */
-function buildAppMenuItem(app, extraAttrs) {
-    return '<button class="wd-dropdown-item" data-app="' + app.id + '"' + (extraAttrs || '') + '>'
-        + '<span class="wd-app-icon wd-app-icon-' + app.accent + '">' + app.icon + '</span>'
-        + '<div class="wd-dropdown-item-text">'
-        + '<span class="wd-dropdown-item-title">' + escapeHtml(app.name) + '</span>'
-        + '</div>'
-        + '</button>';
+function buildAppMenuItem(app, selected) {
+    const btn = $('wdDropdownItemTemplate').content.firstElementChild.cloneNode(true);
+    btn.dataset.app = app.id;
+    if (selected) btn.dataset.selected = 'true';
+    const chip = btn.querySelector('.wd-app-icon');
+    chip.classList.add('wd-app-icon-' + app.accent);
+    chip.append(wdIcon(app.icon));
+    btn.querySelector('.wd-dropdown-item-title').textContent = app.name;
+    return btn;
 }
 
 
 function renderNewMenus() {
-    const items = WD_APPS.map(function (app) { return buildAppMenuItem(app); }).join('');
-    $('newDropdown').innerHTML = items;
-    $('emptyNewDropdown').innerHTML = items;
+    const items = WD_APPS.map(function (app) { return buildAppMenuItem(app); });
+    $('newDropdown').replaceChildren(...items);
+    $('emptyNewDropdown').replaceChildren(...items.map(function (item) { return item.cloneNode(true); }));
 }
 
 /**
@@ -736,17 +717,15 @@ function renderNewMenus() {
  * chooser button's label/icon/tint with the active filter.
  */
 function renderFilterMenu() {
-    const checkmark = '<svg class="wd-filter-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">'
-        + '<polyline points="20 6 9 17 4 12"></polyline>'
-        + '</svg>';
-
-    $('filterDropdown').innerHTML = WD_APPS.map(function (app) {
-        return buildAppMenuItem(app, state.filter === app.id ? ' data-selected="true"' : '');
-    }).join('');
+    $('filterDropdown').replaceChildren(...WD_APPS.map(function (app) {
+        return buildAppMenuItem(app, state.filter === app.id);
+    }));
 
     document.querySelectorAll('#filterDropdown .wd-dropdown-item').forEach(function (item) {
-        item.insertAdjacentHTML('beforeend', '<span class="wd-filter-check-slot">'
-            + (item.dataset.selected ? checkmark : '') + '</span>');
+        const slot = document.createElement('span');
+        slot.className = 'wd-filter-check-slot';
+        if (item.dataset.selected) slot.append(wdIcon('filter-check'));
+        item.append(slot);
     });
 
     // Chooser button face: app icon + name when filtered, generic otherwise.
@@ -767,62 +746,48 @@ function renderFilterMenu() {
         btn.style.background = '';
         btn.style.color = '';
     }
-    iconSlot.innerHTML = activeApp ? activeApp.icon : '';
+    iconSlot.replaceChildren(...(activeApp ? [wdIcon(activeApp.icon)] : []));
     iconSlot.classList.toggle('hidden', !activeApp);
     label.textContent = activeApp ? activeApp.name : 'Apps';
 }
 
-const RENAME_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    + '<path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />'
-    + '</svg>';
-
-const DELETE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    + '<path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />'
-    + '</svg>';
-
-const MOVE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    + '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />'
-    + '</svg>';
-
-const LINK_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    + '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />'
-    + '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />'
-    + '</svg>';
-
-const CHECK_ICON = '<svg class="wd-move-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">'
-    + '<polyline points="20 6 9 17 4 12"></polyline>'
-    + '</svg>';
+function projectChip(tag, extraClass) {
+    const chip = document.createElement('span');
+    chip.className = 'wd-file-project' + (extraClass ? ' ' + extraClass : '');
+    chip.title = tag.name;
+    const name = document.createElement('span');
+    name.className = 'wd-file-project-name';
+    name.textContent = tag.name;
+    chip.append(wdDot(tag.color), name);
+    return chip;
+}
 
 /**
  * Tag chips on cards and list rows. Filebox items are multi-tag: up to
  * 3 chips + an overflow count. Other apps keep the single chip.
  */
-function projectChipHtml(file, extraClass) {
-    const base = 'wd-file-project' + (extraClass ? ' ' + extraClass : '');
+function projectChipFragment(file, extraClass) {
+    const frag = document.createDocumentFragment();
     if (isMultiTagItem(file)) {
         const tags = (file.tags || []).map(getTag).filter(Boolean);
-        if (!tags.length) return '';
+        if (!tags.length) return frag;
         const shown = tags.slice(0, 3);
+        shown.forEach(function (tag) { frag.append(projectChip(tag, extraClass)); });
         const overflow = tags.length - shown.length;
-        return shown.map(function (tag) {
-            return '<span class="' + base + '" title="' + escapeHtml(tag.name) + '">'
-                + '<span class="wd-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
-                + '<span class="wd-file-project-name">' + escapeHtml(tag.name) + '</span>'
-                + '</span>';
-        }).join('')
-            + (overflow > 0
-                ? '<span class="' + base + ' wd-file-project-more" title="'
-                    + tags.slice(3).map(function (t) { return escapeHtml(t.name); }).join(', ')
-                    + '">+' + overflow + '</span>'
-                : '');
+        if (overflow > 0) {
+            const more = document.createElement('span');
+            more.className = 'wd-file-project' + (extraClass ? ' ' + extraClass : '') + ' wd-file-project-more';
+            more.title = tags.slice(3).map(function (t) { return t.name; }).join(', ');
+            more.textContent = '+' + overflow;
+            frag.append(more);
+        }
+        return frag;
     }
 
     const tag = file.tagId ? getTag(file.tagId) : null;
-    if (!tag) return '';
-    return '<span class="' + base + '" title="' + escapeHtml(tag.name) + '">'
-        + '<span class="wd-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
-        + '<span class="wd-file-project-name">' + escapeHtml(tag.name) + '</span>'
-        + '</span>';
+    if (!tag) return frag;
+    frag.append(projectChip(tag, extraClass));
+    return frag;
 }
 
 function renderFiles() {
@@ -843,8 +808,7 @@ function renderFiles() {
     const filterNames = { all: 'Recent files' };
     WD_APPS.forEach(function (app) { filterNames[app.id] = app.name; });
     if (activeTag) {
-        viewTitle.innerHTML = '<span class="wd-dot" style="background:' + escapeHtml(activeTag.color) + '"></span>'
-            + escapeHtml(activeTag.name);
+        viewTitle.replaceChildren(wdDot(activeTag.color), document.createTextNode(activeTag.name));
     } else {
         viewTitle.textContent = isSearching ? 'Search results' : filterNames[state.filter];
     }
@@ -890,32 +854,24 @@ function renderFiles() {
 function buildCard(file) {
     if (file.kind === 'folder') return buildFolderCard(file);
 
-    const card = document.createElement('div');
-    card.className = 'wd-file-card';
+    const card = $('wdFileCardTemplate').content.firstElementChild.cloneNode(true);
     card.dataset.id = file.id;
     card.dataset.app = file.app;
 
     const app = getApp(file.app);
     const when = file.lastOpened || file.updatedAt;
 
-    card.innerHTML = '<div class="wd-file-card-top">'
-        + '<div class="wd-file-icon wd-file-icon-' + app.accent + '">' + app.icon + '</div>'
-        + '<div class="wd-file-title">' + escapeHtml(file.name) + '</div>'
-        + '<div class="wd-file-actions">'
-        + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
-        + '<button class="wd-file-action-btn copylink" title="Copy link">' + LINK_ICON + '</button>'
-        + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
-        + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
-        + '</div>'
-        + '</div>'
-        + '<div class="wd-file-preview"><div class="wd-file-preview-page">'
-        + '<div class="wd-preview-skeleton"></div>'
-        + '</div></div>'
-        + '<div class="wd-file-meta">'
-        + '<span class="wd-file-app-badge ' + app.accent + '">' + app.label + '</span>'
-        + projectChipHtml(file)
-        + '<span>' + formatRelativeDate(when) + '</span>'
-        + '</div>';
+    const icon = card.querySelector('.wd-file-icon');
+    icon.classList.add('wd-file-icon-' + app.accent);
+    icon.append(wdIcon(app.icon));
+    card.querySelector('.wd-file-title').textContent = file.name;
+
+    const badge = card.querySelector('.wd-file-app-badge');
+    badge.classList.add(app.accent);
+    badge.textContent = app.label;
+    const date = card.querySelector('.wd-file-date');
+    date.textContent = formatRelativeDate(when);
+    date.before(projectChipFragment(file));
 
     const previewPage = card.querySelector('.wd-file-preview-page');
     if (previewPage && window.WDPreviews) WDPreviews.mount(previewPage, file);
@@ -946,33 +902,20 @@ function buildCard(file) {
 
 /** Drive-style folder tile card (homepage shows root-level folders only). */
 function buildFolderCard(folder) {
-    const card = document.createElement('div');
-    card.className = 'wd-file-card wd-file-card--folder';
+    const card = $('wdFolderCardTemplate').content.firstElementChild.cloneNode(true);
     card.dataset.id = folder.id;
     card.dataset.app = 'filebox';
 
     const when = folder.lastOpened || folder.updatedAt;
     const color = (folder.raw && folder.raw.color) || '#FACC15';
 
-    card.innerHTML = '<div class="wd-file-card-top">'
-        + '<div class="wd-file-icon wd-file-icon-filebox">' + FILEBOX_ICON + '</div>'
-        + '<div class="wd-file-title">' + escapeHtml(folder.name) + '</div>'
-        + '<div class="wd-file-actions">'
-        + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
-        + '<button class="wd-file-action-btn copylink" title="Copy link">' + LINK_ICON + '</button>'
-        + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
-        + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
-        + '</div>'
-        + '</div>'
-        + '<div class="wd-file-preview"><div class="wd-folder-tile">'
-        + '<span class="wd-folder-tile-glyph">' + folderArt(color) + '</span>'
-        + '<span class="wd-folder-tile-count">' + folder.childCount + (folder.childCount === 1 ? ' item' : ' items') + '</span>'
-        + '</div></div>'
-        + '<div class="wd-file-meta">'
-        + '<span class="wd-file-app-badge filebox">Folder</span>'
-        + projectChipHtml(folder)
-        + '<span>' + formatRelativeDate(when) + '</span>'
-        + '</div>';
+    card.querySelector('.wd-file-title').textContent = folder.name;
+    card.querySelector('.wd-folder-tile-glyph').append(folderArt(color));
+    card.querySelector('.wd-folder-tile-count').textContent =
+        folder.childCount + (folder.childCount === 1 ? ' item' : ' items');
+    const date = card.querySelector('.wd-file-date');
+    date.textContent = formatRelativeDate(when);
+    date.before(projectChipFragment(folder));
 
     card.addEventListener('click', function (e) {
         if (!e.target.closest('.wd-file-action-btn')) openFile(folder);
@@ -1001,27 +944,22 @@ function buildFolderCard(folder) {
 function buildListRow(file) {
     if (file.kind === 'folder') return buildFolderRow(file);
 
-    const row = document.createElement('div');
-    row.className = 'wd-file-row';
+    const row = $('wdFileRowTemplate').content.firstElementChild.cloneNode(true);
     row.dataset.id = file.id;
     row.dataset.app = file.app;
 
     const app = getApp(file.app);
     const when = file.lastOpened || file.updatedAt;
 
-    row.innerHTML = '<div class="wd-file-icon wd-file-icon-' + app.accent + '">' + app.icon + '</div>'
-        + '<div class="wd-file-row-main">'
-        + '<div class="wd-file-row-title">' + escapeHtml(file.name) + '</div>'
-        + projectChipHtml(file, 'wd-file-row-project')
-        + '</div>'
-        + '<span class="wd-file-app-badge ' + app.accent + '">' + app.label + '</span>'
-        + '<div class="wd-file-row-meta">' + formatRelativeDate(when) + '</div>'
-        + '<div class="wd-file-actions">'
-        + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
-        + '<button class="wd-file-action-btn copylink" title="Copy link">' + LINK_ICON + '</button>'
-        + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
-        + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
-        + '</div>';
+    const icon = row.querySelector('.wd-file-icon');
+    icon.classList.add('wd-file-icon-' + app.accent);
+    icon.append(wdIcon(app.icon));
+    row.querySelector('.wd-file-row-title').textContent = file.name;
+    row.querySelector('.wd-file-row-main').append(projectChipFragment(file, 'wd-file-row-project'));
+    const badge = row.querySelector('.wd-file-app-badge');
+    badge.classList.add(app.accent);
+    badge.textContent = app.label;
+    row.querySelector('.wd-file-row-meta').textContent = formatRelativeDate(when);
 
     row.addEventListener('click', function (e) {
         if (!e.target.closest('.wd-file-action-btn')) openFile(file);
@@ -1049,28 +987,19 @@ function buildListRow(file) {
 
 /** List-mode folder row (same actions as the folder card). */
 function buildFolderRow(folder) {
-    const row = document.createElement('div');
-    row.className = 'wd-file-row wd-file-row--folder';
+    const row = $('wdFolderRowTemplate').content.firstElementChild.cloneNode(true);
     row.dataset.id = folder.id;
     row.dataset.app = 'filebox';
 
     const when = folder.lastOpened || folder.updatedAt;
     const color = (folder.raw && folder.raw.color) || '#FACC15';
 
-    row.innerHTML = '<div class="wd-file-icon wd-file-icon-filebox">' + FILEBOX_ICON + '</div>'
-        + '<div class="wd-file-row-main">'
-        + '<div class="wd-file-row-title">' + escapeHtml(folder.name) + '</div>'
-        + projectChipHtml(folder, 'wd-file-row-project')
-        + '</div>'
-        + '<span class="wd-file-app-badge filebox">Folder</span>'
-        + '<span class="wd-folder-row-count" style="color:' + escapeHtml(color) + '">' + folder.childCount + (folder.childCount === 1 ? ' item' : ' items') + '</span>'
-        + '<div class="wd-file-row-meta">' + formatRelativeDate(when) + '</div>'
-        + '<div class="wd-file-actions">'
-        + '<button class="wd-file-action-btn move" title="Add tag">' + MOVE_ICON + '</button>'
-        + '<button class="wd-file-action-btn copylink" title="Copy link">' + LINK_ICON + '</button>'
-        + '<button class="wd-file-action-btn rename" title="Rename">' + RENAME_ICON + '</button>'
-        + '<button class="wd-file-action-btn danger delete" title="Delete">' + DELETE_ICON + '</button>'
-        + '</div>';
+    row.querySelector('.wd-file-row-title').textContent = folder.name;
+    row.querySelector('.wd-file-row-main').append(projectChipFragment(folder, 'wd-file-row-project'));
+    const count = row.querySelector('.wd-folder-row-count');
+    count.style.color = color;
+    count.textContent = folder.childCount + (folder.childCount === 1 ? ' item' : ' items');
+    row.querySelector('.wd-file-row-meta').textContent = formatRelativeDate(when);
 
     row.addEventListener('click', function (e) {
         if (!e.target.closest('.wd-file-action-btn')) openFile(folder);
@@ -1251,27 +1180,30 @@ async function confirmRename() {
 
 function showDeleteModal(file) {
     state.fileToDelete = file;
-    let text;
+    const el = $('deleteModalText');
+    const strong = document.createElement('span');
+    strong.className = 'wd-strong';
+    strong.textContent = file.name;
     if (file.kind === 'folder') {
         // Destructive cascade: everything inside goes with it.
         const count = folderDeleteCount(file.id);
-        text = 'Delete "<span class="wd-strong">' + escapeHtml(file.name)
-            + '</span>" and its ' + count + (count === 1 ? ' item' : ' items')
-            + '? This cannot be undone.';
+        el.replaceChildren('Delete "', strong,
+            '" and its ' + count + (count === 1 ? ' item' : ' items') + '? This cannot be undone.');
     } else {
-        text = 'Are you sure you want to delete "<span class="wd-strong">'
-            + escapeHtml(file.name) + '</span>"? This cannot be undone.';
+        el.replaceChildren('Are you sure you want to delete "', strong, '"? This cannot be undone.');
         // Warn when other files reference this one (@mentions will break).
         if (window.WDMentions) {
             const backlinks = WDMentions.findBacklinks(file.id, state);
             if (backlinks.length) {
-                text += '<div class="wd-delete-backlinks">' + backlinks.length
+                const note = document.createElement('div');
+                note.className = 'wd-delete-backlinks';
+                note.textContent = backlinks.length
                     + (backlinks.length === 1 ? ' file links' : ' files link')
-                    + ' to this — its mentions will show as unavailable.</div>';
+                    + ' to this — its mentions will show as unavailable.';
+                el.append(note);
             }
         }
     }
-    $('deleteModalText').innerHTML = text;
     $('deleteModal').classList.add('active');
 }
 
@@ -1520,18 +1452,41 @@ function closeMoveDropdown() {
 }
 
 function setMoveTriggerValue(option) {
-    $('moveSelectValue').innerHTML = option && option.color
-        ? '<span class="wd-dot" style="background:' + escapeHtml(option.color) + '"></span>'
-            + '<span class="wd-move-select-name">' + escapeHtml(option.name) + '</span>'
-        : '<span class="wd-move-select-placeholder">' + (option ? escapeHtml(option.name) : 'Choose tags') + '</span>';
+    const el = $('moveSelectValue');
+    if (option && option.color) {
+        const name = document.createElement('span');
+        name.className = 'wd-move-select-name';
+        name.textContent = option.name;
+        el.replaceChildren(wdDot(option.color), name);
+    } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'wd-move-select-placeholder';
+        placeholder.textContent = option ? option.name : 'Choose tags';
+        el.replaceChildren(placeholder);
+    }
+}
+
+function moveEmptyDiv() {
+    const el = document.createElement('div');
+    el.className = 'wd-move-empty';
+    el.textContent = 'No tags yet — create one in the sidebar.';
+    return el;
+}
+
+function moveOptionRow(selected) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'wd-move-option' + (selected ? ' selected' : '');
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', String(selected));
+    return row;
 }
 
 function renderMoveOptions() {
     const dd = $('moveDropdown');
-    dd.innerHTML = '';
 
     if (state.tags.length === 0) {
-        dd.innerHTML = '<div class="wd-move-empty">No tags yet — create one in the sidebar.</div>';
+        dd.replaceChildren(moveEmptyDiv());
         setMoveTriggerValue(null);
         return;
     }
@@ -1539,15 +1494,13 @@ function renderMoveOptions() {
     const options = [{ id: null, name: 'No tags', color: null }].concat(state.tags);
     options.forEach(function (option) {
         const selected = (state.moveTarget || null) === option.id;
-        const row = document.createElement('button');
-        row.type = 'button';
-        row.className = 'wd-move-option' + (selected ? ' selected' : '');
-        row.setAttribute('role', 'option');
-        row.setAttribute('aria-selected', String(selected));
-        row.innerHTML = '<span class="wd-dot' + (option.color ? '' : ' wd-dot-none') + '"'
-            + (option.color ? ' style="background:' + option.color + '"' : '') + '></span>'
-            + '<span class="wd-move-option-name">' + escapeHtml(option.name) + '</span>'
-            + CHECK_ICON;
+        const row = moveOptionRow(selected);
+        const dot = wdDot(option.color);
+        if (!option.color) dot.classList.add('wd-dot-none');
+        const name = document.createElement('span');
+        name.className = 'wd-move-option-name';
+        name.textContent = option.name;
+        row.append(dot, name, wdIcon('check'));
         row.addEventListener('click', function () {
             state.moveTarget = option.id;
             renderMoveOptions();
@@ -1563,24 +1516,20 @@ function renderMoveOptions() {
  *  hidden; the menu renders inline. */
 function renderMoveChecks() {
     const dd = $('moveDropdown');
-    dd.innerHTML = '';
     const checked = state.moveChecked || new Set();
 
     if (state.tags.length === 0) {
-        dd.innerHTML = '<div class="wd-move-empty">No tags yet — create one in the sidebar.</div>';
+        dd.replaceChildren(moveEmptyDiv());
         return;
     }
 
     state.tags.forEach(function (tag) {
         const selected = checked.has(tag.id);
-        const row = document.createElement('button');
-        row.type = 'button';
-        row.className = 'wd-move-option' + (selected ? ' selected' : '');
-        row.setAttribute('role', 'option');
-        row.setAttribute('aria-selected', String(selected));
-        row.innerHTML = '<span class="wd-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
-            + '<span class="wd-move-option-name">' + escapeHtml(tag.name) + '</span>'
-            + CHECK_ICON;
+        const row = moveOptionRow(selected);
+        const name = document.createElement('span');
+        name.className = 'wd-move-option-name';
+        name.textContent = tag.name;
+        row.append(wdDot(tag.color), name, wdIcon('check'));
         row.addEventListener('click', function () {
             if (checked.has(tag.id)) {
                 checked.delete(tag.id);

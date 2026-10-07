@@ -79,7 +79,10 @@ class FileboxViewer {
         openModal('fbViewer');
         this.emitAfterEntryAnimation($('fbViewer').querySelector('.fb-modal-content'));
         const body = $('fbViewerBody');
-        body.innerHTML = '<div class="fb-viewer-loading">Loading preview…</div>';
+        const loading = document.createElement('div');
+        loading.className = 'fb-viewer-loading';
+        loading.textContent = 'Loading preview…';
+        body.replaceChildren(loading);
 
         const renderers = {
             pdf: this.renderPdf,
@@ -95,7 +98,12 @@ class FileboxViewer {
         const renderer = renderers[kind] || this.renderFallback;
         renderer.call(this, file, body).catch(function (err) {
             console.error('[VIEWER] Preview failed:', err);
-            body.innerHTML = '<div class="fb-viewer-fallback"><p>Preview failed to load.</p></div>';
+            const box = document.createElement('div');
+            box.className = 'fb-viewer-fallback';
+            const p = document.createElement('p');
+            p.textContent = 'Preview failed to load.';
+            box.append(p);
+            body.replaceChildren(box);
         });
     }
 
@@ -236,16 +244,8 @@ class FileboxViewer {
         const doc = await pdfjsLib.getDocument({ data: await this.fetchBuffer(file) }).promise;
         this.pdfDoc = doc;
 
-        const toolbar = document.createElement('div');
-        toolbar.className = 'fb-pdf-toolbar';
-        toolbar.innerHTML =
-            '<button type="button" data-a="prev" title="Previous page">‹</button>' +
-            '<span class="fb-pdf-pageinfo">Page <span data-r="page">1</span> / ' + doc.numPages + '</span>' +
-            '<button type="button" data-a="next" title="Next page">›</button>' +
-            '<span class="fb-pdf-sep"></span>' +
-            '<button type="button" data-a="out" title="Zoom out">−</button>' +
-            '<span data-r="zoom">100%</span>' +
-            '<button type="button" data-a="in" title="Zoom in">+</button>';
+        const toolbar = $('fbPdfToolbarTemplate').content.firstElementChild.cloneNode(true);
+        toolbar.querySelector('[data-r="pages"]').textContent = doc.numPages;
 
         const scroller = document.createElement('div');
         scroller.className = 'fb-pdf-scroll';
@@ -479,10 +479,12 @@ class FileboxViewer {
 
     renderFallback(file, body) {
         const color = extColor(file.name);
-        body.innerHTML = '<div class="fb-viewer-fallback">'
-            + '<span class="fb-file-tile fb-viewer-tile" style="background:' + escapeHtml(shadeColor(color, 82)) + ';color:' + escapeHtml(color) + '">'
-            + '<span>' + escapeHtml(fileExt(file.name)) + '</span></span>'
-            + '<p>No inline preview for this file type — use Download.</p></div>';
+        const box = $('fbViewerFallbackTemplate').content.firstElementChild.cloneNode(true);
+        const tile = box.querySelector('.fb-viewer-tile');
+        tile.style.background = shadeColor(color, 82);
+        tile.style.color = color;
+        tile.firstElementChild.textContent = fileExt(file.name);
+        body.replaceChildren(box);
         return Promise.resolve();
     }
 }

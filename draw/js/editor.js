@@ -384,7 +384,7 @@ function setActiveTool(tool) {
 function mirrorDropdownIcon(dropdownId, selector, holderId) {
     const item = document.querySelector(`#${dropdownId} ${selector}`);
     if (item && item.querySelector('svg')) {
-        $(holderId).innerHTML = item.querySelector('svg').outerHTML;
+        $(holderId).replaceChildren(item.querySelector('svg').cloneNode(true));
     }
 }
 

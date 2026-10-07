@@ -106,12 +106,6 @@
         return scored.map(function (x) { return x.e; });
     }
 
-    function escapeHtml(text) {
-        return String(text).replace(/[&<>"']/g, function (c) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-        });
-    }
-
     // ================================================
     // Picker (singleton)
     // ================================================
@@ -137,34 +131,61 @@
         return pop;
     }
 
-    function itemHtml(entry, index, selected) {
+    function buildItem(entry, index, selected) {
         var app = WDLinks.APPS[entry.app] || WDLinks.APPS.filebox;
-        return '<button type="button" class="wdm-item' + (selected ? ' wdm-item-active' : '') + '"'
-            + ' role="option" data-index="' + index + '"'
-            + ' aria-selected="' + (selected ? 'true' : 'false') + '">'
-            + '<span class="wdm-item-icon wdm-app-' + entry.app + '">' + WDLinks.icon(entry.app, 16) + '</span>'
-            + '<span class="wdm-item-name">' + escapeHtml(entry.name) + '</span>'
-            + '<span class="wdm-item-app">' + escapeHtml(app.name) + '</span>'
-            + '</button>';
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'wdm-item' + (selected ? ' wdm-item-active' : '');
+        btn.setAttribute('role', 'option');
+        btn.dataset.index = index;
+        btn.setAttribute('aria-selected', selected ? 'true' : 'false');
+
+        var icon = document.createElement('span');
+        icon.className = 'wdm-item-icon wdm-app-' + entry.app;
+        icon.append(WDLinks.iconNode(entry.app, 16));
+        var name = document.createElement('span');
+        name.className = 'wdm-item-name';
+        name.textContent = entry.name;
+        var appLabel = document.createElement('span');
+        appLabel.className = 'wdm-item-app';
+        appLabel.textContent = app.name;
+        btn.append(icon, name, appLabel);
+        return btn;
+    }
+
+    function emptyDiv(message) {
+        var el = document.createElement('div');
+        el.className = 'wdm-empty';
+        el.textContent = message;
+        return el;
     }
 
     function render() {
         if (!pop || !popState) return;
-        var body = '';
+        var head = [];
         if (popState.mode === 'input') {
-            body += '<div class="wdm-search"><input type="text" class="wdm-search-input"'
-                + ' placeholder="Link to a file…" spellcheck="false" autocomplete="off"></div>';
+            var search = document.createElement('div');
+            search.className = 'wdm-search';
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'wdm-search-input';
+            input.placeholder = 'Link to a file…';
+            input.spellcheck = false;
+            input.autocomplete = 'off';
+            search.append(input);
+            head.push(search);
         }
         if (popState.filtered.length) {
-            body += '<div class="wdm-list">';
+            var list = document.createElement('div');
+            list.className = 'wdm-list';
             for (var i = 0; i < popState.filtered.length; i++) {
-                body += itemHtml(popState.filtered[i], i, i === popState.index);
+                list.append(buildItem(popState.filtered[i], i, i === popState.index));
             }
-            body += '</div>';
+            head.push(list);
         } else {
-            body += '<div class="wdm-empty">No matching files</div>';
+            head.push(emptyDiv('No matching files'));
         }
-        pop.innerHTML = body;
+        pop.replaceChildren(...head);
 
         var input = pop.querySelector('.wdm-search-input');
         if (input) {
@@ -236,7 +257,7 @@
             .catch(function (err) {
                 if (!popState) return;
                 pop.classList.remove('loading');
-                pop.innerHTML = '<div class="wdm-empty">' + escapeHtml(err.message || 'Failed to load files') + '</div>';
+                pop.replaceChildren(emptyDiv(err.message || 'Failed to load files'));
                 position(opts.anchor);
             });
 

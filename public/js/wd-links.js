@@ -54,22 +54,82 @@
         }
     };
 
-    /** Minimal stroke icons (14px grid) for chips/pickers. Kept independent
-     *  from the launcher's WD_APPS so every page renders the same art. */
-    var ICON_PATHS = {
-        docs: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
-        sheets: '<path d="M3 10h18M3 14h18m-9-4v8m-7-6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2z"/>',
-        forms: '<path d="M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>',
-        slides: '<rect x="3" y="4" width="18" height="13" rx="2"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/>',
-        draw: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
-        filebox: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'
+    /** Minimal stroke icons (24px grid) for chips/pickers. Kept independent
+     *  from the launcher's WD_APPS so every page renders the same art.
+     *  Each icon is a [tag, attrs] element list. */
+    var ICONS = {
+        docs: [
+            ['path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }],
+            ['polyline', { points: '14 2 14 8 20 8' }],
+            ['line', { x1: 16, y1: 13, x2: 8, y2: 13 }],
+            ['line', { x1: 16, y1: 17, x2: 8, y2: 17 }]
+        ],
+        sheets: [
+            ['path', { d: 'M3 10h18M3 14h18m-9-4v8m-7-6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2z' }]
+        ],
+        forms: [
+            ['path', { d: 'M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z' }],
+            ['path', { d: 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' }],
+            ['line', { x1: 9, y1: 12, x2: 15, y2: 12 }],
+            ['line', { x1: 9, y1: 16, x2: 13, y2: 16 }]
+        ],
+        slides: [
+            ['rect', { x: 3, y: 4, width: 18, height: 13, rx: 2 }],
+            ['line', { x1: 12, y1: 17, x2: 12, y2: 21 }],
+            ['line', { x1: 8, y1: 21, x2: 16, y2: 21 }]
+        ],
+        draw: [
+            ['path', { d: 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z' }],
+            ['path', { d: 'm15 5 4 4' }]
+        ],
+        filebox: [
+            ['path', { d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' }]
+        ]
     };
 
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+
+    function iconParts(appId) {
+        return ICONS[appId] || ICONS.filebox;
+    }
+
+    function setIconAttrs(el, attrs) {
+        for (var name in attrs) el.setAttribute(name, attrs[name]);
+    }
+
+    /** Icon as an <svg> element. */
+    function iconNode(appId, size) {
+        var s = size || 16;
+        var svg = document.createElementNS(SVG_NS, 'svg');
+        svg.setAttribute('width', s);
+        svg.setAttribute('height', s);
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.setAttribute('aria-hidden', 'true');
+        iconParts(appId).forEach(function (part) {
+            var el = document.createElementNS(SVG_NS, part[0]);
+            setIconAttrs(el, part[1]);
+            svg.appendChild(el);
+        });
+        return svg;
+    }
+
+    /** Icon as SVG markup. The docs app embeds this string directly. */
     function icon(appId, size) {
         var s = size || 16;
+        var body = iconParts(appId).map(function (part) {
+            var attrs = Object.keys(part[1]).map(function (name) {
+                return ' ' + name + '="' + part[1][name] + '"';
+            }).join('');
+            return '<' + part[0] + attrs + '/>';
+        }).join('');
         return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" '
             + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-            + (ICON_PATHS[appId] || ICON_PATHS.filebox) + '</svg>';
+            + body + '</svg>';
     }
 
     function isValidId(id) {
@@ -262,6 +322,7 @@
         INTERNAL_LINK_RE: INTERNAL_LINK_RE,
         APPS: APPS,
         icon: icon,
+        iconNode: iconNode,
         url: url,
         parseLocation: parseLocation,
         parsePath: parsePath,
