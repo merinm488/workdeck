@@ -1,6 +1,6 @@
 {
-  "name": "Filebox — Workdeck",
-  "short_name": "Filebox",
+  "name": "Files — Workdeck",
+  "short_name": "Files",
   "description": "Your files, organized in nested folders. Part of Workdeck.",
   "start_url": "/filebox/",
   "scope": "/filebox/",
@@ -27,7 +27,7 @@
     {
       "name": "Upload files",
       "short_name": "Upload",
-      "description": "Open Filebox and pick files to upload",
+      "description": "Open Files and pick files to upload",
       "url": "/filebox/?upload=1",
       "icons": [
         {

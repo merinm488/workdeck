@@ -168,7 +168,7 @@ const WD_APPS = [
     },
     {
         id: 'filebox',
-        name: 'Filebox',
+        name: 'Files',
         label: 'File',
         accent: 'filebox',
         icon: FILEBOX_ICON,

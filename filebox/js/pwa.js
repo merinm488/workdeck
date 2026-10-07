@@ -78,7 +78,7 @@
       const btn = document.createElement('button');
       btn.id = 'fbInstallBtn';
       btn.className = 'fb-pwa-banner';
-      btn.textContent = 'Install Filebox';
+      btn.textContent = 'Install Files';
       btn.addEventListener('click', async function () {
         btn.remove();
         deferredPrompt.prompt();

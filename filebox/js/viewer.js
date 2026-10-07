@@ -42,6 +42,21 @@ class FileboxViewer {
         this.state = state;
     }
 
+    emitShown() {
+        if (typeof this.onShown === 'function') this.onShown();
+    }
+
+    emitAfterEntryAnimation(el) {
+        let fired = false;
+        const fire = () => {
+            if (fired) return;
+            fired = true;
+            this.emitShown();
+        };
+        if (el) el.addEventListener('animationend', fire, { once: true });
+        setTimeout(fire, 300);   // entry fade is 160ms
+    }
+
     // ================================================
     // Entry / exit
     // ================================================
@@ -62,6 +77,7 @@ class FileboxViewer {
         }
 
         openModal('fbViewer');
+        this.emitAfterEntryAnimation($('fbViewer').querySelector('.fb-modal-content'));
         const body = $('fbViewerBody');
         body.innerHTML = '<div class="fb-viewer-loading">Loading preview…</div>';
 
@@ -175,7 +191,7 @@ class FileboxViewer {
                 close: true,
                 counter: false,
                 wheelToZoom: true,
-                bgOpacity: 0.92
+                bgOpacity: 1
             });
             pswp.on('uiRegister', function () {
                 pswp.ui.registerElement({
@@ -201,6 +217,9 @@ class FileboxViewer {
                     const qs = params.toString();
                     history.replaceState(null, '', '/filebox/' + (qs ? '?' + qs : ''));
                 }
+            });
+            pswp.on('openingAnimationEnd', function () {
+                self.emitShown();
             });
             pswp.init();
             self.pswp = pswp;
@@ -230,19 +249,23 @@ class FileboxViewer {
 
         const scroller = document.createElement('div');
         scroller.className = 'fb-pdf-scroll';
+        const stack = document.createElement('div');
+        stack.className = 'fb-pdf-stack';
         body.innerHTML = '';
         body.appendChild(toolbar);
         body.appendChild(scroller);
+        scroller.appendChild(stack);
 
         const steps = [0.6, 0.8, 1, 1.25, 1.5, 2];
         let step = 2;
         let pageEls = [];
 
+        // 100% shows the page at actual size (A4 = 794×1123 CSS px on
+        // standard 96-dpi screens) — 1 PDF point renders as 4/3 CSS px.
+        const NATURAL = 96 / 72;
+
         async function renderAll() {
-            const page1 = await doc.getPage(1);
-            const base = page1.getViewport({ scale: 1 });
-            const fit = Math.max(0.2, ((scroller.clientWidth || 640) - 36) / base.width);
-            const scale = Math.min(Math.max(0.2, fit * steps[step]), 4);
+            const scale = Math.min(Math.max(0.2, NATURAL * steps[step]), 4);
 
             pageEls.forEach(function (el) { el.remove(); });
             pageEls = [];
@@ -258,7 +281,7 @@ class FileboxViewer {
                 canvas.width = Math.ceil(viewport.width);
                 canvas.height = Math.ceil(viewport.height);
                 wrap.appendChild(canvas);
-                scroller.appendChild(wrap);
+                stack.appendChild(wrap);
                 pageEls.push(wrap);
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
             }

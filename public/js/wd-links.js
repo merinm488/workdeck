@@ -49,7 +49,7 @@
             page: '/draw/editor.html', param: 'id', prefix: '/draw/'
         },
         filebox: {
-            id: 'filebox', name: 'Filebox', label: 'File',
+            id: 'filebox', name: 'Files', label: 'File',
             page: '/filebox/', param: 'id', prefix: '/filebox/'
         }
     };

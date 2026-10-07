@@ -17,8 +17,10 @@
     --text-secondary: #475569;
     --text-tertiary: #94a3b8;
     --border: #e2e8f0;
+    --border-strong: #cbd5e1;
     --danger: #dc2626;
     --danger-soft: rgba(220, 38, 38, 0.1);
+    --shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.07);
     --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
     --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.16);
     --radius-sm: 8px;
@@ -35,8 +37,10 @@
     --text-secondary: #cbd5e1;
     --text-tertiary: #64748b;
     --border: #2c3a52;
+    --border-strong: #3e4f6b;
     --danger: #f87171;
     --danger-soft: rgba(248, 113, 113, 0.12);
+    --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.3);
     --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
     --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
@@ -83,6 +87,21 @@ input, select {
     display: flex;
     height: 100vh;
     overflow: hidden;
+}
+
+/* Deep-link boot veil (class set by the inline <head> script in
+   index.html): while a ?id= / /filebox/<id> URL boots, the shell stays
+   hidden so the homepage can't flash before the viewer opens. visibility
+   rather than display keeps layout measurable for the viewer's renderers.
+   The animation is the no-JS escape hatch — CSS reveals the shell on its
+   own after 6s if boot never completes (blocked CDN, script error). */
+html.fb-deep-boot .fb-app {
+    visibility: hidden;
+    animation: fb-boot-reveal 0s 6s forwards;
+}
+
+@keyframes fb-boot-reveal {
+    to { visibility: visible; }
 }
 
 .fb-main {
@@ -716,26 +735,26 @@ input, select {
 
 .fb-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
 }
 
 .fb-card {
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: 12px;
+    padding: 12px 12px 14px;
     cursor: pointer;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 }
 
 .fb-card:hover {
-    box-shadow: var(--shadow);
-    border-color: var(--text-tertiary);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--border-strong);
+    transform: translateY(-2px);
 }
 
 .fb-card.dragging {
@@ -744,33 +763,23 @@ input, select {
 
 .fb-card-top {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
-    min-height: 88px;
-}
-
-.fb-folder-art {
-    display: flex;
     align-items: center;
+    gap: 10px;
 }
 
-.fb-folder-art svg {
-    width: 84px;
-    height: 70px;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.14));
-}
-
-.fb-file-tile {
-    width: 88px;
-    height: 88px;
+.fb-card-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radius-md);
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.fb-card-icon svg {
+    width: 18px;
+    height: 18px;
 }
 
 .fb-item-menu {
@@ -789,8 +798,27 @@ input, select {
     color: var(--text);
 }
 
+/* ⋮ hides on cards until hover/focus; list rows keep it always visible */
+.fb-card .fb-item-menu {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.fb-card:hover .fb-item-menu,
+.fb-card:focus-within .fb-item-menu {
+    opacity: 1;
+}
+
+@media (pointer: coarse) {
+    .fb-card .fb-item-menu {
+        opacity: 1;
+    }
+}
+
 .fb-card-title {
-    font-size: 14px;
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -800,13 +828,97 @@ input, select {
     overflow-wrap: anywhere;
 }
 
-.fb-card-meta {
+/* Drive-style preview panel — page stays white in both themes */
+.fb-card-preview {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    flex-shrink: 0;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.fb-card-preview-folder {
+    background: var(--bg-input);
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: 6px;
+}
+
+.fb-folder-glyph svg {
+    width: 72px;
+    height: 60px;
+    display: block;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+}
+
+.fb-folder-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+}
+
+.fb-ext-pill {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.fb-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 12px;
     color: var(--text-tertiary);
     margin-top: auto;
+    min-width: 0;
+}
+
+.fb-type-badge {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.fb-type-badge-folder {
+    background: var(--fb-accent-soft);
+    color: var(--fb-accent);
+}
+
+.fb-meta-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    max-width: 110px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.fb-meta-tag .fb-dot {
+    width: 7px;
+    height: 7px;
+}
+
+.fb-meta-tag-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fb-meta-tag-more {
+    flex-shrink: 0;
+    font-weight: 700;
 }
 
 /* List view */
@@ -1101,9 +1213,16 @@ input, select {
     animation: fb-modal-in 0.16s ease;
 }
 
+/* File viewer takes over the whole viewport, Drive-preview style */
+.fb-modal-wide {
+    padding: 0;
+}
+
 .fb-modal-wide .fb-modal-content {
-    max-width: 860px;
-    height: 82vh;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
     display: flex;
     flex-direction: column;
 }
@@ -1473,12 +1592,9 @@ input, select {
    ================================================ */
 
 .fb-card-thumb {
-    display: block;
-    width: 100%;
-    height: 100%;
-    border-radius: inherit;
-    background-color: var(--bg-input);
-    background-size: cover;
+    position: absolute;
+    inset: 0;
+    background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
 }
@@ -1553,13 +1669,23 @@ input, select {
 }
 
 .fb-pdf-scroll {
+    position: relative; /* offsetTop of pages resolves against this */
     flex: 1;
     overflow: auto;
     padding: 16px;
+}
+
+/* Centering lives on an inner stack that grows with its content: with
+   align-items on the scroller itself, a page wider than the viewport
+   overflows both edges and the left half is unreachable by scrolling. */
+.fb-pdf-stack {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 14px;
+    width: fit-content;
+    min-width: 100%;
+    margin: 0 auto;
 }
 
 .fb-pdf-page {
@@ -1764,9 +1890,14 @@ input, select {
     height: 60px;
 }
 
-/* PhotoSwipe download button inherits our icon stroke color */
+.pswp__button--download {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .pswp__button--download svg {
-    stroke: currentColor;
+    stroke: var(--pswp-icon-color, #fff);
 }
 
 /* ================================================

@@ -22,10 +22,10 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
   Account (deletes the unified account).
 - ✏️ **Rename & delete files** from the landing page (including shared
   copies cleanup).
-- 🗃️ **Filebox** — upload files (up to 300 KB each) and organize them in
+- 🗃️ **Files** — upload files (up to 300 KB each) and organize them in
   nested folders of unlimited depth; folder-aware dashboard, drag-to-move,
   search, list/grid views, and a PWA. Files and folders are taggable from
-  the landing page's Tags sidebar or inside Filebox.
+  the landing page's Tags sidebar or inside Files.
 - 📱 **Mobile-friendly** — touch devices open files in the same tab.
 
 ## 🏗️ Architecture
@@ -48,7 +48,7 @@ workdeck/
 │   ├── forms.js            # Forms API (incl. public response submission)
 │   ├── slides.js           # Slides API (deck records + public share snapshots)
 │   ├── draw.js             # Draw API (drawing records + public share snapshots)
-│   └── filebox.js          # Filebox API (file bytes: upload + download)
+│   └── filebox.js          # Files API (file bytes: upload + download)
 ├── docs/                   # Docs build output (from docs-src, base /docs/)
 ├── docs-src/               # Docs source (React+Vite, with:
 │                           #   base '/docs/', ?doc= deep link, shared sessions)
@@ -72,7 +72,7 @@ workdeck/
 │   ├── styles.css
 │   ├── config/config.js
 │   └── js/                 # auth/storage/themes/editor/shared.
-├── filebox/                # Filebox app (vanilla file manager)
+├── filebox/                # Files app (vanilla file manager)
 │   ├── index.html          # manager UI (?folder=, ?id=, ?upload=1 URL states)
 │   ├── styles.css          # self-contained, teal accents
 │   ├── manifest.json       # PWA (scoped to /filebox/, "Upload files" shortcut)
@@ -99,8 +99,8 @@ document per hash in production):
   "forms": [ ... ],
   "slides": [ ... ],
   "draws": [ ... ],
-  "files": [ ... ],      // Filebox file metadata (bytes live in separate records)
-  "folders": [ ... ],    // Filebox folders (nested via parentId)
+  "files": [ ... ],      // Files app file metadata (bytes live in separate records)
+  "folders": [ ... ],    // Files app folders (nested via parentId)
   "settings": {
     "theme": "dark",
     "viewMode": "grid",
@@ -124,7 +124,7 @@ other file.
 "Insert reference" toolbar buttons anywhere) to open a fuzzy picker of
 every file across every app. 
 
-## 🗃️ Filebox
+## 🗃️ Files
 
 A Drive-style file manager at `/filebox/` — upload via picker or full-window
 drag-drop, organize in nested folders of unlimited depth, browse as cards.
@@ -136,7 +136,7 @@ drag-drop, organize in nested folders of unlimited depth, browse as cards.
   `api/_lib/store.js`), never inside the ~1 MB user doc. Upload writes the
   bytes first and bails without metadata on failure (orphan guard); file
   and account deletion remove them again.
-- **Folders vs tags** — folders are Filebox-only (`parentId` nesting,
+- **Folders vs tags** — folders live only in Files (`parentId` nesting,
   8-color palette); tags are the suite-wide `tags` array. Files AND folders
   are multi-tag (`tags: [tagId, ...]`), unlike the single `tagId` on
   docs/sheets/forms/slides/draws.
@@ -144,12 +144,12 @@ drag-drop, organize in nested folders of unlimited depth, browse as cards.
   every descendant folder and contained file (content records included),
   behind a count-confirm.
 - **Tag delete is mixed**: docs/sheets/forms/slides/draws carrying the tag
-  are deleted (existing behavior), while Filebox files/folders only lose
+  are deleted (existing behavior), while files/folders in Files only lose
   the tag id — the confirm copy states this explicitly.
-- **Homepage integration** — Filebox files appear as file cards, top-level
-  folders as Finder-style folder cards (click → opens Filebox inside that
+- **Homepage integration** — Files files appear as file cards, top-level
+  folders as Finder-style folder cards (click → opens Files inside that
   folder); both open/recency-sort via `settings.lastOpened`. Nested depth
-  is navigated inside Filebox only.
+  is navigated inside Files only.
 - **No file thumbnails** — file cards show extension tiles; folder cards
   show a Finder-style folder graphic tinted with the folder color.
 - **PWA** — installable standalone app (teal), `?upload=1` shortcut,

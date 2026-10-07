@@ -28,6 +28,7 @@
 
 const FB_ICONS = {
     folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
+    file: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>',
     upload: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>',
     plus: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16m8-8H4"></path></svg>',
     caret: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>',
@@ -271,6 +272,23 @@ function tagChipsHtml(record) {
         + '</span>';
 }
 
+/** Quiet dot+name tags for the card meta row (Workdeck-style). */
+function tagMetaHtml(record) {
+    const tags = (record.tags || []).map(getTag).filter(Boolean);
+    if (!tags.length) return '';
+    const shown = tags.slice(0, 2);
+    const overflow = tags.length - shown.length;
+    return shown.map(function (tag) {
+        return '<span class="fb-meta-tag" title="' + escapeHtml(tag.name) + '">'
+            + '<span class="fb-dot" style="background:' + escapeHtml(tag.color) + '"></span>'
+            + '<span class="fb-meta-tag-name">' + escapeHtml(tag.name) + '</span>'
+            + '</span>';
+    }).join('')
+        + (overflow > 0 ? '<span class="fb-meta-tag-more" title="'
+            + tags.slice(2).map(function (t) { return escapeHtml(t.name); }).join(', ')
+            + '">+' + overflow + '</span>' : '');
+}
+
 // ================================================
 // Notifications
 // ================================================
@@ -352,6 +370,7 @@ function applyUrlState() {
             openViewer(file);
         } else {
             showNotification('That file no longer exists', 'error');
+            revealApp();   // no viewer will open — un-veil now
         }
     }
 
@@ -363,6 +382,10 @@ function applyUrlState() {
         }, 300);
     }
     syncUrl();
+}
+
+function revealApp() {
+    document.documentElement.classList.remove('fb-deep-boot');
 }
 
 // ================================================
@@ -674,15 +697,21 @@ function buildFolderCard(folder) {
     card.dataset.id = folder.id;
 
     const childCount = childFolders(folder.id).length + childFiles(folder.id).length;
+    const color = folder.color || '#FACC15';
 
     card.innerHTML = '<div class="fb-card-top">'
-        + '<span class="fb-folder-art">' + folderArt(folder.color || '#FACC15') + '</span>'
+        + '<span class="fb-card-icon" style="background:' + escapeHtml(shadeColor(color, 82)) + ';color:' + escapeHtml(color) + '">' + FB_ICONS.folder + '</span>'
+        + '<div class="fb-card-title">' + escapeHtml(folder.name) + '</div>'
         + '<span class="fb-item-menu">' + FB_ICONS.dots + '</span>'
         + '</div>'
-        + '<div class="fb-card-title">' + escapeHtml(folder.name) + '</div>'
+        + '<div class="fb-card-preview fb-card-preview-folder">'
+        + '<span class="fb-folder-glyph">' + folderArt(color) + '</span>'
+        + '<span class="fb-folder-count">' + childCount + (childCount === 1 ? ' item' : ' items') + '</span>'
+        + '</div>'
         + '<div class="fb-card-meta">'
-        + '<span>' + childCount + (childCount === 1 ? ' item' : ' items') + '</span>'
-        + tagChipsHtml(folder)
+        + '<span class="fb-type-badge fb-type-badge-folder">Folder</span>'
+        + tagMetaHtml(folder)
+        + '<span>' + formatRelativeDate(folder.updatedAt) + '</span>'
         + '</div>';
 
     card.addEventListener('click', function (e) {
@@ -699,19 +728,22 @@ function buildFileCard(file) {
     card.dataset.id = file.id;
 
     const color = extColor(file.name);
-    const tileHtml = file.thumbnail
+    const ext = fileExt(file.name);
+    const tile = 'background:' + escapeHtml(shadeColor(color, 82)) + ';color:' + escapeHtml(color);
+    const previewHtml = file.thumbnail
         ? '<span class="fb-card-thumb" style="background-image:url(\'' + escapeHtml(file.thumbnail) + '\')"></span>'
-        : '<div class="fb-file-tile" style="background:' + escapeHtml(shadeColor(color, 82)) + ';color:' + escapeHtml(color) + '">'
-            + '<span>' + escapeHtml(fileExt(file.name)) + '</span></div>';
+        : '<span class="fb-ext-pill" style="' + tile + '">' + escapeHtml(ext) + '</span>';
 
     card.innerHTML = '<div class="fb-card-top">'
-        + tileHtml
+        + '<span class="fb-card-icon" style="' + tile + '">' + FB_ICONS.file + '</span>'
+        + '<div class="fb-card-title">' + escapeHtml(file.name) + '</div>'
         + '<span class="fb-item-menu">' + FB_ICONS.dots + '</span>'
         + '</div>'
-        + '<div class="fb-card-title">' + escapeHtml(file.name) + '</div>'
+        + '<div class="fb-card-preview">' + previewHtml + '</div>'
         + '<div class="fb-card-meta">'
+        + '<span class="fb-type-badge" style="' + tile + '">' + escapeHtml(ext) + '</span>'
+        + tagMetaHtml(file)
         + '<span>' + formatBytes(file.size) + ' · ' + formatRelativeDate(file.updatedAt) + '</span>'
-        + tagChipsHtml(file)
         + '</div>';
 
     card.addEventListener('click', function (e) {
@@ -1082,7 +1114,7 @@ function confirmDeleteTag(tag) {
     }, 0);
     $('fbDeleteTitle').textContent = 'Delete tag';
     let text = 'Delete "<span class="fb-strong">' + escapeHtml(tag.name) + '</span>"? '
-        + fbCount + (fbCount === 1 ? ' Filebox item loses' : ' Filebox items lose') + ' this tag';
+        + fbCount + (fbCount === 1 ? ' item in Files loses' : ' items in Files lose') + ' this tag';
     if (suiteCount) {
         text += '; ' + suiteCount + (suiteCount === 1 ? ' file' : ' files')
             + ' in Docs, Sheets, Forms, Slides and Draw will be deleted';
@@ -1748,6 +1780,7 @@ async function init() {
     updateThemeLabel();
 
     fileboxViewer.init(state);
+    fileboxViewer.onShown = revealApp;
     fileboxUploads.init({
         theme: function () { return fileboxThemeManager.getPreference(); },
         currentFolderId: function () { return state.currentFolderId; },
@@ -1771,7 +1804,10 @@ async function init() {
     });
 
     const ok = await loadUserData();
-    if (!ok) return;
+    if (!ok) {
+        revealApp();   // show the shell behind the "cannot reach server" note
+        return;
+    }
 
     // A deleted account (cleared in another tab) bounces back to Workdeck.
     const verified = await fileboxAuth.verifySession();

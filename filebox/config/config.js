@@ -6,7 +6,7 @@
  */
 
 const APP_CONFIG = {
-    name: 'Filebox',
+    name: 'Files',
     version: '1.0.0',
     description: 'File manager for Workdeck',
 

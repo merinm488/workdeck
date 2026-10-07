@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
 
-    <title>Filebox — Workdeck</title>
-    <meta name="description" content="Filebox — your files, organized in folders. Part of Workdeck.">
+    <title>Files — Workdeck</title>
+    <meta name="description" content="Files — your files, organized in folders. Part of Workdeck.">
     <meta name="theme-color" content="#0d9488">
 
     <link rel="icon" type="image/png" sizes="192x192" href="/filebox/icons/icon-192x192.png">
@@ -28,6 +28,20 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video-js.css">
 
     <link rel="stylesheet" href="/filebox/styles.css">
+
+    <!-- Deep-link boot veil: when the URL targets a file (?id= or the
+         /filebox/<id> hard link), hide the shell before first paint so the
+         homepage never flashes while boot waits on the data load. main.js
+         drops the class once the viewer is actually showing; the CSS rule
+         also self-reveals after 6s in case boot never completes (blocked
+         CDN, dead script). -->
+    <script>
+        (function () {
+            var targetsFile = /(?:\?|&)id=[a-z0-9]{14,}/i.test(window.location.search)
+                || /^\/filebox\/[a-z0-9]{14,}\/?$/i.test(window.location.pathname);
+            if (targetsFile) document.documentElement.classList.add('fb-deep-boot');
+        })();
+    </script>
 </head>
 <body>
     <div class="fb-app">
@@ -41,7 +55,7 @@
                 <span class="fb-brand-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                 </span>
-                <span class="fb-brand-text">Filebox</span>
+                <span class="fb-brand-text">Files</span>
             </a>
 
             <nav class="fb-sidebar-scroll">
