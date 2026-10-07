@@ -1,9 +1,6 @@
 /**
  * Filebox PWA registration.
- *
- * Registers the Filebox service worker at the /filebox/ scope, offers the
- * update banner when a new worker is waiting, captures the install prompt,
- * and keeps the theme-color meta tag in sync with the active theme.
+
  */
 (function () {
   'use strict';
@@ -67,28 +64,6 @@
     document.body.appendChild(banner);
   }
 
-  function captureInstallPrompt() {
-    let deferredPrompt = null;
-
-    window.addEventListener('beforeinstallprompt', function (e) {
-      e.preventDefault();
-      deferredPrompt = e;
-
-      if (document.getElementById('fbInstallBtn')) return;
-      const btn = document.createElement('button');
-      btn.id = 'fbInstallBtn';
-      btn.className = 'fb-pwa-banner';
-      btn.textContent = 'Install Files';
-      btn.addEventListener('click', async function () {
-        btn.remove();
-        deferredPrompt.prompt();
-        await deferredPrompt.userChoice.catch(function () {});
-        deferredPrompt = null;
-      });
-      document.body.appendChild(btn);
-    });
-  }
-
   function setupThemeColor() {
     var updateThemeColor = function () {
       var meta = document.querySelector('meta[name="theme-color"]');
@@ -111,7 +86,6 @@
   }
 
   registerServiceWorker();
-  captureInstallPrompt();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', setupThemeColor);
   } else {
