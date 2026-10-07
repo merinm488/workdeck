@@ -29,12 +29,12 @@
 
     <link rel="stylesheet" href="/filebox/styles.css">
 
-    <!-- Deep-link boot veil: when the URL targets a file (?id= or the
-         /filebox/<id> hard link), hide the shell before first paint so the
-         homepage never flashes while boot waits on the data load. main.js
-         drops the class once the viewer is actually showing; the CSS rule
-         also self-reveals after 6s in case boot never completes (blocked
-         CDN, dead script). -->
+    <!-- Deep-link boot veil: when the URL targets a file or folder (?id= or
+         the /filebox/<id> hard link), hide the shell before first paint so
+         the homepage never flashes while boot waits on the data load. main.js
+         drops the class once the viewer is showing (or the folder opened);
+         the CSS rule also self-reveals after 6s in case boot never completes
+         (blocked CDN, dead script). -->
     <script>
         (function () {
             var targetsFile = /(?:\?|&)id=[a-z0-9]{14,}/i.test(window.location.search)

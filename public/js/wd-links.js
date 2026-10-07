@@ -7,7 +7,7 @@
  * has a canonical, pasteable address:
  *
  *   /docs/<id>   /sheets/<id>   /forms/<id>   /slides/<id>   /draw/<id>
- *   /filebox/<id>                (folders stay query-based: /filebox/?folder=<id>)
+ *   /filebox/<id>                (files AND folders — the app tells them apart)
  *   /f/<id>                      universal resolver -> canonical address
  *
  */
@@ -128,18 +128,16 @@
     }
 
     /**
-     * Canonical URL for a file.
-     *   WDLinks.url('sheets', id)                     -> '/sheets/<id>'
-     *   WDLinks.url('docs', id, { edit: true })       -> '/docs/<id>?edit=1'
-     *   WDLinks.url('forms', id, { fill: true })      -> '/forms/<id>?fill=1'
-     *   WDLinks.url('filebox', id, { folder: true })  -> '/filebox/?folder=<id>'
+     * Canonical URL for a file. Filebox folders share the file form — the
+     * Files app tells them apart from its data, not from the URL.
+     *   WDLinks.url('sheets', id)                -> '/sheets/<id>'
+     *   WDLinks.url('docs', id, { edit: true })  -> '/docs/<id>?edit=1'
+     *   WDLinks.url('forms', id, { fill: true }) -> '/forms/<id>?fill=1'
+     *   WDLinks.url('filebox', id)               -> '/filebox/<id>'
      */
     function url(appId, id, opts) {
         opts = opts || {};
         var app = APPS[appId] || APPS.filebox;
-        if (opts.folder) {
-            return '/filebox/?folder=' + encodeURIComponent(id);
-        }
         var qs = [];
         if (opts.edit) qs.push('edit=1');
         if (opts.fill) qs.push('fill=1');
@@ -259,7 +257,7 @@
         for (var o = 0; o < folders.length; o++) {
             if (folders[o] && folders[o].id === id) {
                 return { app: 'filebox', id: id, name: folders[o].name || 'Folder',
-                    kind: 'folder', record: folders[o], url: url('filebox', id, { folder: true }) };
+                    kind: 'folder', record: folders[o], url: url('filebox', id) };
             }
         }
         return null;

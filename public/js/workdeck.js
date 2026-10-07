@@ -1059,14 +1059,13 @@ function openInNewTab(url) {
 /**
  * Open a file in its app (new tab) and record lastOpened fire-and-forget —
  * the Workdeck tab stays open and refreshes on visibilitychange, so the
- * recents ordering picks it up then. Filebox files deep-link to the viewer
- * (?id=); folder cards open Filebox inside that folder (?folder=).
+ * recents ordering picks it up then. Filebox folder cards share the
+ * /filebox/<id> hard link with files; the Files app opens them inside
+ * the folder.
  */
 function openFile(file) {
-    // Canonical hard link (/sheets/<id>, /filebox/?folder=<id>, ...).
-    const url = file.kind === 'folder'
-        ? WDLinks.url('filebox', file.id, { folder: true })
-        : WDLinks.url(file.app, file.id);
+    // Canonical hard link (/sheets/<id>, /filebox/<id>, ...).
+    const url = WDLinks.url(file.app, file.id);
     openInNewTab(url);
     api('recordOpen', { fileId: file.id, app: file.app })
         .catch(function (err) { console.error('[WORKDECK] recordOpen failed:', err); });
@@ -1074,9 +1073,7 @@ function openFile(file) {
 
 /** Copy a file's canonical hard link (absolute URL) to the clipboard. */
 function copyFileLink(file) {
-    const path = file.kind === 'folder'
-        ? WDLinks.url('filebox', file.id, { folder: true })
-        : WDLinks.url(file.app, file.id);
+    const path = WDLinks.url(file.app, file.id);
     const absolute = window.location.origin + path;
     const done = ok => showNotification(ok ? 'Link copied' : 'Could not copy link', ok ? 'success' : 'error');
     const fallbackCopy = function () {

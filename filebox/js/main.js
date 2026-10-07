@@ -352,14 +352,11 @@ async function loadUserData() {
 // ================================================
 
 function syncUrl() {
-    const params = new URLSearchParams();
-    if (state.currentFolderId) params.set('folder', state.currentFolderId);
-    const qs = params.toString();
-    history.replaceState(null, '', '/filebox/' + (qs ? '?' + qs : ''));
+    history.replaceState(null, '', '/filebox/' + (state.currentFolderId || ''));
 }
 
-/** Apply the hard link (/filebox/<id>), ?folder= / ?tag= / ?id= /
- *  ?upload=1 after data has loaded. */
+/** Apply the hard link (/filebox/<id> — file or folder), ?folder= (legacy)
+ *  / ?tag= / ?id= / ?upload=1 after data has loaded. */
 function applyUrlState() {
     const params = new URLSearchParams(window.location.search);
 
@@ -377,18 +374,19 @@ function applyUrlState() {
         state.currentFolderId = null;
     }
 
-    // Hard link /filebox/<id> first (the browser URL carries no query —
-    // the server rewrite targets the file invisibly), legacy ?id= second.
     // ?folder= ids are handled above, not here.
     const loc = window.WDLinks ? WDLinks.parseLocation() : null;
-    const fileId = (loc && loc.kind !== 'folder' && loc.id) || params.get('id');
-    if (fileId) {
-        const file = getFile(fileId);
+    const targetId = (loc && loc.kind !== 'folder' && loc.id) || params.get('id');
+    if (targetId) {
+        const file = getFile(targetId);
         if (file) {
-            openViewer(file);
+            openViewer(file);   // the viewer reveals the app when shown
+        } else if (getFolder(targetId)) {
+            openFolder(targetId);
+            revealApp();        // no viewer will open — un-veil now
         } else {
-            showNotification('That file no longer exists', 'error');
-            revealApp();   // no viewer will open — un-veil now
+            showNotification('That item no longer exists', 'error');
+            revealApp();        // no viewer will open — un-veil now
         }
     }
 

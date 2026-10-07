@@ -512,7 +512,7 @@
             id: ref.id,
             name: null,
             kind: ref.kind || 'file',
-            url: WDLinks.url(ref.app || 'filebox', ref.id, ref.kind === 'folder' ? { folder: true } : undefined),
+            url: WDLinks.url(ref.app || 'filebox', ref.id),
             missing: true
         };
     }
