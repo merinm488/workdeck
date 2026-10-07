@@ -99,8 +99,8 @@ document per hash in production):
   "forms": [ ... ],
   "slides": [ ... ],
   "draws": [ ... ],
-  "files": [ ... ],      // Files app file metadata (bytes live in separate records)
-  "folders": [ ... ],    // Files app folders (nested via parentId)
+  "files": [ ... ],      
+  "folders": [ ... ],   
   "settings": {
     "theme": "dark",
     "viewMode": "grid",
