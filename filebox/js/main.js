@@ -102,7 +102,6 @@ const state = {
     files: [],
     folders: [],
     tags: [],
-    rawDoc: null,                   
     settings: {},
     currentFolderId: null,          // null = root ("All folders")
     activeTag: null,               
@@ -345,7 +344,6 @@ function applyUserData(data) {
     state.folders = data.folders || [];
     state.tags = data.tags || [];
     state.settings = data.settings || {};
-    state.rawDoc = data;    // docs/sheets/... counts for the delete-tag warning
     render();
     if (window.fileboxThumbs) {
         fileboxThumbs.ensureMissing(state.files, {
@@ -1189,19 +1187,8 @@ function setDeleteText(prefix, name, suffix) {
 
 function confirmDeleteTag(tag) {
     state.deleteTarget = { kind: 'tag', id: tag.id };
-    const fbCount = tagItemCount(tag.id);
-    const doc = state.rawDoc || {};
-    const suiteCount = ['docs', 'sheets', 'forms', 'slides', 'draws'].reduce(function (sum, key) {
-        return sum + (doc[key] || []).filter(function (f) { return f && f.tagId === tag.id; }).length;
-    }, 0);
     $('fbDeleteTitle').textContent = 'Delete tag';
-    let suffix = '"? ' + fbCount + (fbCount === 1 ? ' item in Files loses' : ' items in Files lose') + ' this tag';
-    if (suiteCount) {
-        suffix += '; ' + suiteCount + (suiteCount === 1 ? ' file' : ' files')
-            + ' in Docs, Sheets, Forms, Slides and Draw will be deleted';
-    }
-    suffix += '. This cannot be undone.';
-    setDeleteText('Delete "', tag.name, suffix);
+    setDeleteText('Delete "', tag.name, '"? This cannot be undone.');
     openModal('fbDeleteModal');
 }
 
