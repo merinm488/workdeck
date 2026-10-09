@@ -67,7 +67,7 @@ class FileboxViewer {
     // ================================================
 
     open(file) {
-        fileboxStorage.recordOpen(file.id).catch(function () {});
+        recordOpenNow(file.id);
         $('fbViewerTitle').textContent = file.name;
         $('fbViewerMeta').textContent = formatBytes(file.size) + ' · ' + formatRelativeDate(file.updatedAt);
         $('fbViewerDownload').onclick = function () {
@@ -125,6 +125,7 @@ class FileboxViewer {
             const qs = params.toString();
             history.replaceState(null, '', '/filebox/' + (qs ? '?' + qs : ''));
         }
+        if (typeof this.onClosed === 'function') this.onClosed();
     }
 
     teardown() {
@@ -245,6 +246,7 @@ class FileboxViewer {
                     const qs = params.toString();
                     history.replaceState(null, '', '/filebox/' + (qs ? '?' + qs : ''));
                 }
+                if (typeof self.onClosed === 'function') self.onClosed();
             });
             pswp.on('openingAnimationEnd', function () {
                 self.emitShown();

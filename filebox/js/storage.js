@@ -176,6 +176,11 @@ class FileboxStorage {
         return this.workdeckAction('setFileFolder', { fileId, folderId: folderId || null });
     }
 
+    /** Move a folder (parentId null = root). */
+    setFolderParent(folderId, parentId) {
+        return this.workdeckAction('setFolderParent', { folderId, parentId: parentId || null });
+    }
+
     setFileThumbnail(fileId, thumbnail, cover, version) {
         return this.workdeckAction('setFileThumbnail', {
             fileId, thumbnail, thumbnailCover: cover === true, thumbVer: version || 0

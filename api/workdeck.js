@@ -462,6 +462,30 @@ export default async function handler(req, res) {
           target.updatedAt = new Date().toISOString();
           break;
         }
+
+        // Moving a folder = reparenting. parentId may not be the folder
+        // itself or one of its descendants, or the tree would cycle.
+        case 'setFolderParent': {
+          const target = (userData.folders || []).find(f => f.id === data?.folderId);
+          if (!target) {
+            return res.status(404).json({ success: false, error: 'Folder not found' });
+          }
+          const parentId = data?.parentId || null;
+          if (parentId) {
+            if (parentId === target.id) {
+              return res.status(400).json({ success: false, error: 'Cannot move a folder into itself' });
+            }
+            if (!(userData.folders || []).some(f => f.id === parentId)) {
+              return res.status(404).json({ success: false, error: 'Parent folder not found' });
+            }
+            if (collectFolderTree(userData.folders || [], target.id).has(parentId)) {
+              return res.status(400).json({ success: false, error: 'Cannot move a folder into its own subfolder' });
+            }
+          }
+          target.parentId = parentId;
+          target.updatedAt = new Date().toISOString();
+          break;
+        }
         
         case 'setFileThumbnail': {
           const target = (userData.files || []).find(f => f.id === data?.fileId);

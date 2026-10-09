@@ -7,7 +7,7 @@
  *   header     — brand (/), search, Upload, New folder, sort, view toggle,
  *                settings (theme + View My Key + Logout)
  *   sidebar    — "All folders" root + unlimited-depth folder tree with
- *                expand/collapse, per-row actions, drag-a-file-to-move
+ *                expand/collapse, per-row actions, drag-a-file-or-folder-to-move
  *   dashboard  — breadcrumb + folder/file cards (grid) or rows (list)
  *
  * Two subsystems live in their own modules, each backed by libraries:
@@ -110,7 +110,7 @@ const state = {
     sort: localStorage.getItem(FB_SORT_KEY) || 'recent',
     searchQuery: '',
     expanded: new Set(),            // expanded folder ids in the sidebar tree
-    dragFileId: null,
+    dragItem: null,                 // {kind: 'file'|'folder', id} while dragging
     dragDepth: 0,
 
     // Modal scratch
@@ -190,6 +190,13 @@ function getFolder(id) {
     return state.folders.find(function (f) { return f.id === id; }) || null;
 }
 
+/** Stamp recency locally (sort updates before the next poll) + on the server. */
+function recordOpenNow(id) {
+    state.settings.lastOpened = state.settings.lastOpened || {};
+    state.settings.lastOpened[id] = new Date().toISOString();
+    fileboxStorage.recordOpen(id).catch(function () {});
+}
+
 function getFile(id) {
     return state.files.find(function (f) { return f.id === id; }) || null;
 }
@@ -236,9 +243,12 @@ function folderItemCount(rootId) {
         + state.files.filter(function (f) { return f && doomed.has(f.folderId); }).length;
 }
 
+/** Latest of open/updated/created, so a tag or edit after an open
+ *  still bumps the item to the top. */
 function recency(record) {
     const lastOpened = (state.settings && state.settings.lastOpened) || {};
-    return lastOpened[record.id] || record.updatedAt || record.createdAt || '';
+    return [lastOpened[record.id], record.updatedAt, record.createdAt]
+        .filter(Boolean).sort().pop() || '';
 }
 
 function sortBy(list, keyFn) {
@@ -432,7 +442,7 @@ function openFolder(folderId) {
     applySidebarDrawer(false);
     if (folderId) {
         ancestorsOf(folderId).forEach(function (f) { state.expanded.add(f.id); });
-        fileboxStorage.recordOpen(folderId).catch(function () {});
+        recordOpenNow(folderId);
     }
     syncUrl();
     closeItemMenu();
@@ -564,7 +574,8 @@ function buildTreeLevel(container, parentId, depth) {
                 openFolder(folder.id);
             }
         });
-        makeSidebarDropTarget(row, folder.id);
+        makeFolderDropTarget(row, folder.id);
+        makeItemDraggable(row, folder, 'folder');
         row.tabIndex = 0;
 
         container.appendChild(row);
@@ -692,14 +703,21 @@ function renderContent() {
     }
     empty.classList.add('hidden');
 
+    const folderIds = new Set(folders.map(function (f) { return f.id; }));
+    const ordered = state.sort === 'recent'
+        ? sortBy(folders.concat(files), function () { return 0; })
+        : folders.concat(files);
+
     if (state.view === 'list') {
         list.classList.remove('hidden');
-        folders.forEach(function (folder) { list.appendChild(buildFolderRow(folder)); });
-        files.forEach(function (file) { list.appendChild(buildFileRow(file)); });
+        ordered.forEach(function (record) {
+            list.appendChild(folderIds.has(record.id) ? buildFolderRow(record) : buildFileRow(record));
+        });
     } else {
         grid.classList.remove('hidden');
-        folders.forEach(function (folder) { grid.appendChild(buildFolderCard(folder)); });
-        files.forEach(function (file) { grid.appendChild(buildFileCard(file)); });
+        ordered.forEach(function (record) {
+            grid.appendChild(folderIds.has(record.id) ? buildFolderCard(record) : buildFileCard(record));
+        });
     }
 
     renderFooter();
@@ -734,6 +752,8 @@ function buildFolderCard(folder) {
         openFolder(folder.id);
     });
     bindItemMenu(card, folder, 'folder');
+    makeItemDraggable(card, folder, 'folder');
+    makeFolderDropTarget(card, folder.id);
     return card;
 }
 
@@ -781,7 +801,7 @@ function buildFileCard(file) {
         openViewer(file);
     });
     bindItemMenu(card, file, 'file');
-    makeFileDraggable(card, file);
+    makeItemDraggable(card, file, 'file');
     return card;
 }
 
@@ -802,6 +822,8 @@ function buildFolderRow(folder) {
         openFolder(folder.id);
     });
     bindItemMenu(row, folder, 'folder');
+    makeItemDraggable(row, folder, 'folder');
+    makeFolderDropTarget(row, folder.id);
     return row;
 }
 
@@ -831,7 +853,7 @@ function buildFileRow(file) {
         openViewer(file);
     });
     bindItemMenu(row, file, 'file');
-    makeFileDraggable(row, file);
+    makeItemDraggable(row, file, 'file');
     return row;
 }
 
@@ -1471,47 +1493,57 @@ async function confirmTags() {
 }
 
 // ================================================
-// Sidebar: drag a file card onto a folder row to move it
+// Drag & drop: files/folders onto folders (move) or tags (tag)
 // ================================================
 
-function makeFileDraggable(el, file) {
+function makeItemDraggable(el, record, kind) {
     el.draggable = true;
     el.addEventListener('dragstart', function (e) {
-        state.dragFileId = file.id;
+        state.dragItem = { kind: kind, id: record.id };
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', 'filebox:' + file.id);
+        e.dataTransfer.setData('text/plain', 'filebox:' + record.id);
         el.classList.add('dragging');
     });
     el.addEventListener('dragend', function () {
-        state.dragFileId = null;
+        state.dragItem = null;
         el.classList.remove('dragging');
-        document.querySelectorAll('.fb-side-row.drop-target, #fbAllFolders.drop-target').forEach(function (row) {
+        document.querySelectorAll('.drop-target').forEach(function (row) {
             row.classList.remove('drop-target');
         });
     });
 }
 
-function makeSidebarDropTarget(row, folderId) {
-    row.addEventListener('dragover', function (e) {
-        if (!state.dragFileId) return;
+/** False while a folder drags over itself or its own subtree. */
+function canDropInto(item, folderId) {
+    if (!item) return false;
+    if (item.kind !== 'folder') return true;
+    return item.id !== folderId && !collectFolderIds(item.id).has(folderId);
+}
+
+function makeFolderDropTarget(el, folderId) {
+    el.addEventListener('dragover', function (e) {
+        if (!canDropInto(state.dragItem, folderId)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        row.classList.add('drop-target');
+        el.classList.add('drop-target');
     });
-    row.addEventListener('dragleave', function (e) {
-        if (!row.contains(e.relatedTarget)) row.classList.remove('drop-target');
+    el.addEventListener('dragleave', function (e) {
+        if (!el.contains(e.relatedTarget)) el.classList.remove('drop-target');
     });
-    row.addEventListener('drop', function (e) {
+    el.addEventListener('drop', function (e) {
         e.preventDefault();
-        row.classList.remove('drop-target');
-        if (state.dragFileId) moveFileToFolder(state.dragFileId, folderId);
+        el.classList.remove('drop-target');
+        const item = state.dragItem;
+        if (!item || !canDropInto(item, folderId)) return;
+        if (item.kind === 'folder') moveFolderToFolder(item.id, folderId);
+        else moveFileToFolder(item.id, folderId);
     });
 }
 
 /** Drop a dragged file/folder card on a tag row*/
 function makeTagDropTarget(row, tagId) {
     row.addEventListener('dragover', function (e) {
-        if (!state.dragFileId) return;
+        if (!state.dragItem) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         row.classList.add('drop-target');
@@ -1522,7 +1554,7 @@ function makeTagDropTarget(row, tagId) {
     row.addEventListener('drop', function (e) {
         e.preventDefault();
         row.classList.remove('drop-target');
-        if (state.dragFileId) addTagToRecord(state.dragFileId, tagId);
+        if (state.dragItem) addTagToRecord(state.dragItem.id, tagId);
     });
 }
 
@@ -1550,6 +1582,30 @@ async function moveFileToFolder(fileId, folderId) {
         file.folderId = before;
         render();
         showNotification('Failed to move file', 'error');
+    }
+}
+
+async function moveFolderToFolder(folderId, parentId) {
+    const folder = getFolder(folderId);
+    if (!folder || (folder.parentId || null) === (parentId || null)) return;
+    if (!canDropInto({ kind: 'folder', id: folderId }, parentId)) {
+        showNotification('Can’t move a folder into its own subfolder', 'error');
+        return;
+    }
+
+    const before = folder.parentId;
+    folder.parentId = parentId;
+    render();
+    const data = await fileboxStorage.setFolderParent(folderId, parentId);
+    if (data) {
+        applyUserData(data);
+        ancestorsOf(folderId).forEach(function (f) { state.expanded.add(f.id); });
+        renderSidebar();
+        showNotification('Moved', 'success');
+    } else {
+        folder.parentId = before;
+        render();
+        showNotification('Failed to move folder', 'error');
     }
 }
 
@@ -1698,7 +1754,7 @@ function setupEventListeners() {
             openFolder(null);
         }
     });
-    makeSidebarDropTarget($('fbAllFolders'), null);
+    makeFolderDropTarget($('fbAllFolders'), null);
     $('fbAllFolders').tabIndex = 0;
 
     // ----- Folder form -----
@@ -1849,6 +1905,7 @@ async function init() {
 
     fileboxViewer.init(state);
     fileboxViewer.onShown = revealApp;
+    fileboxViewer.onClosed = renderContent;
     fileboxUploads.init({
         theme: function () { return fileboxThemeManager.getPreference(); },
         currentFolderId: function () { return state.currentFolderId; },
