@@ -1189,18 +1189,6 @@ function showDeleteModal(file) {
             '" and its ' + count + (count === 1 ? ' item' : ' items') + '? This cannot be undone.');
     } else {
         el.replaceChildren('Are you sure you want to delete "', strong, '"? This cannot be undone.');
-        // Warn when other files reference this one (@mentions will break).
-        if (window.WDMentions) {
-            const backlinks = WDMentions.findBacklinks(file.id, state);
-            if (backlinks.length) {
-                const note = document.createElement('div');
-                note.className = 'wd-delete-backlinks';
-                note.textContent = backlinks.length
-                    + (backlinks.length === 1 ? ' file links' : ' files link')
-                    + ' to this — its mentions will show as unavailable.';
-                el.append(note);
-            }
-        }
     }
     $('deleteModal').classList.add('active');
 }
