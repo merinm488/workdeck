@@ -40,7 +40,7 @@
  */
 const FORMJS_FIELD_TYPES = new Set([
     // Input
-    'textfield', 'textarea', 'number', 'datetime', 'filepicker',
+    'textfield', 'textarea', 'number', 'datetime', 'filepicker', 'expression',
     // Selection
     'checkbox', 'checklist', 'radio', 'select', 'taglist',
     // Presentation
