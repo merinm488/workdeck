@@ -1116,7 +1116,7 @@ async function createFile(appId) {
         const data = await api(app.create.action, payload);
         const file = app.create.pickNewest(data);
         if (!file) throw new Error('File creation failed');
-        openInNewTab(WDLinks.url(file.app, file.id, { edit: true }));
+        openInNewTab(WDLinks.url(app.id, file.id, { edit: true }));
         hideLoading();
         loadUserData();  // show the new file in the list right away
     } catch (error) {
