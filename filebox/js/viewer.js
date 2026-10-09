@@ -9,6 +9,8 @@
  *   image/*      PhotoSwipe   fullscreen lightbox: pinch/zoom/swipe + download
  *   pdf          pdf.js       paginated canvas renderer with zoom controls
  *   docx         docx-preview layout-faithful Word rendering (.docx only)
+ *   pptx         pptx-preview all slides, stacked (lazy-loaded CDN lib)
+ *   ppt          fileboxThumbs.parsePpt -> slide cards (text + pictures)
  *   xlsx         SheetJS      table view with sheet tabs
  *   csv          Papa Parse   parsed rows rendered as a table
  *   md           marked       sanitized HTML + highlight.js code blocks
@@ -25,9 +27,11 @@
  */
 
 const FB_CODE_LANGS = {
-    js: 'javascript', ts: 'typescript', json: 'json', html: 'xml', css: 'css',
+    js: 'javascript', ts: 'typescript', json: 'json', jsonl: 'json',
+    ndjson: 'json', html: 'xml', css: 'css',
     py: 'python', xml: 'xml', sh: 'bash', yml: 'yaml', yaml: 'yaml',
-    java: 'java', c: 'c', cpp: 'cpp', rb: 'ruby', go: 'go', rs: 'rust'
+    java: 'java', c: 'c', cpp: 'cpp', rb: 'ruby', go: 'go', rs: 'rust',
+    log: 'plaintext'
 };
 
 class FileboxViewer {
@@ -35,6 +39,7 @@ class FileboxViewer {
         this.state = null;
         this.pdfDoc = null;         // active pdf.js document
         this.mediaPlayer = null;    // active video.js player
+        this.pptxPreviewer = null;  // active pptx-preview instance
     }
 
     /** Wire to main.js state (needs the folder context + deep-link URL). */
@@ -87,6 +92,8 @@ class FileboxViewer {
         const renderers = {
             pdf: this.renderPdf,
             docx: this.renderDocx,
+            pptx: this.renderPptx,
+            ppt: this.renderPpt,
             xlsx: this.renderXlsx,
             csv: this.renderCsv,
             md: this.renderMarkdown,
@@ -121,6 +128,10 @@ class FileboxViewer {
     }
 
     teardown() {
+        // .ppt slide-card images are object URLs — release them
+        document.querySelectorAll('#fbViewerBody .fb-ppt-pics img').forEach(function (img) {
+            if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+        });
         if (this.pdfDoc) {
             try { this.pdfDoc.destroy(); } catch (err) { /* already gone */ }
             this.pdfDoc = null;
@@ -128,6 +139,10 @@ class FileboxViewer {
         if (this.mediaPlayer) {
             try { this.mediaPlayer.dispose(); } catch (err) { /* already gone */ }
             this.mediaPlayer = null;
+        }
+        if (this.pptxPreviewer) {
+            try { this.pptxPreviewer.destroy(); } catch (err) { /* already gone */ }
+            this.pptxPreviewer = null;
         }
     }
 
@@ -151,6 +166,8 @@ class FileboxViewer {
         if (mime.startsWith('image/')) return 'image';
         if (mime === 'application/pdf' || ext === 'pdf') return 'pdf';
         if (ext === 'docx') return 'docx';
+        if (ext === 'pptx' || mime.includes('presentation')) return 'pptx';
+        if (ext === 'ppt' || mime === 'application/vnd.ms-powerpoint') return 'ppt';
         if (ext === 'xls' || ext === 'xlsx' || mime.includes('spreadsheet')) return 'xlsx';
         if (ext === 'csv' || mime === 'text/csv') return 'csv';
         if (ext === 'md' || ext === 'markdown') return 'md';
@@ -330,6 +347,93 @@ class FileboxViewer {
         paper.className = 'fb-docx-paper';
         body.appendChild(paper);
         await docx.renderAsync(buffer, paper, null, { inWrapper: true });
+    }
+
+    /** PDF-style prev/next bar that scrolls `scroller` between slides. */
+    slideToolbar(scroller, itemSelector, count) {
+        const bar = $('fbSlideToolbarTemplate').content.firstElementChild.cloneNode(true);
+        bar.querySelector('[data-r="pages"]').textContent = count;
+        const pageEl = bar.querySelector('[data-r="page"]');
+
+        const goTo = (n) => {
+            const el = scroller.querySelectorAll(itemSelector)[n - 1];
+            if (el) scroller.scrollTo({ top: el.offsetTop - 14, behavior: 'smooth' });
+        };
+        bar.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-a]');
+            if (!btn) return;
+            const current = this.seenSlide(scroller, itemSelector);
+            if (btn.dataset.a === 'prev' && current > 1) goTo(current - 1);
+            if (btn.dataset.a === 'next' && current < count) goTo(current + 1);
+        });
+        scroller.addEventListener('scroll', () => {
+            pageEl.textContent = this.seenSlide(scroller, itemSelector);
+        });
+        return bar;
+    }
+
+    seenSlide(scroller, itemSelector) {
+        const els = scroller.querySelectorAll(itemSelector);
+        const pos = scroller.scrollTop + scroller.clientHeight / 3;
+        let seen = 1;
+        for (let i = 0; i < els.length; i++) {
+            if (els[i].offsetTop <= pos) seen = i + 1;
+        }
+        return seen;
+    }
+
+    async renderPptx(file, body) {
+        if (window.fileboxThumbs) await fileboxThumbs.preload('pptx');
+        if (!window.pptxPreview) return this.renderFallback(file, body);
+
+        const buffer = await this.fetchBuffer(file);
+        body.innerHTML = '';
+        const scroller = document.createElement('div');
+        scroller.className = 'fb-pptx-scroll';
+        const stage = document.createElement('div');
+        scroller.appendChild(stage);
+        body.appendChild(scroller);
+
+        this.pptxPreviewer = window.pptxPreview.init(stage, {
+            width: Math.max(320, Math.min(960, stage.clientWidth || 860)),
+            mode: 'list'
+        });
+        await this.pptxPreviewer.preview(buffer);
+        if (!stage.querySelector('.pptx-preview-slide-wrapper') && window.fileboxThumbs) {
+            // broken package (dead [Content_Types].xml overrides) — repair + retry
+            const fixed = await fileboxThumbs.repairPptx(buffer);
+            if (fixed) await this.pptxPreviewer.preview(fixed);
+        }
+        const slides = stage.querySelectorAll('.pptx-preview-slide-wrapper');
+        if (!slides.length) {
+            this.pptxPreviewer = null;
+            body.replaceChildren();
+            return this.renderFallback(file, body);
+        }
+        if (slides.length > 1) {
+            body.insertBefore(this.slideToolbar(scroller, '.pptx-preview-slide-wrapper', slides.length), scroller);
+        }
+    }
+
+    async renderPpt(file, body) {
+        const deck = window.fileboxThumbs
+            ? fileboxThumbs.parsePpt(await this.fetchBuffer(file))
+            : { slides: [] };
+        const slides = deck.slides.filter(function (slide) {
+            return slide.lines.length || slide.images.length;
+        });
+        if (!slides.length) return this.renderFallback(file, body);
+
+        body.innerHTML = '';
+        const scroller = document.createElement('div');
+        scroller.className = 'fb-pptx-scroll fb-ppt-deck';
+        slides.forEach(function (slide, i) {
+            scroller.appendChild(fileboxThumbs.pptSlideCard(deck, slide, i, slides.length));
+        });
+        body.appendChild(scroller);
+        if (slides.length > 1) {
+            body.insertBefore(this.slideToolbar(scroller, '.fb-ppt-slide', slides.length), scroller);
+        }
     }
 
     // ================================================

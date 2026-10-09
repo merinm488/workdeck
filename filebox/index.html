@@ -534,6 +534,15 @@
         </div>
     </template>
 
+    <!-- Slide nav bar (viewer.js: slideToolbar for .pptx / .ppt) -->
+    <template id="fbSlideToolbarTemplate">
+        <div class="fb-pdf-toolbar">
+            <button type="button" data-a="prev" title="Previous slide">‹</button>
+            <span class="fb-pdf-pageinfo">Slide <span data-r="page">1</span> / <span data-r="pages"></span></span>
+            <button type="button" data-a="next" title="Next slide">›</button>
+        </div>
+    </template>
+
     <!-- No-preview fallback (viewer.js: renderFallback) -->
     <template id="fbViewerFallbackTemplate">
         <div class="fb-viewer-fallback">
@@ -543,10 +552,11 @@
     </template>
 
     <!-- Vendor libraries (see <head> note). UMD tags expose globals:
-         Uppy, imageCompression, docx, XLSX, Papa, marked, DOMPurify,
-         hljs, videojs. -->
+         Uppy, imageCompression, JSZip, docx, XLSX, Papa, marked,
+         DOMPurify, hljs, videojs. JSZip backs docx-preview's zip reads. -->
     <script src="https://releases.transloadit.com/uppy/v4.18.3/uppy.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.4.1/dist/docx-preview.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.7.0/papaparse.min.js"></script>
@@ -557,9 +567,10 @@
 
     <!-- Custom JavaScript (plain script tags, no modules).
          Load order matters: config -> auth -> storage -> themes ->
-         uploads -> viewer -> main. vendor-esm.js is a module script: it
-         executes after the classics above but before DOMContentLoaded, so
-         pdfjsLib/PhotoSwipe globals exist before init() runs. -->
+         thumbs -> uploads -> viewer -> main. vendor-esm.js is a module
+         script: it executes after the classics above but before
+         DOMContentLoaded, so pdfjsLib/PhotoSwipe globals exist before
+         init() runs. -->
     <link rel="stylesheet" href="/js/wd-mentions.css">
     <script src="/js/wd-links.js"></script>
     <script src="/js/wd-mentions.js"></script>
@@ -568,6 +579,7 @@
     <script src="js/storage.js"></script>
     <script src="js/themes.js"></script>
     <script type="module" src="js/vendor-esm.js"></script>
+    <script src="js/thumbs.js"></script>
     <script src="js/uploads.js"></script>
     <script src="js/viewer.js"></script>
     <script src="js/main.js"></script>

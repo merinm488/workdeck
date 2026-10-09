@@ -176,6 +176,12 @@ class FileboxStorage {
         return this.workdeckAction('setFileFolder', { fileId, folderId: folderId || null });
     }
 
+    setFileThumbnail(fileId, thumbnail, cover, version) {
+        return this.workdeckAction('setFileThumbnail', {
+            fileId, thumbnail, thumbnailCover: cover === true, thumbVer: version || 0
+        });
+    }
+
     /** Full tag-array replace (one call adds AND removes). */
     setFileTags(fileId, tagIds) {
         return this.workdeckAction('setFileTags', { fileId, tagIds });

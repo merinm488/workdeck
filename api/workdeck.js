@@ -462,6 +462,20 @@ export default async function handler(req, res) {
           target.updatedAt = new Date().toISOString();
           break;
         }
+        
+        case 'setFileThumbnail': {
+          const target = (userData.files || []).find(f => f.id === data?.fileId);
+          if (!target) {
+            return res.status(404).json({ success: false, error: 'File not found' });
+          }
+          const thumb = data?.thumbnail;
+          const valid = typeof thumb === 'string' &&
+            thumb.startsWith('data:image/') && thumb.length <= 60000;
+          target.thumbnail = valid ? thumb : null;
+          target.thumbnailCover = valid ? data?.thumbnailCover === true : false;
+          target.thumbVer = valid && data?.thumbVer > 0 ? data.thumbVer : 0;
+          break;
+        }
 
         // Full-array replace, so one call both adds and removes tags.
         case 'setFileTags': {

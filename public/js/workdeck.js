@@ -346,6 +346,7 @@ function getAllFiles() {
             tagId: null,
             tags: Array.isArray(f.tags) ? f.tags.slice() : [],
             folderId: f.folderId || null,
+            thumbnail: f.thumbnail || null,
             content: '',
             raw: f
         };

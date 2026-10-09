@@ -580,7 +580,7 @@
     }
 
     // ================================================
-    // Filebox previews (extension tile; files carry no thumbnails)
+    // Filebox previews 
     // ================================================
 
     function fileExtension(name) {
@@ -589,6 +589,10 @@
     }
 
     function renderFilebox(page, file) {
+        if (file.thumbnail) {
+            setImage(page, file.thumbnail);
+            return;
+        }
         const raw = file.raw || {};
         const tile = document.createElement('div');
         tile.className = 'wd-preview-filebox-tile';

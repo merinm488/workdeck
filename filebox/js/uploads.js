@@ -9,14 +9,14 @@
  * per-file progress, retry/cancel, and oversize rejection (restrictions.maxFileSize).
  *
  *
- * Thumbnails ride along on the upload: images are downscaled with
- * browser-image-compression, PDF first pages are rasterised with pdf.js.
- * Both become a small JPEG data URL (api/filebox.js caps it at 60 KB
- * and nulls anything bigger — a thumbnail never fails an upload).
+ * Thumbnails ride along on the upload — one generator per file kind
+ * (js/thumbs.js): images, PDFs, Office files, video, audio, text. Each
+ * becomes a small JPEG data URL (api/filebox.js caps it at 60 KB and
+ * nulls anything bigger — a thumbnail never fails an upload).
  */
 
 // ================================================
-// Encoding / thumbnail helpers
+// Encoding helpers
 // ================================================
 
 function blobToBase64(blob, withPrefix) {
@@ -31,43 +31,9 @@ function blobToBase64(blob, withPrefix) {
     });
 }
 
-/**
- * Small JPEG data URL for image/PDF cards. Returns null for anything
- * else (or on any failure) — previews are best-effort.
- */
 async function makeThumbnail(file) {
-    const type = file.type || '';
-    try {
-        if (/^image\//.test(type) && type !== 'image/gif' && type !== 'image/svg+xml') {
-            const blob = await imageCompression(file.data, {
-                maxWidthOrHeight: 480,
-                initialQuality: 0.72,
-                fileType: 'image/jpeg'
-            });
-            const url = await blobToBase64(blob, true);
-            return url.length <= 60000 ? url : null;
-        }
-        if (type === 'application/pdf' && window.pdfjsLib) {
-            const buffer = await file.data.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-            const page = await pdf.getPage(1);
-            const base = page.getViewport({ scale: 1 });
-            const viewport = page.getViewport({ scale: Math.min(480 / base.width, 2) });
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.ceil(viewport.width);
-            canvas.height = Math.ceil(viewport.height);
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-            const url = canvas.toDataURL('image/jpeg', 0.72);
-            pdf.destroy();
-            return url.length <= 60000 ? url : null;
-        }
-    } catch (err) {
-        return null;   // never fail an upload over a preview
-    }
-    return null;
+    if (!window.fileboxThumbs) return { url: null, cover: true };
+    return fileboxThumbs.forCard(file.data, { name: file.name, mime: file.type });
 }
 
 // ================================================
@@ -108,7 +74,7 @@ class FileboxJsonUploader extends Uppy.BasePlugin {
         });
 
         try {
-            const thumbnail = await makeThumbnail(file);
+            const thumb = await makeThumbnail(file);
             const base64 = await blobToBase64(file.data, false);
             // Uploading inside a tag view files the new record under it
             // (same idea as currentFolderId). The server drops tag ids it
@@ -126,7 +92,9 @@ class FileboxJsonUploader extends Uppy.BasePlugin {
                         base64: base64,
                         folderId: this.opts.currentFolderId() || null,
                         tags: tagId ? [tagId] : [],
-                        thumbnail: thumbnail
+                        thumbnail: thumb ? thumb.url : null,
+                        thumbnailCover: Boolean(thumb && thumb.cover),
+                        thumbVer: thumb ? thumb.ver || 0 : 0
                     }
                 })
             });

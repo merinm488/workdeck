@@ -14,7 +14,9 @@
  *   uploads.js — Uppy Dashboard picker/queue/progress; a custom plugin
  *                POSTs base64 JSON to /api/filebox, strictly sequentially
  *                (parallel uploads would read-modify-write the shared
- *                user doc), with client-side thumbnails for images/PDFs.
+ *                user doc).
+ *   thumbs.js  — card thumbnails for every supported type, at upload
+ *                time plus a persisted backfill sweep on load.
  *   viewer.js  — per-type previews (PhotoSwipe, pdf.js, docx-preview,
  *                SheetJS, Papa Parse, marked, highlight.js, Video.js).
  *
@@ -335,6 +337,12 @@ function applyUserData(data) {
     state.settings = data.settings || {};
     state.rawDoc = data;    // docs/sheets/... counts for the delete-tag warning
     render();
+    if (window.fileboxThumbs) {
+        fileboxThumbs.ensureMissing(state.files, {
+            getFile: getFile,
+            onThumb: refreshFilePreview
+        });
+    }
 }
 
 async function loadUserData() {
@@ -748,6 +756,10 @@ function buildFileCard(file) {
         thumb.className = 'fb-card-thumb';
         thumb.style.backgroundImage = 'url("' + file.thumbnail + '")';
         preview.replaceChildren(thumb);
+    } else if (window.fileboxThumbs && fileboxThumbs.isPending(file)) {
+        const skel = document.createElement('span');
+        skel.className = 'fb-thumb-skel';
+        preview.replaceChildren(skel);
     } else {
         const pill = preview.querySelector('.fb-ext-pill');
         pill.style.background = tint;
@@ -803,6 +815,8 @@ function buildFileRow(file) {
         iconSpan.classList.remove('fb-row-ext');
         iconSpan.classList.add('fb-row-thumb');
         iconSpan.style.backgroundImage = 'url("' + file.thumbnail + '")';
+    } else if (window.fileboxThumbs && fileboxThumbs.isPending(file)) {
+        iconSpan.classList.add('fb-row-skel');
     } else {
         iconSpan.style.color = color;
         iconSpan.textContent = fileExt(file.name);
@@ -819,6 +833,24 @@ function buildFileRow(file) {
     bindItemMenu(row, file, 'file');
     makeFileDraggable(row, file);
     return row;
+}
+
+function refreshFilePreview(file) {
+    if (!file || !file.thumbnail) return;
+    const card = document.querySelector('#fbGrid [data-id="' + file.id + '"] .fb-card-preview');
+    if (card) {
+        const thumb = document.createElement('span');
+        thumb.className = 'fb-card-thumb';
+        thumb.style.backgroundImage = 'url("' + file.thumbnail + '")';
+        card.replaceChildren(thumb);
+    }
+    const icon = document.querySelector('#fbList [data-id="' + file.id + '"] .fb-row-icon');
+    if (icon) {
+        icon.classList.remove('fb-row-skel');
+        icon.classList.add('fb-row-thumb');
+        icon.style.backgroundImage = 'url("' + file.thumbnail + '")';
+        icon.textContent = '';
+    }
 }
 
 function renderFooter() {

@@ -78,6 +78,7 @@ function sanitizeTags(tags, userData) {
 function buildFileRecord(data, tagIds, size) {
   const id = generateId();
   const now = new Date().toISOString();
+  const thumbnail = sanitizeThumbnail(data.thumbnail);
   return {
     id,
     name: data.name,
@@ -85,7 +86,9 @@ function buildFileRecord(data, tagIds, size) {
     size,
     folderId: data.folderId || null,
     tags: tagIds,
-    thumbnail: sanitizeThumbnail(data.thumbnail),
+    thumbnail,
+    thumbnailCover: thumbnail ? data.thumbnailCover === true : false,
+    thumbVer: thumbnail && data.thumbVer > 0 ? data.thumbVer : 0,
     storage: 'textdb',
     storageKey: `file_${id}`,
     createdAt: now,
