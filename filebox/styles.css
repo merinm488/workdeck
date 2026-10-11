@@ -1597,6 +1597,20 @@ html.fb-deep-boot .fb-app {
     .fb-row-meta:nth-of-type(2) {
         display: none;
     }
+
+    /* Theme options expand inside the menu instead of a side flyout */
+    .fb-theme-submenu {
+        position: static;
+        min-width: 0;
+        margin: 2px 4px 6px;
+        border-color: var(--border);
+        background: var(--bg-input);
+        box-shadow: none;
+    }
+
+    .fb-theme-container:has(#fbThemeSubmenu.open) .fb-dropdown-arrow {
+        transform: rotate(90deg);
+    }
 }
 
 /* ================================================
