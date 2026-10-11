@@ -147,21 +147,17 @@ class FileboxUploads {
             restrictions: { maxFileSize: APP_CONFIG.maxFileSize }
         });
 
-        const localeStrings = { uploadXFiles: 'Done', uploadXNewFiles: 'Done' };
-        if (this.touchOnly) localeStrings.dropPasteFiles = 'Browse files';
-
         this.uppy.use(window.Uppy.Dashboard, {
             trigger: '#fbUploadBtn',
             inline: false,
             showProgressDetails: true,
             proudlyDisplayPoweredByUppy: false,
             closeModalOnClickOutside: true,
-            // Only shown once a run has finished; the modal-closed handler resets.
             doneButtonHandler: function () {
                 if (this.dashboard) this.dashboard.closeModal();
             }.bind(this),
             theme: this.mapTheme(opts.theme()),
-            locale: { strings: localeStrings }
+            locale: this.touchOnly ? { strings: { dropPasteFiles: 'Browse files' } } : undefined
         });
         // use() returns the Uppy instance in v4 — the plugin comes from getPlugin().
         this.dashboard = this.uppy.getPlugin('Dashboard');
