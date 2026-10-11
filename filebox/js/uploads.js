@@ -5,9 +5,8 @@
  *
  * fileboxUploads — the upload pipeline, built on Uppy's Dashboard widget.
  *
- * Uppy owns the picker, the drag-and-drop surface, the multi-file queue, 
+ * Uppy owns the picker, the drag-and-drop surface, the multi-file queue,
  * per-file progress, retry/cancel, and oversize rejection (restrictions.maxFileSize).
- *
  *
  * Thumbnails ride along on the upload — one generator per file kind
  * (js/thumbs.js): images, PDFs, Office files, video, audio, text. Each
@@ -144,9 +143,12 @@ class FileboxUploads {
         }
 
         this.uppy = new window.Uppy.Uppy({
-            autoProceed: true,
+            autoProceed: false,
             restrictions: { maxFileSize: APP_CONFIG.maxFileSize }
         });
+
+        const localeStrings = { uploadXFiles: 'Done', uploadXNewFiles: 'Done' };
+        if (this.touchOnly) localeStrings.dropPasteFiles = 'Browse files';
 
         this.uppy.use(window.Uppy.Dashboard, {
             trigger: '#fbUploadBtn',
@@ -154,8 +156,12 @@ class FileboxUploads {
             showProgressDetails: true,
             proudlyDisplayPoweredByUppy: false,
             closeModalOnClickOutside: true,
+            // Only shown once a run has finished; the modal-closed handler resets.
+            doneButtonHandler: function () {
+                if (this.dashboard) this.dashboard.closeModal();
+            }.bind(this),
             theme: this.mapTheme(opts.theme()),
-            locale: this.touchOnly ? { strings: { dropPasteFiles: 'Browse files' } } : undefined
+            locale: { strings: localeStrings }
         });
         // use() returns the Uppy instance in v4 — the plugin comes from getPlugin().
         this.dashboard = this.uppy.getPlugin('Dashboard');
@@ -171,6 +177,10 @@ class FileboxUploads {
         this.uppy.on('complete', function (result) {
             this.busy = false;
             opts.onComplete(result);
+        }.bind(this));
+        this.uppy.on('dashboard:modal-closed', function () {
+            // Dismissal drops a pending selection; a run in flight keeps going.
+            if (!this.busy) this.uppy.cancelAll();
         }.bind(this));
     }
 
