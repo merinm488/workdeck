@@ -126,6 +126,7 @@ class FileboxUploads {
         this.opts = null;
         this.disabled = false;
         this.busy = false;
+        this.touchOnly = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     }
 
     /**
@@ -153,7 +154,8 @@ class FileboxUploads {
             showProgressDetails: true,
             proudlyDisplayPoweredByUppy: false,
             closeModalOnClickOutside: true,
-            theme: this.mapTheme(opts.theme())
+            theme: this.mapTheme(opts.theme()),
+            locale: this.touchOnly ? { strings: { dropPasteFiles: 'Browse files' } } : undefined
         });
         // use() returns the Uppy instance in v4 — the plugin comes from getPlugin().
         this.dashboard = this.uppy.getPlugin('Dashboard');
@@ -195,6 +197,10 @@ class FileboxUploads {
 
     openPicker() {
         if (this.dashboard) this.dashboard.openModal();
+    }
+
+    isPickerOpen() {
+        return Boolean(this.dashboard && this.dashboard.isModalOpen());
     }
 
     isBusy() {

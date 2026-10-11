@@ -1601,32 +1601,39 @@ async function moveFolderToFolder(folderId, parentId) {
 // ================================================
 
 function setupDropOverlay() {
-    const overlay = $('fbDropOverlay');
+    if (fileboxUploads.touchOnly) return;
 
+    const overlay = $('fbDropOverlay');
+    const hasFiles = function (e) {
+        return Boolean(e.dataTransfer) && Array.from(e.dataTransfer.types || []).includes('Files');
+    };
+
+    // Capture phase, so the picker can't swallow the cleanup with stopPropagation.
     window.addEventListener('dragenter', function (e) {
-        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        if (!hasFiles(e)) return;
         e.preventDefault();
         state.dragDepth++;
-        overlay.classList.add('active');
-    });
+        if (!fileboxUploads.isPickerOpen()) overlay.classList.add('active');
+    }, true);
     window.addEventListener('dragover', function (e) {
-        if (!Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        if (!hasFiles(e)) return;
         e.preventDefault();
-    });
+    }, true);
     window.addEventListener('dragleave', function (e) {
-        if (!Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        if (!hasFiles(e)) return;
         state.dragDepth = Math.max(0, state.dragDepth - 1);
-        if (state.dragDepth === 0) overlay.classList.remove('active');
-    });
+        if (state.dragDepth === 0 || fileboxUploads.isPickerOpen()) overlay.classList.remove('active');
+    }, true);
     window.addEventListener('drop', function (e) {
-        if (!Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        if (!hasFiles(e)) return;
         e.preventDefault();
         state.dragDepth = 0;
         overlay.classList.remove('active');
+        if (fileboxUploads.isPickerOpen()) return;
         if (e.dataTransfer.files && e.dataTransfer.files.length) {
             fileboxUploads.addFiles(e.dataTransfer.files);
         }
-    });
+    }, true);
 }
 
 // ================================================
