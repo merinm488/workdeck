@@ -155,6 +155,22 @@ const WD_APPS = [
         contentSearch: false
     },
     {
+        id: 'todo',
+        name: 'Todo',
+        label: 'Todo',
+        accent: 'todo',
+        icon: 'todo',
+        route: '/todo/',
+        editorParam: 'list',
+        create: {
+            action: 'createTodo',
+            payload: {},
+            // The API unshifts, so the newest list is first.
+            pickNewest: function (data) { return data.todo && data.todo[0]; }
+        },
+        contentSearch: true                 // search matches task text
+    },
+    {
         id: 'filebox',
         name: 'Files',
         label: 'File',
@@ -215,6 +231,7 @@ const state = {
     draws: [],
     files: [],           // Filebox file metadata
     folders: [],         // Filebox folders
+    todo: [],            // Todo task lists
     settings: {},
     searchQuery: '',
     filter: 'all',       // 'all' | app id from WD_APPS
@@ -335,6 +352,23 @@ function getAllFiles() {
         };
     });
 
+    const todoFiles = (state.todo || []).map(function (t) {
+        const items = Array.isArray(t.items) ? t.items : [];
+        return {
+            id: t.id,
+            app: 'todo',
+            name: t.name || 'Untitled List',
+            updatedAt: t.updatedAt,
+            lastOpened: lastOpened[t.id] || null,
+            tagId: getTag(t.tagId) ? t.tagId : null,
+            // Task text is searchable from the home page.
+            content: items.map(function (i) {
+                return (i.title || '') + ' ' + (i.description || '');
+            }).join('\n'),
+            raw: t
+        };
+    });
+
     const fileboxFiles = (state.files || []).map(function (f) {
         return {
             id: f.id,
@@ -375,7 +409,7 @@ function getAllFiles() {
         });
 
     return docs.concat(sheetFiles).concat(formFiles).concat(slideFiles).concat(drawFiles)
-        .concat(fileboxFiles).concat(folderCards)
+        .concat(todoFiles).concat(fileboxFiles).concat(folderCards)
         .sort(function (a, b) {
             const aTime = a.lastOpened || a.updatedAt || '';
             const bTime = b.lastOpened || b.updatedAt || '';
@@ -456,6 +490,7 @@ function applyUserData(data) {
     state.draws = data.draws || [];
     state.files = data.files || [];
     state.folders = data.folders || [];
+    state.todo = data.todo || [];
     state.settings = data.settings || {};
     render();
 }
@@ -1250,6 +1285,8 @@ async function confirmDelete() {
         state.slides = state.slides.filter(function (d) { return d.id !== file.id});
     } else if (file.app === 'draw') {
         state.draws = state.draws.filter(function (d) { return d.id !== file.id });
+    } else if (file.app === 'todo') {
+        state.todo = state.todo.filter(function (l) { return l.id !== file.id });
     } else if (file.app === 'filebox') {
         state.files = state.files.filter(function (f) { return f.id !== file.id; });
     } else {
@@ -1388,6 +1425,7 @@ async function confirmDeleteProject() {
     state.forms = dropTagged(state.forms);
     state.slides = dropTagged(state.slides);
     state.draws = dropTagged(state.draws);
+    state.todo = dropTagged(state.todo);
     state.files = stripTag(state.files);
     state.folders = stripTag(state.folders);
     render();

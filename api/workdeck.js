@@ -33,6 +33,7 @@ const DEFAULT_FORM_TITLE = 'Untitled Form';
 const DEFAULT_DECK_NAME = 'Untitled';
 const DEFAULT_DRAWING_NAME = 'Untitled Drawing';
 const DEFAULT_FOLDER_NAME = 'Untitled';
+const DEFAULT_TODO_LIST_NAME = 'Untitled List';
 
 /**
  * Filebox tags are multi-valued
@@ -149,6 +150,16 @@ function createDefaultDrawing(id) {
     objects: [],
     viewport: { zoom: 1, panX: 0, panY: 0 },
     sharedId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function createDefaultTodoList(id) {
+  return {
+    id,
+    name: DEFAULT_TODO_LIST_NAME,
+    items: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -312,6 +323,16 @@ export default async function handler(req, res) {
           break;
         }
 
+        // Create empty task list
+        case 'createTodo': {
+          const id = data?.id || generateId();
+          const list = createDefaultTodoList(id);
+          if (data?.name) list.name = data.name;
+          if (data?.tagId) list.tagId = data.tagId;
+          userData.todo.unshift(list);
+          break;
+        }
+
         // ---- Projects (tags) ----
         // origin marks where a tag was born. All tags list in Workdeck;
         // Filebox lists its own plus any tag currently carried by at least
@@ -355,7 +376,8 @@ export default async function handler(req, res) {
             ...taggedIn(userData.sheets),
             ...taggedIn(userData.forms),
             ...taggedIn(userData.slides),
-            ...taggedIn(userData.draws)
+            ...taggedIn(userData.draws),
+            ...taggedIn(userData.todo || [])
           ];
           for (const file of doomed) {
             if (file.sharedId) {
@@ -374,6 +396,7 @@ export default async function handler(req, res) {
           userData.forms = userData.forms.filter(f => !f || f.tagId !== tagId);
           userData.slides = userData.slides.filter(f => !f || f.tagId !== tagId);
           userData.draws = userData.draws.filter(f => !f || f.tagId !== tagId);
+          userData.todo = (userData.todo || []).filter(f => !f || f.tagId !== tagId);
           (userData.files || []).forEach(f => {
             if (Array.isArray(f.tags)) f.tags = f.tags.filter(id => id !== tagId);
           });
@@ -535,7 +558,8 @@ export default async function handler(req, res) {
           const isForm = app === 'forms';
           const isDeck = app === 'slides';
           const isDrawing = app === 'draw';
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : userData.docs;
+          const isTodo = app === 'todo';
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isTodo ? (userData.todo || []) : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -566,6 +590,8 @@ export default async function handler(req, res) {
                   ? userData.slides.find(d => d.id === fileId)
                   : app === 'draw'
                   ? userData.draws.find(d => d.id === fileId)
+                  : app === 'todo'
+                  ? (userData.todo || []).find(l => l.id === fileId)
                   : userData.docs.find(n => n.id === fileId)
             );
           }
@@ -591,7 +617,8 @@ export default async function handler(req, res) {
           const isDeck = app === "slides";
           const isDrawing = app === "draw";
           const isFileboxFile = app === "filebox";
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : userData.docs;
+          const isTodo = app === "todo";
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : isTodo ? (userData.todo || []) : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -607,6 +634,8 @@ export default async function handler(req, res) {
           } else if (isDrawing) {
             target.name = cleanName;
           } else if (isFileboxFile) {
+            target.name = cleanName;
+          } else if (isTodo) {
             target.name = cleanName;
           } else {
             target.title = cleanName;
@@ -646,6 +675,8 @@ export default async function handler(req, res) {
               await deleteSharedDoc(drawing.sharedId);
             }
             userData.draws = userData.draws.filter(d => d.id !== fileId);
+          } else if (app === 'todo') {
+            userData.todo = (userData.todo || []).filter(l => l.id !== fileId);
           } else if (app === 'filebox') {
             const file = (userData.files || []).find(f => f.id === fileId);
             if (file?.storageKey) {
@@ -692,6 +723,7 @@ export default async function handler(req, res) {
         draws: userData.draws,
         files: userData.files,
         folders: userData.folders,
+        todo: userData.todo,
         settings: userData.settings
       });
 

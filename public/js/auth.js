@@ -28,7 +28,9 @@ const WD_AUTH_CONFIG = {
         drawHash: 'draw_user_hash',
         drawKey: 'draw_user_key',
         fileboxHash: 'filebox_user_hash',
-        fileboxKey: 'filebox_user_key'
+        fileboxKey: 'filebox_user_key',
+        todoHash: 'todo_user_hash',
+        todoKey: 'todo_user_key'
     }
 };
 
@@ -65,6 +67,8 @@ class WdAuthManager {
             localStorage.setItem(s.drawKey, key);
             localStorage.setItem(s.fileboxHash, hash);
             localStorage.setItem(s.fileboxKey, key);
+            localStorage.setItem(s.todoHash, hash);
+            localStorage.setItem(s.todoKey, key);
         } catch (err) {
             console.warn('[AUTH] localStorage seed failed (private mode?):', err);
         }
@@ -153,6 +157,8 @@ class WdAuthManager {
         sessionStorage.setItem(s.drawKey, key);
         sessionStorage.setItem(s.fileboxHash, hash);
         sessionStorage.setItem(s.fileboxKey, key);
+        sessionStorage.setItem(s.todoHash, hash);
+        sessionStorage.setItem(s.todoKey, key);
 
         this.seedMirrors(hash, key);
 

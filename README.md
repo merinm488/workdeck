@@ -26,6 +26,8 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
   nested folders of unlimited depth; folder-aware dashboard, drag-to-move,
   search, list/grid views, and a PWA. Files and folders are taggable from
   the landing page's Tags sidebar or inside Files.
+- ✅ **Todo** — task lists: create lists, add tasks with due
+  dates and priorities, toggle/complete, edit in place, drag-to-reorder.
 - 📱 **Mobile-friendly** — touch devices open files in the same tab.
 
 ## 🏗️ Architecture
@@ -48,7 +50,8 @@ workdeck/
 │   ├── forms.js            # Forms API (incl. public response submission)
 │   ├── slides.js           # Slides API (deck records + public share snapshots)
 │   ├── draw.js             # Draw API (drawing records + public share snapshots)
-│   └── filebox.js          # Files API (file bytes: upload + download)
+│   ├── filebox.js          # Files API (file bytes: upload + download)
+│   └── todo.js             # Todo API (task list records)
 ├── docs/                   # Docs build output (from docs-src, base /docs/)
 ├── docs-src/               # Docs source (React+Vite, with:
 │                           #   base '/docs/', ?doc= deep link, shared sessions)
@@ -80,6 +83,11 @@ workdeck/
 │   ├── icons/              # teal icon set (192/512, any+maskable)
 │   ├── config/config.js
 │   └── js/                 # auth/storage/themes/main/pwa
+├── todo/                   # Todo app (vanilla task lists)
+│   ├── index.html          # lists view + task list view (/todo/<id>, ?list=<id>)
+│   ├── styles.css          # self-contained, green accents
+│   ├── config/config.js
+│   └── js/                 # auth/storage/themes/editor
 ├── server/dev-server.js    # one Express server mirroring the prod layout
 ├── vercel.json             # routing for production
 ├── .env                    # PEPPER_SECRET for local dev
@@ -99,8 +107,9 @@ document per hash in production):
   "forms": [ ... ],
   "slides": [ ... ],
   "draws": [ ... ],
-  "files": [ ... ],      
-  "folders": [ ... ],   
+  "files": [ ... ],
+  "folders": [ ... ],
+  "todo": [ ... ],
   "settings": {
     "theme": "dark",
     "viewMode": "grid",
@@ -111,7 +120,8 @@ document per hash in production):
 
 All the APIs share `api/_lib/store.js` and save **section-merged**: Docs
 only writes docs/tags, Sheets only writes sheets, Forms only writes
-forms, Slides only writes slides, Draw only writes draws, Workdeck writes
+forms, Slides only writes slides, Draw only writes draws, Todo only
+writes todo, Workdeck writes
 docs/tags/sheets/forms/slides/draws/settings etc — so no app can wipe another's
 data.
 

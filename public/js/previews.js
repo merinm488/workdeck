@@ -15,7 +15,7 @@
 (function () {
     'use strict';
 
-    const VIRTUAL_WIDTH = { docs: 720, forms: 420 };
+    const VIRTUAL_WIDTH = { docs: 720, forms: 420, todo: 420 };
     const MAX_SHEET_COLS = 9;
     const MAX_SHEET_ROWS = 8;
     const CACHE_LIMIT = 300;
@@ -604,6 +604,48 @@
     }
 
     // ================================================
+    // Todo preview (checklist rows)
+    // ================================================
+
+    function renderTodo(page, file) {
+        const items = (file.raw && file.raw.items) || [];
+        if (!items.length) return;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'wd-preview-todo';
+
+        items.slice(0, 7).forEach(function (item) {
+            if (!item) return;
+            const row = document.createElement('div');
+            row.className = 'wd-todo-row' + (item.completed ? ' wd-todo-done' : '');
+
+            const box = document.createElement('span');
+            box.className = 'wd-todo-box';
+            row.append(box);
+
+            const text = document.createElement('span');
+            text.className = 'wd-todo-text';
+            text.textContent = item.title || '';
+            row.append(text);
+
+            if (item.dueDate) {
+                const badge = document.createElement('span');
+                badge.className = 'wd-todo-badge';
+                const d = new Date(item.dueDate + 'T00:00:00');
+                badge.textContent = Number.isNaN(d.getTime())
+                    ? item.dueDate
+                    : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                row.append(badge);
+            }
+
+            wrap.append(row);
+        });
+
+        page.replaceChildren(wrap);
+        registerScaledPage(page.firstChild, VIRTUAL_WIDTH.todo);
+    }
+
+    // ================================================
     // Resize: keep DOM previews scaled to their card
     // ================================================
 
@@ -632,6 +674,7 @@
             case 'sheets': renderSheets(page, file); break;
             case 'slides':
             case 'draw': renderFabric(page, file); break;
+            case 'todo': renderTodo(page, file); break;
             case 'filebox': renderFilebox(page, file); break;
         }
     }

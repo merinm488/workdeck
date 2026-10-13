@@ -21,6 +21,7 @@
  *     draws:        [ ...drawings... ],
  *     files:        [ ...Filebox file metadata (bytes live in raw docs below) ],
  *     folders:      [ ...Filebox folders... ],
+ *     todo:         [ ...Todo task lists... ],
  *     settings:     { theme, viewMode, lastOpened, createdAt, ... }
  *   }
  *
@@ -184,7 +185,7 @@ async function postTextdbDoc(id, value) {
 // User documents
 // ================================================
 
-const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders', 'settings'];
+const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders', 'todo', 'settings'];
 
 /** A stored doc counts as an existing account if it has any known section. */
 export function isValidUserDoc(doc) {
@@ -219,6 +220,7 @@ export async function getUserDoc(hash) {
   if (!Array.isArray(doc.draws)) doc.draws = [];
   if (!Array.isArray(doc.files)) doc.files = [];
   if (!Array.isArray(doc.folders)) doc.folders = [];
+  if (!Array.isArray(doc.todo)) doc.todo = [];
   if (!doc.settings || typeof doc.settings !== 'object') doc.settings = {};
 
   return doc;
@@ -244,7 +246,7 @@ export async function overwriteDoc(hash, doc) {
  * without clobbering each other.
  *
  * @param {string} hash
- * @param {{docs?:Array, tags?:Array, sheets?:Array, forms?:Array, slides?:Array, draws?:Array, files?:Array, folders?:Array, settings?:Object}} owned
+ * @param {{docs?:Array, tags?:Array, sheets?:Array, forms?:Array, slides?:Array, draws?:Array, files?:Array, folders?:Array, todo?:Array, settings?:Object}} owned
  * @returns {Promise<boolean>}
  */
 export async function saveOwnedSections(hash, owned) {
@@ -261,7 +263,7 @@ export async function saveOwnedSections(hash, owned) {
 
   const next = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : {};
 
-  for (const key of ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders']) {
+  for (const key of ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders', 'todo']) {
     if (owned[key] !== undefined) next[key] = owned[key];
   }
 
@@ -286,6 +288,7 @@ export async function createUserDoc(hash, defaults = {}) {
     draws: [],
     files: [],
     folders: [],
+    todo: [],
     settings: {
       theme: 'dark',
       viewMode: 'grid',

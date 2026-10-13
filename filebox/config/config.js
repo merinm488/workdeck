@@ -99,7 +99,8 @@ function clearUnifiedSession() {
         'forms_user_hash', 'forms_user_key',
         'slides_user_hash', 'slides_user_key',
         'draw_user_hash', 'draw_user_key',
-        'filebox_user_hash', 'filebox_user_key'
+        'filebox_user_hash', 'filebox_user_key',
+        'todo_user_hash', 'todo_user_key'
     ].forEach(name => {
         sessionStorage.removeItem(name);
         localStorage.removeItem(name);

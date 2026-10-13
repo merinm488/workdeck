@@ -65,6 +65,7 @@
         (userData.forms || []).forEach(function (f) { add('forms', f); });
         (userData.slides || []).forEach(function (s) { add('slides', s); });
         (userData.draws || []).forEach(function (d) { add('draw', d); });
+        (userData.todo || []).forEach(function (t) { add('todo', t); });
         (userData.files || []).forEach(function (f) { add('filebox', f); });
         (userData.folders || []).forEach(function (f) { add('filebox', f, 'folder'); });
         return list;
@@ -524,7 +525,7 @@
   
     function findBacklinks(targetId, userData) {
         if (!userData || !WDLinks.ID_RE.test(targetId || '')) return [];
-        var targetRe = new RegExp('/(?:docs|sheets|forms|slides|draw|filebox)/' + escapeRegExp(targetId) + '(?![a-z0-9])');
+        var targetRe = new RegExp('/(?:docs|sheets|forms|slides|draw|todo|filebox)/' + escapeRegExp(targetId) + '(?![a-z0-9])');
         var out = [];
         var seen = {};
         function push(app, id, name) {

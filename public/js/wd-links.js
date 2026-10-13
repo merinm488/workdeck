@@ -48,6 +48,10 @@
             id: 'draw', name: 'Draw', label: 'Drawing',
             page: '/draw/editor.html', param: 'id', prefix: '/draw/'
         },
+        todo: {
+            id: 'todo', name: 'Todo', label: 'Todo',
+            page: '/todo/index.html', param: 'list', prefix: '/todo/'
+        },
         filebox: {
             id: 'filebox', name: 'Files', label: 'File',
             page: '/filebox/', param: 'id', prefix: '/filebox/'
@@ -81,6 +85,13 @@
         draw: [
             ['path', { d: 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z' }],
             ['path', { d: 'm15 5 4 4' }]
+        ],
+        todo: [
+            ['path', { d: 'm3 17 2 2 4-4' }],
+            ['path', { d: 'm3 7 2 2 4-4' }],
+            ['path', { d: 'M13 6h8' }],
+            ['path', { d: 'M13 12h8' }],
+            ['path', { d: 'M13 18h8' }]
         ],
         filebox: [
             ['path', { d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' }]
@@ -159,7 +170,7 @@
 
         // Pretty path: /<app>/<id>
         var pretty = new RegExp(
-            '^/(docs|sheets|forms|slides|draw|filebox)/(' + ID_SOURCE + ')/?$'
+            '^/(docs|sheets|forms|slides|draw|todo|filebox)/(' + ID_SOURCE + ')/?$'
         ).exec(pathname);
         if (pretty) {
             return { app: pretty[1], id: pretty[2], query: query };
@@ -172,11 +183,14 @@
         }
 
         // Legacy query form — infer the app from the path prefix.
-        var prefix = new RegExp('^/(docs|sheets|forms|slides|draw|filebox)(/|$)').exec(pathname);
+        var prefix = new RegExp('^/(docs|sheets|forms|slides|draw|todo|filebox)(/|$)').exec(pathname);
         if (prefix) {
             var app = prefix[1];
             if (app === 'docs' && params.get('doc') && isValidId(params.get('doc'))) {
                 return { app: 'docs', id: params.get('doc'), query: query };
+            }
+            if (app === 'todo' && params.get('list') && isValidId(params.get('list'))) {
+                return { app: 'todo', id: params.get('list'), query: query };
             }
             if (app === 'filebox' && params.get('folder') && isValidId(params.get('folder'))) {
                 return { app: 'filebox', id: params.get('folder'), kind: 'folder', query: query };
@@ -246,6 +260,13 @@
                     kind: 'file', record: draws[m], url: url('draw', id) };
             }
         }
+        var todoLists = userData.todo || [];
+        for (var p = 0; p < todoLists.length; p++) {
+            if (todoLists[p] && todoLists[p].id === id) {
+                return { app: 'todo', id: id, name: todoLists[p].name || 'Untitled List',
+                    kind: 'file', record: todoLists[p], url: url('todo', id) };
+            }
+        }
         var files = userData.files || [];
         for (var n = 0; n < files.length; n++) {
             if (files[n] && files[n].id === id) {
@@ -266,7 +287,7 @@
     /** Session hash: Workdeck's key first, then any app mirror. */
     function sessionHash() {
         var KEYS = ['wd_hash', 'docs_hash', 'sheets_user_hash', 'forms_user_hash',
-            'slides_user_hash', 'draw_user_hash', 'filebox_user_hash'];
+            'slides_user_hash', 'draw_user_hash', 'filebox_user_hash', 'todo_user_hash'];
         for (var i = 0; i < KEYS.length; i++) {
             var v = sessionStorage.getItem(KEYS[i]) || localStorage.getItem(KEYS[i]);
             if (v) return v;

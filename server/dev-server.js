@@ -13,6 +13,7 @@
  *   /slides/*      -> Slides app (static)
  *   /draw/*        -> Draw app (static)
  *   /filebox/*     -> Filebox app (static)
+ *   /todo/*        -> Todo app (static)
  *   /docs/*        -> Docs build (static, vite base '/docs/')
  *   /api/workdeck  -> api/workdeck.js     (Workdeck API)
  *   /api/docs      -> api/docs.js         (Docs API, fetch-style handler)
@@ -21,6 +22,7 @@
  *   /api/slides    -> api/slides.js       (Slides API)
  *   /api/draw      -> api/draw.js         (Draw API)
  *   /api/filebox   -> api/filebox.js      (Filebox bytes API)
+ *   /api/todo      -> api/todo.js         (Todo API)
  *
  * Storage: local JSON files under db/users/ (NODE_ENV=development).
  * Run with:  npm run dev   (port 4000)
@@ -58,6 +60,7 @@ const { default: formsHandler } = await import('../api/forms.js');
 const { default: slidesHandler } = await import('../api/slides.js');
 const { default: drawHandler } = await import('../api/draw.js');
 const { default: fileboxHandler } = await import('../api/filebox.js');
+const { default: todoHandler } = await import('../api/todo.js');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -115,6 +118,7 @@ app.all('/api/forms', (req, res) => formsHandler(req, res));
 app.all('/api/slides', (req, res) => slidesHandler(req, res));
 app.all('/api/draw', (req, res) => drawHandler(req, res));
 app.all('/api/filebox', (req, res) => fileboxHandler(req, res));
+app.all('/api/todo', (req, res) => todoHandler(req, res));
 
 // ---------- Pretty file URLs ----------
 const WD_ID_RE = /^[a-z0-9]{14,}$/;
@@ -124,15 +128,17 @@ const WD_PRETTY_PAGES = {
   forms: '/forms/editor.html',
   slides: '/slides/editor.html',
   draw: '/draw/editor.html',
+  todo: '/todo/index.html',
   filebox: '/filebox/index.html'
 };
+const WD_PRETTY_PARAMS = { docs: 'doc', todo: 'list' };
 
 Object.keys(WD_PRETTY_PAGES).forEach((prettyApp) => {
   app.get('/' + prettyApp + '/:id', (req, res, next) => {
     if (!WD_ID_RE.test(req.params.id)) return next();
     // Carry extra query params through (?edit=1 from create flows).
     const params = new URLSearchParams(req.url.split('?')[1] || '');
-    params.set(prettyApp === 'docs' ? 'doc' : 'id', req.params.id);
+    params.set(WD_PRETTY_PARAMS[prettyApp] || 'id', req.params.id);
     req.url = WD_PRETTY_PAGES[prettyApp] + '?' + params.toString();
     next();
   });
@@ -171,6 +177,9 @@ app.use('/draw', express.static(path.join(ROOT_DIR, 'draw'), { index: 'index.htm
 // Filebox (plain static)
 app.use('/filebox', express.static(path.join(ROOT_DIR, 'filebox'), { index: 'index.html' }));
 
+// Todo (plain static)
+app.use('/todo', express.static(path.join(ROOT_DIR, 'todo'), { index: 'index.html' }));
+
 // Root redirect to the Workdeck landing page
 app.get('/', (req, res) => {
   res.sendFile(path.join(ROOT_DIR, 'public', 'index.html'));
@@ -186,7 +195,8 @@ app.listen(PORT, () => {
   console.log(`🎬 Slides:     http://localhost:${PORT}/slides/`);
   console.log(`✏️  Draw:       http://localhost:${PORT}/draw/`);
   console.log(`🗂️  Filebox:    http://localhost:${PORT}/filebox/`);
-  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw, /api/filebox`);
+  console.log(`✅ Todo:       http://localhost:${PORT}/todo/`);
+  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw, /api/filebox, /api/todo`);
   console.log(`📁 Local DB:   ${path.join(ROOT_DIR, 'db')}`);
   console.log('\nPress Ctrl+C to stop\n');
 });

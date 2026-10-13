@@ -29,6 +29,10 @@
       "destination": "/draw/editor.html?id=:id"
     },
     {
+      "source": "/todo/:id([a-z0-9]{14,})",
+      "destination": "/todo/index.html?list=:id"
+    },
+    {
       "source": "/filebox/:id([a-z0-9]{14,})",
       "destination": "/filebox/index.html?id=:id"
     },

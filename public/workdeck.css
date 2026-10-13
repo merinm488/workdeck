@@ -26,6 +26,8 @@
     --slide-accent-soft: rgba(234, 88, 12, 0.15);
     --draw-accent: #e11d48;       /* Draw rose */
     --draw-accent-soft: rgba(225, 29, 72, 0.12);
+    --todo-accent: #188038;       /* Todo green */
+    --todo-accent-soft: rgba(24, 128, 56, 0.15);
     --danger: #ef4444;
     --danger-soft: rgba(239, 68, 68, 0.12);
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
@@ -970,6 +972,11 @@ html[data-theme="dark"] .wd-theme-option-icon {
     color: var(--draw-accent);
 }
 
+.wd-file-icon-todo {
+    background: var(--todo-accent-soft);
+    color: var(--todo-accent);
+}
+
 .wd-file-actions {
     display: flex;
     gap: 4px;
@@ -1229,6 +1236,57 @@ html[data-theme="dark"] .wd-theme-option-icon {
     border: 1.5px solid #9aa0a8;
     border-radius: 3px;
     flex-shrink: 0;
+}
+
+/* Todo preview: checklist rows */
+.wd-preview-todo {
+    width: 420px;
+    padding: 20px 24px;
+    font-size: 13px;
+}
+
+.wd-todo-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin: 0 0 9px;
+}
+
+.wd-todo-row.wd-todo-done .wd-todo-text {
+    text-decoration: line-through;
+    color: #9aa0a8;
+}
+
+.wd-todo-box {
+    width: 13px;
+    height: 13px;
+    border: 1.5px solid #9aa0a8;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.wd-todo-row.wd-todo-done .wd-todo-box {
+    background: var(--todo-accent);
+    border-color: var(--todo-accent);
+}
+
+.wd-todo-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wd-todo-badge {
+    flex-shrink: 0;
+    margin-left: auto;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #57606a;
+    background: #eef0f2;
 }
 
 /* Touch devices have no hover: keep rename/delete visible. */
