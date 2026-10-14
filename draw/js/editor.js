@@ -1257,7 +1257,7 @@ function exportPng() {
 function goHome() {
     offerRenameBeforeLeaving(() => {
         saveDrawing();   // best-effort — must never block navigation
-        goToWorkdeck();
+        window.location.href = '/draw/';
     });
 }
 

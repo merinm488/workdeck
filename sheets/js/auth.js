@@ -60,12 +60,7 @@ class AuthenticationManager {
             // Verify session is still valid by fetching user data
             const isValid = await this.verifySession();
 
-            if (isValid) {
-                // Redirect to home page if on login page
-                if (window.location.pathname.endsWith('/sheets/index.html') || window.location.pathname === '/sheets/') {
-                    window.location.href = '/sheets/home.html';
-                }
-            } else {
+            if (!isValid) {
                 // Invalid session, clear storage
                 this.clearSession();
             }
@@ -250,10 +245,8 @@ class AuthenticationManager {
             ];
             keysToRemove.forEach(key => localStorage.removeItem(key));
 
-            // Redirect to login page
-            if (!window.location.pathname.endsWith('/sheets/index.html') && window.location.pathname !== '/sheets/') {
-                window.location.href = '/sheets/';
-            }
+            // Workdeck is the login point
+            window.location.href = '/';
 
             return {
                 success: true,

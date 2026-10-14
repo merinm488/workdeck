@@ -27,7 +27,15 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
   search, list/grid views, and a PWA. Files and folders are taggable from
   the landing page's Tags sidebar or inside Files.
 - ✅ **Todo** — task lists: create lists, add tasks with due
-  dates and priorities, toggle/complete, edit in place, drag-to-reorder.
+  dates and priorities, toggle/complete, edit in place, drag-to-reorder;
+  search across lists and tasks, card/row list layouts.
+- 📅 **Calendar** — multiple colored calendars with show/hide, Month /
+  Week / Day / Agenda views (FullCalendar), drag-create/move/resize,
+  all-day & multi-day events, RRULE recurrence with per-occurrence
+  exceptions ("this / this and following / all"), reminders (in-app toast
+  + browser notifications), search, keyboard shortcuts,
+  Todo tasks rendered on the grid, file links via the suite's WDLinks,
+  and .ics import/export (rrule.js + ical.js).
 - 📱 **Mobile-friendly** — touch devices open files in the same tab.
 
 ## 🏗️ Architecture
@@ -51,7 +59,8 @@ workdeck/
 │   ├── slides.js           # Slides API (deck records + public share snapshots)
 │   ├── draw.js             # Draw API (drawing records + public share snapshots)
 │   ├── filebox.js          # Files API (file bytes: upload + download)
-│   └── todo.js             # Todo API (task list records)
+│   ├── todo.js             # Todo API (task list records)
+│   └── calendar.js         # Calendar API (calendars + event records)
 ├── docs/                   # Docs build output (from docs-src, base /docs/)
 ├── docs-src/               # Docs source (React+Vite, with:
 │                           #   base '/docs/', ?doc= deep link, shared sessions)
@@ -75,11 +84,11 @@ workdeck/
 │   ├── styles.css
 │   ├── config/config.js
 │   └── js/                 # auth/storage/themes/editor/shared.
-├── filebox/                # Files app (vanilla file manager)
+├── files/                  # Files app (vanilla file manager)
 │   ├── index.html          # manager UI (?folder=, ?id=, ?upload=1 URL states)
 │   ├── styles.css          # self-contained, teal accents
-│   ├── manifest.json       # PWA (scoped to /filebox/, "Upload files" shortcut)
-│   ├── service-worker.js   # filebox-v1, /api/ always bypasses
+│   ├── manifest.json       # PWA (scoped to /files/, "Upload files" shortcut)
+│   ├── service-worker.js   # filebox-v4, /api/ always bypasses
 │   ├── icons/              # teal icon set (192/512, any+maskable)
 │   ├── config/config.js
 │   └── js/                 # auth/storage/themes/main/pwa
@@ -88,6 +97,11 @@ workdeck/
 │   ├── styles.css          # self-contained, green accents
 │   ├── config/config.js
 │   └── js/                 # auth/storage/themes/editor
+├── calendar/               # Calendar app (vanilla + FullCalendar v6)
+│   ├── index.html          # grid + sidebar (/calendar/<id>, ?cal=<id>)
+│   ├── styles.css          # self-contained, sky accents
+│   ├── config/config.js
+│   └── js/                 # auth/storage/themes/editor (+ rrule.js, ical.js via CDN)
 ├── server/dev-server.js    # one Express server mirroring the prod layout
 ├── vercel.json             # routing for production
 ├── .env                    # PEPPER_SECRET for local dev
@@ -110,6 +124,8 @@ document per hash in production):
   "files": [ ... ],
   "folders": [ ... ],
   "todo": [ ... ],
+  "calendars": [ ... ],
+  "events": [ ... ],
   "settings": {
     "theme": "dark",
     "viewMode": "grid",
@@ -121,7 +137,7 @@ document per hash in production):
 All the APIs share `api/_lib/store.js` and save **section-merged**: Docs
 only writes docs/tags, Sheets only writes sheets, Forms only writes
 forms, Slides only writes slides, Draw only writes draws, Todo only
-writes todo, Workdeck writes
+writes todo, Calendar only writes calendars/events, Workdeck writes
 docs/tags/sheets/forms/slides/draws/settings etc — so no app can wipe another's
 data.
 
@@ -136,7 +152,7 @@ every file across every app.
 
 ## 🗃️ Files
 
-A Drive-style file manager at `/filebox/` — upload via picker or full-window
+A Drive-style file manager at `/files/` — upload via picker or full-window
 drag-drop, organize in nested folders of unlimited depth, browse as cards.
 
 - **300 KB cap per file** — gated client-side with a toast before reading,

@@ -1,6 +1,6 @@
-const STATIC_CACHE = 'sheets-static-v7-univer';
-const DYNAMIC_CACHE = 'sheets-dynamic-v7-univer';
-const API_CACHE = 'sheets-api-v7-univer';
+const STATIC_CACHE = 'sheets-static-v8-univer';
+const DYNAMIC_CACHE = 'sheets-dynamic-v8-univer';
+const API_CACHE = 'sheets-api-v8-univer';
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
@@ -9,11 +9,10 @@ self.addEventListener('install', (event) => {
       .then((cache) => {
         return cache.addAll([
           '/',
-          '/sheets/home.html',
+          '/sheets/',
           '/sheets/editor.html',
           '/styles.css',
           '/home.css',
-          '/auth.css',
           '/manifest.json'
         ]);
       })
@@ -98,7 +97,7 @@ self.addEventListener('fetch', (event) => {
           return response;
         }).catch((error) => {
           if (event.request.headers.get('accept').includes('text/html')) {
-            return caches.match('/sheets/home.html');
+            return caches.match('/sheets/');
           }
         });
       })
@@ -136,7 +135,7 @@ self.addEventListener('push', (event) => {
       badge: '/icons/badge-72x72.png',
       vibrate: [200, 100, 200],
       data: {
-        url: data.url || '/sheets/home.html'
+        url: data.url || '/sheets/'
       }
     };
 
@@ -150,7 +149,7 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
-    clients.openWindow(event.notification.data.url || '/sheets/home.html')
+    clients.openWindow(event.notification.data.url || '/sheets/')
   );
 });
 

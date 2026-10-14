@@ -1840,6 +1840,14 @@ body {
     margin: 0 auto;
 }
 
+/* Offscreen host for the throw-away grid behind CSV exports */
+.offscreen-export {
+    position: fixed;
+    left: -10000px;
+    top: 0;
+    width: 1200px;
+}
+
 /* Blend the grid into the app: card surface + radius, app font and
    text tokens, accent-tinted row hover. The light/midnight Tabulator
    theme sheets still supply the widget's internal detail colors. */
@@ -1966,4 +1974,326 @@ body {
 
 .rename-prompt-btn-primary:hover {
     filter: brightness(1.05);
+}
+
+/* ============================================================
+   Home page (/forms/) — every form on the account
+   ============================================================ */
+
+body.home-page {
+    display: flex;
+    flex-direction: column;
+}
+
+.home-page .form-title {
+    cursor: default;
+}
+
+.home-main {
+    flex: 1;
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 20px 16px 32px;
+    overflow-y: auto;
+}
+
+.home-toolbar {
+    margin-bottom: 14px;
+}
+
+.home-toolbar h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* Search lives in the top nav (second row on phones — see #homeSearchToggle) */
+.home-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    max-width: 320px;
+    min-width: 0;
+}
+
+.home-search-icon {
+    position: absolute;
+    left: 12px;
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+.home-search-input {
+    width: 100%;
+    padding: 9px 34px 9px 36px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home-search-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.home-search-clear {
+    position: absolute;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.home-search-clear:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.home-search-toggle {
+    display: none;
+    flex-shrink: 0;
+}
+
+.home-layout-btn {
+    flex-shrink: 0;
+}
+
+.home-layout-btn svg {
+    pointer-events: none;
+}
+
+.home-new-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 14px;
+    flex-shrink: 0;
+}
+
+.home-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 12px;
+}
+
+.home-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    position: relative;
+}
+
+.home-card:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 4px 14px var(--shadow-color);
+    transform: translateY(-1px);
+}
+
+.home-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.home-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-light);
+    color: var(--accent-color);
+    flex-shrink: 0;
+}
+
+.home-card-name {
+    font-size: 14.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+
+.home-card-meta {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.home-card-actions {
+    display: none;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    gap: 2px;
+}
+
+.home-card:hover .home-card-actions,
+.home-card:focus-within .home-card-actions {
+    display: inline-flex;
+}
+
+/* Rows layout (card/list toggle) */
+.home-grid.as-list {
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.home-grid.as-list .home-card {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+}
+
+.home-grid.as-list .home-card:hover {
+    transform: none;
+}
+
+.home-grid.as-list .home-card-head {
+    flex: 1;
+    min-width: 0;
+}
+
+.home-grid.as-list .home-card-meta {
+    margin-left: auto;
+    flex-shrink: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.home-grid.as-list .home-card-actions {
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.home-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.home-icon-btn:hover {
+    background: var(--accent-light);
+    color: var(--accent-color);
+}
+
+.home-icon-btn.danger:hover {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+.home-rename-input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    margin-bottom: 14px;
+}
+
+.home-rename-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 56px 20px;
+    text-align: center;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius);
+}
+
+.empty-state .empty-icon {
+    color: var(--accent-color);
+    opacity: 0.7;
+}
+
+.empty-state p {
+    font-size: 14.5px;
+}
+
+@media (max-width: 560px) {
+    .home-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+
+    .home-card-actions {
+        display: inline-flex;
+    }
+}
+
+@media (max-width: 640px) {
+    .top-nav {
+        flex-wrap: wrap;
+    }
+
+    .home-search {
+        display: none;
+        order: 10;
+        flex-basis: 100%;
+        max-width: none;
+    }
+
+    .top-nav.search-open .home-search {
+        display: flex;
+        margin-top: 8px;
+    }
+
+    .home-search-toggle {
+        display: inline-flex;
+    }
+
+    .home-new-btn {
+        padding: 0 10px;
+    }
+
+    .home-new-btn .btn-label {
+        display: none;
+    }
 }

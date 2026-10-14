@@ -28,7 +28,7 @@
       "name": "New Spreadsheet",
       "short_name": "New Sheet",
       "description": "Create a new spreadsheet",
-      "url": "/sheets/home.html?action=new",
+      "url": "/sheets/?action=new",
       "icons": [
         {
           "src": "/sheets/icons/icon-192x192.png",

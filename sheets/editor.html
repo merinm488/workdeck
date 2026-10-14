@@ -406,11 +406,11 @@
                 new URLSearchParams(window.location.search).get('id');
 
             if (!userHash || !userKey) {
-                // No session found, redirect to login
-                window.location.href = '/sheets/';
+                // No session found, back to Workdeck
+                window.location.href = '/';
             } else if (!spreadsheetId) {
-                // Authenticated but no spreadsheet ID, redirect to home
-                window.location.href = '/sheets/home.html';
+                // Authenticated but no spreadsheet ID, go to the Sheets home
+                window.location.href = '/sheets/';
             }
             // Session will be verified by authManager.initialize()
         })();

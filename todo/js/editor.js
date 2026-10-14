@@ -15,6 +15,7 @@
 let lists = [];          // the account's task lists (userData.todo)
 let currentList = null;  // the open list, or null in the lists view
 let sortable = null;
+let listsLayout = APP_CONFIG.layout.default;  // 'cards' | 'list'
 
 // ================================================
 // DOM
@@ -35,8 +36,15 @@ const deleteAccountBtn = $('deleteAccountBtn');
 const listsView = $('listsView');
 const listsGrid = $('listsGrid');
 const listsEmpty = $('listsEmpty');
+const listsNoResults = $('listsNoResults');
 const newListBtn = $('newListBtn');
 const emptyNewListBtn = $('emptyNewListBtn');
+const listsLayoutBtn = $('listsLayoutBtn');
+const listsSearchInput = $('listsSearchInput');
+const listsSearchClear = $('listsSearchClear');
+const clearListsSearchBtn = $('clearListsSearchBtn');
+const listsSearchToggle = $('listsSearchToggle');
+const topNav = document.querySelector('.top-nav');
 
 const listView = $('listView');
 const navAdd = $('navAdd');
@@ -184,14 +192,31 @@ function openRenameList(list) {
 // Lists view
 // ================================================
 
+function getSearchQuery() {
+    return listsSearchInput.value.trim().toLowerCase();
+}
+
+/** Search matches the list name or any task title/description in it. */
+function listMatchesSearch(list, q) {
+    if (!q) return true;
+    if ((list.name || 'Untitled List').toLowerCase().includes(q)) return true;
+    const items = Array.isArray(list.items) ? list.items : [];
+    return items.some(t =>
+        String(t.title || '').toLowerCase().includes(q) ||
+        String(t.description || '').toLowerCase().includes(q));
+}
+
 function renderLists() {
     listsGrid.innerHTML = '';
 
-    const sorted = [...lists].sort((a, b) =>
-        String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+    const q = getSearchQuery();
+    const sorted = [...lists]
+        .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
+        .filter(list => listMatchesSearch(list, q));
 
     listsEmpty.classList.toggle('hidden', lists.length > 0);
-    if (lists.length === 0) {
+    listsNoResults.classList.toggle('hidden', lists.length === 0 || sorted.length > 0);
+    if (lists.length === 0 || sorted.length === 0) {
         updateFooter();
         return;
     }
@@ -258,6 +283,42 @@ async function createNewList() {
 }
 
 // ================================================
+// Lists home layout (cards grid / rows) + search bar
+// ================================================
+
+function applyListsLayout(mode) {
+    listsLayout = mode === 'list' ? 'list' : 'cards';
+    const asList = listsLayout === 'list';
+
+    listsGrid.classList.toggle('as-list', asList);
+    listsLayoutBtn.setAttribute('aria-pressed', String(asList));
+    listsLayoutBtn.querySelector('.layout-icon-list').classList.toggle('hidden', asList);
+    listsLayoutBtn.querySelector('.layout-icon-cards').classList.toggle('hidden', !asList);
+    const label = asList ? 'Switch to card view' : 'Switch to list view';
+    listsLayoutBtn.title = label;
+    listsLayoutBtn.setAttribute('aria-label', label);
+}
+
+function toggleListsLayout() {
+    applyListsLayout(listsLayout === 'list' ? 'cards' : 'list');
+    try {
+        localStorage.setItem(APP_CONFIG.layout.storageKey, listsLayout);
+    } catch (err) { /* private mode */ }
+}
+
+function clearListsSearch() {
+    listsSearchInput.value = '';
+    listsSearchClear.classList.add('hidden');
+    renderLists();
+    listsSearchInput.focus();
+}
+
+function setSearchOpen(open) {
+    topNav.classList.toggle('search-open', open);
+    if (open) listsSearchInput.focus();
+}
+
+// ================================================
 // List view
 // ================================================
 
@@ -279,12 +340,17 @@ function openList(id) {
 
     history.replaceState(null, '', '/todo/' + encodeURIComponent(id));
 
+    // The lists search/layout/new controls don't apply inside a list
+    topNav.classList.add('list-open');
+
     showView('add');
     renderTasks();
 }
 
 function showLists() {
     currentList = null;
+
+    topNav.classList.remove('list-open');
 
     listView.classList.add('hidden');
     listsView.classList.remove('hidden');
@@ -608,6 +674,24 @@ function wireEvents() {
     emptyNewListBtn.addEventListener('click', createNewList);
     emptyAddTaskBtn.addEventListener('click', () => showView('add'));
 
+    listsLayoutBtn.addEventListener('click', toggleListsLayout);
+
+    listsSearchInput.addEventListener('input', () => {
+        listsSearchClear.classList.toggle('hidden', !listsSearchInput.value);
+        renderLists();
+    });
+    listsSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (listsSearchInput.value) clearListsSearch();
+            else setSearchOpen(false);
+        }
+    });
+    listsSearchClear.addEventListener('click', clearListsSearch);
+    clearListsSearchBtn.addEventListener('click', clearListsSearch);
+    listsSearchToggle.addEventListener('click', () => {
+        setSearchOpen(!topNav.classList.contains('search-open'));
+    });
+
     navAdd.addEventListener('click', () => showView('add'));
     navList.addEventListener('click', () => showView('list'));
 
@@ -765,6 +849,13 @@ async function init() {
     todoThemeManager.applyFromServer(userData.settings && userData.settings.theme);
 
     lists = Array.isArray(userData.todo) ? userData.todo : [];
+
+    let storedLayout = null;
+    try {
+        storedLayout = localStorage.getItem(APP_CONFIG.layout.storageKey);
+    } catch (err) { /* private mode */ }
+    applyListsLayout(storedLayout || APP_CONFIG.layout.default);
+
     renderLists();
 
     const pathId = (/^\/todo\/([a-z0-9]{14,})\/?$/.exec(window.location.pathname) || [])[1];

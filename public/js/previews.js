@@ -456,7 +456,7 @@
         frames[kind] = new Promise(function (resolve) {
             const frame = document.createElement('iframe');
             frame.setAttribute('sandbox', 'allow-scripts');
-            frame.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden;';
+            frame.className = 'wd-sandbox-frame';
             let settled = false;
 
             const onMessage = function (e) {

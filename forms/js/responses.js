@@ -230,8 +230,7 @@ class FormsResponsesView {
         // pagination state into the export — the ⋮ CSV must always
         // contain EVERY response.
         const holder = document.createElement('div');
-        holder.style.cssText =
-            'position:fixed;left:-10000px;top:0;width:1200px;';
+        holder.classList.add('offscreen-export');
         document.body.appendChild(holder);
         const temp = new Tabulator(holder, this.tableConfig());
         // Tabulator 6.5.0 crashes if setData() lands before its renderer

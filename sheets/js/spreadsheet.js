@@ -592,7 +592,7 @@ class SpreadsheetManager {
         btn.textContent = isSharedView ? 'Close' : 'Back to Home';
         if (!isSharedView) {
             btn.addEventListener('click', () => {
-                window.location.href = '/sheets/home.html';
+                window.location.href = '/sheets/';
             });
         }
         container.replaceChildren(notice);

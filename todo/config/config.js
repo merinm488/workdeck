@@ -25,6 +25,12 @@ const APP_CONFIG = {
         default: 'light',
         available: ['light', 'dark'],   // 'system' is a preference, not a theme
         storageKey: 'todo_theme'        // localStorage key holding the preference
+    },
+
+    // Lists home layout ('cards' grid or 'list' rows)
+    layout: {
+        default: 'cards',
+        storageKey: 'todo_lists_layout' // localStorage key holding the preference
     }
 };
 

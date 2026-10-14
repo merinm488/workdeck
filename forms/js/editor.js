@@ -1046,7 +1046,7 @@ class FormsEditorApp {
         const homeBtn = document.getElementById('homeBtn');
         if (homeBtn) {
             homeBtn.addEventListener('click', () => {
-                window.location.href = '/';
+                window.location.href = '/forms/';
             });
         }
 

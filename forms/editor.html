@@ -556,7 +556,7 @@
     <!-- Authentication Check Script -->
     <script>
         // Forms has NO login page of its own: Workdeck's login already wrote
-        // the session mirrors. No session or no form id -> back to Workdeck.
+        // the session mirrors. No session -> Workdeck; no form id -> Forms home.
         (function() {
             const userHash = sessionStorage.getItem('forms_user_hash');
             const userKey = sessionStorage.getItem('forms_user_key');
@@ -568,7 +568,7 @@
             if (!userHash || !userKey) {
                 window.location.href = '/';
             } else if (!formId) {
-                window.location.href = '/';
+                window.location.href = '/forms/';
             }
             // Session is verified against the API by formsStorage.loadUserData()
         })();

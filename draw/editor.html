@@ -614,8 +614,8 @@
     </div>
 
     <!-- Authentication Check — Draw has NO login page of its own:
-         Workdeck's login wrote the session mirrors. No session or no
-         drawing id -> back to Workdeck. localStorage is checked as a fallback:
+         Workdeck's login wrote the session mirrors. No session -> Workdeck;
+         no drawing id -> Draw home. localStorage is checked as a fallback:
          Safari doesn't copy sessionStorage into new tabs, so a fresh tab
          would otherwise bounce straight back to '/' (mobile bug).
          config.js's helpers repeat this fallback once scripts load. -->
@@ -639,7 +639,7 @@
             if (!userHash || !userKey) {
                 window.location.href = '/';
             } else if (!drawingId) {
-                window.location.href = '/';
+                window.location.href = '/draw/';
             }
             // Session is verified against the API by drawStorage.loadUserData()
         })();

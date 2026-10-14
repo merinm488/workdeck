@@ -314,11 +314,7 @@ body {
    ============================================================ */
 
 .lists-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
 
 .lists-toolbar h2 {
@@ -327,10 +323,130 @@ body {
     color: var(--text-secondary);
 }
 
+/* Search lives in the top nav (second row on phones — see #listsSearchToggle) */
+.lists-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    max-width: 320px;
+    min-width: 0;
+}
+
+.lists-search-icon {
+    position: absolute;
+    left: 12px;
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+.lists-search-input {
+    width: 100%;
+    padding: 9px 34px 9px 36px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lists-search-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.lists-search-clear {
+    position: absolute;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.lists-search-clear:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Top-bar controls: search toggle (phones), card/list toggle, New button.
+   Hidden while a task list is open — they only apply to the lists home. */
+.top-nav.list-open .lists-nav-control {
+    display: none !important;
+}
+
+.home-search-toggle {
+    display: none;
+    flex-shrink: 0;
+}
+
+.home-layout-btn {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.home-layout-btn svg {
+    pointer-events: none;
+}
+
+.home-new-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 14px;
+    flex-shrink: 0;
+}
+
 .lists-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     gap: 12px;
+}
+
+/* Rows layout (layout toggle) */
+.lists-grid.as-list {
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.lists-grid.as-list .td-list-card {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+}
+
+.lists-grid.as-list .td-list-card:hover {
+    transform: none;
+}
+
+.lists-grid.as-list .td-list-card-head {
+    flex: 1;
+    min-width: 0;
+}
+
+.lists-grid.as-list .td-list-meta {
+    margin-left: auto;
+    flex-shrink: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lists-grid.as-list .td-list-card-actions {
+    top: 50%;
+    transform: translateY(-50%);
 }
 
 .td-list-card {
@@ -1078,7 +1194,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         display: inline-flex;
     }
 
+    .lists-grid.as-list .td-list-meta {
+        margin-right: 64px;
+    }
+
     .todo-actions {
         flex-direction: column;
+    }
+}
+
+@media (max-width: 640px) {
+    .top-nav {
+        flex-wrap: wrap;
+    }
+
+    .lists-search {
+        display: none;
+        order: 10;
+        flex-basis: 100%;
+        max-width: none;
+    }
+
+    .top-nav.search-open .lists-search {
+        display: flex;
+        margin-top: 8px;
+    }
+
+    .top-nav:not(.list-open) .home-search-toggle {
+        display: inline-flex;
+    }
+
+    .home-new-btn {
+        padding: 0 10px;
+    }
+
+    .home-new-btn .btn-label {
+        display: none;
     }
 }

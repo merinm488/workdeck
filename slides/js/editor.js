@@ -2065,7 +2065,7 @@ async function exportPptx() {
 function bindTopNav() {
     $('homeBtn').addEventListener('click', () => {
         saveDeck({ explicit: false });   // best-effort; the reminder must not block navigation
-        goToWorkdeck();
+        window.location.href = '/slides/';
     });
 
     $('saveBtn').addEventListener('click', () => saveDeck());

@@ -19,6 +19,12 @@ class SheetsHome {
         this.spreadsheetToDelete = null;
         this.isInitialized = false;
         this.isLoading = false;
+        // Home layout: 'cards' grid or 'list' rows (toggle in the top bar)
+        this.layoutStorageKey = 'sheets_home_layout';
+        this.layout = 'cards';
+        try {
+            this.layout = localStorage.getItem(this.layoutStorageKey) === 'list' ? 'list' : 'cards';
+        } catch (err) { /* private mode */ }
     }
 
     // ================================================
@@ -48,6 +54,9 @@ class SheetsHome {
 
             // Update theme indicator
             this.updateThemeIndicator();
+
+            // Apply the saved card/list layout before rendering
+            this.applyLayout(this.layout);
 
             // Always load spreadsheets (even if already initialized) to get fresh data
             await this.loadSpreadsheets();
@@ -209,8 +218,23 @@ class SheetsHome {
                     searchInput.value = '';
                     this.handleSearch('');
                     searchInput.blur();
+                    this.setSearchOpen(false);
                 }
             });
+        }
+
+        // Mobile: the search icon button reveals the search row
+        const homeSearchToggle = document.getElementById('homeSearchToggle');
+        if (homeSearchToggle) {
+            homeSearchToggle.addEventListener('click', () => {
+                this.setSearchOpen(!homeSearchToggle.closest('.home-header-content').classList.contains('search-open'));
+            });
+        }
+
+        // Card/list view toggle
+        const homeLayoutBtn = document.getElementById('homeLayoutBtn');
+        if (homeLayoutBtn) {
+            homeLayoutBtn.addEventListener('click', () => this.toggleLayout());
         }
 
         if (clearSearch) {
@@ -513,6 +537,59 @@ class SheetsHome {
     }
 
     // ================================================
+    // Top Bar: Layout Toggle + Mobile Search Row
+    // ================================================
+
+    /**
+     * Apply card or list layout to the spreadsheets grid
+     * @param {string} mode - 'cards' or 'list'
+     */
+    applyLayout(mode) {
+        this.layout = mode === 'list' ? 'list' : 'cards';
+        const asList = this.layout === 'list';
+
+        const container = document.getElementById('spreadsheetsContainer');
+        const layoutBtn = document.getElementById('homeLayoutBtn');
+
+        if (container) {
+            container.classList.toggle('as-list', asList);
+        }
+
+        if (layoutBtn) {
+            layoutBtn.setAttribute('aria-pressed', String(asList));
+            layoutBtn.querySelector('.layout-icon-list').classList.toggle('hidden', asList);
+            layoutBtn.querySelector('.layout-icon-cards').classList.toggle('hidden', !asList);
+            const label = asList ? 'Switch to card view' : 'Switch to list view';
+            layoutBtn.title = label;
+            layoutBtn.setAttribute('aria-label', label);
+        }
+    }
+
+    /**
+     * Toggle card/list layout and remember the choice
+     */
+    toggleLayout() {
+        this.applyLayout(this.layout === 'list' ? 'cards' : 'list');
+        try {
+            localStorage.setItem(this.layoutStorageKey, this.layout);
+        } catch (err) { /* private mode */ }
+    }
+
+    /**
+     * Show/hide the search row (mobile)
+     */
+    setSearchOpen(open) {
+        const headerContent = document.querySelector('.home-header-content');
+        if (headerContent) {
+            headerContent.classList.toggle('search-open', open);
+        }
+        if (open) {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.focus();
+        }
+    }
+
+    // ================================================
     // Spreadsheet Operations
     // ================================================
 
@@ -520,8 +597,8 @@ class SheetsHome {
      * Open spreadsheet in editor
      */
     openSpreadsheet(id) {
-        // Navigate to spreadsheet (the destination page will show its own loading)
-        window.location.href = `/sheets/editor.html?id=${id}`;
+        // Canonical hard link — the server rewrites /sheets/<id> to the editor
+        window.location.href = `/sheets/${id}`;
     }
 
     /**
@@ -529,56 +606,27 @@ class SheetsHome {
      */
     async createNewSpreadsheet() {
         try {
-            // Generate unique ID
-            const id = `${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-
-            // Create default spreadsheet data - Univer workbook snapshot
-            const sheetId = `sheet-${Date.now().toString(36)}`;
-            const newSpreadsheet = {
-                id: id,
-                name: 'Untitled Spreadsheet',
-                formatVersion: 2,
-                data: {
-                    id: `wb_${id}`,
-                    name: 'Untitled Spreadsheet',
-                    appVersion: '0.25.1',
-                    locale: 'enUS',
-                    styles: {},
-                    sheetOrder: [sheetId],
-                    sheets: {
-                        [sheetId]: {
-                            id: sheetId,
-                            name: 'Sheet1',
-                            tabColor: '',
-                            hidden: 0,
-                            freeze: { xOffset: 0, yOffset: 0, startRow: -1, startColumn: -1, xSplit: 0, ySplit: 0 },
-                            rowCount: 84,
-                            columnCount: 60,
-                            zoomRatio: 1,
-                            scrollTop: 0,
-                            scrollLeft: 0,
-                            defaultColumnWidth: 73,
-                            defaultRowHeight: 19,
-                            mergeData: [],
-                            cellData: {},
-                            rowData: {},
-                            columnData: {}
-                        }
-                    }
-                },
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
-
-            // Save to storage
-            const success = await sheetsStorage.saveSpreadsheet(id, newSpreadsheet);
-
-            if (success) {
-                // Navigate to the new spreadsheet
-                this.openSpreadsheet(id);
-            } else {
-                this.showError('Failed to create spreadsheet');
+            const hash = sheetsStorage.getUserHash();
+            if (!hash) {
+                window.location.href = '/';
+                return;
             }
+
+            // Server generates the id and default workbook (createDefaultSheet
+            // in api/workdeck.js), so /sheets/<id> URLs match the pretty-URL
+            // id pattern. The API pushes to the array -> new sheet is last.
+            const response = await fetch('/api/workdeck', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hash, action: 'createSheet', data: {} })
+            });
+            const result = await response.json();
+            const sheets = result && result.success && result.data && result.data.sheets;
+            const created = sheets && sheets[sheets.length - 1];
+            if (!created) throw new Error(result && result.error);
+
+            // Navigate to the new spreadsheet
+            this.openSpreadsheet(created.id);
         } catch (error) {
             console.error('[HOME] Failed to create spreadsheet:', error);
             this.showError('Failed to create spreadsheet');
@@ -890,12 +938,12 @@ class SheetsHome {
                 // Fallback
                 sessionStorage.removeItem('sheets_user_hash');
                 sessionStorage.removeItem('sheets_user_key');
-                window.location.href = '/sheets/';
+                window.location.href = '/';
             }
         } catch (error) {
             console.error('[HOME] Logout error:', error);
             // Force redirect
-            window.location.href = '/sheets/';
+            window.location.href = '/';
         }
     }
 

@@ -229,6 +229,14 @@
     gap: 0.75rem;
 }
 
+.home-layout-btn {
+    flex-shrink: 0;
+}
+
+.home-layout-btn svg {
+    pointer-events: none;
+}
+
 /* Settings Container - Uses shared styles from styles.css */
 .top-nav-settings {
     position: relative;
@@ -262,6 +270,13 @@
 
 .top-nav-btn:hover .top-nav-icon {
     color: var(--accent-color);
+}
+
+/* Search icon button (phones) — reveals the search row.
+   Must come after .top-nav-btn so the display:none wins the cascade. */
+.home-search-toggle {
+    display: none;
+    flex-shrink: 0;
 }
 
 .home-create-btn {
@@ -329,6 +344,35 @@
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1rem;
     padding: 1rem;
+}
+
+/* Rows layout (card/list toggle) */
+.home-spreadsheets-grid.as-list {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+.home-spreadsheets-grid.as-list .spreadsheet-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.875rem 1.25rem;
+}
+
+.home-spreadsheets-grid.as-list .spreadsheet-card:hover {
+    transform: none;
+}
+
+.home-spreadsheets-grid.as-list .spreadsheet-card-header {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+.home-spreadsheets-grid.as-list .spreadsheet-card-info {
+    margin-left: auto;
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 /* Spreadsheet Card */
@@ -730,10 +774,20 @@
         flex-wrap: wrap;
     }
 
+    /* Search collapses behind the icon button in the top bar */
     .home-search-container {
+        display: none;
+    }
+
+    .home-header-content.search-open .home-search-container {
+        display: block;
         order: 3;
         min-width: 100%;
         margin-top: 0.5rem;
+    }
+
+    .home-search-toggle {
+        display: inline-flex;
     }
 
     .home-spreadsheets-grid {

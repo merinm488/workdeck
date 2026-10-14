@@ -51,9 +51,9 @@ class SheetsApp {
             // Get or create spreadsheet ID
             this.spreadsheetId = this.getOrCreateSpreadsheetId();
 
-            // If no spreadsheet ID and user is authenticated, redirect to home
+            // If no spreadsheet ID and user is authenticated, go to the Sheets home
             if (!this.spreadsheetId && window.authManager && window.authManager.isAuthenticated()) {
-                window.location.href = '/sheets/home.html';
+                window.location.href = '/sheets/';
                 return false;
             }
 
@@ -225,7 +225,7 @@ class SheetsApp {
         // Home button - navigate back to home page
         if (homeBtn) {
             homeBtn.addEventListener('click', () => {
-                window.location.href = '/sheets/home.html';
+                window.location.href = '/sheets/';
             });
         }
 

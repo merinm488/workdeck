@@ -702,8 +702,8 @@
     </div>
 
     <!-- Authentication Check — Slides has NO login page of its own:
-         Workdeck's login wrote the session mirrors. No session or no
-         deck id -> back to Workdeck. localStorage is checked as a fallback:
+         Workdeck's login wrote the session mirrors. No session -> Workdeck;
+         no deck id -> Slides home. localStorage is checked as a fallback:
          Safari doesn't copy sessionStorage into new tabs, so a fresh tab
          would otherwise bounce straight back to '/' (mobile bug).
          config.js's helpers repeat this fallback once scripts load. -->
@@ -727,7 +727,7 @@
             if (!userHash || !userKey) {
                 window.location.href = '/';
             } else if (!deckId) {
-                window.location.href = '/';
+                window.location.href = '/slides/';
             }
             // Session is verified against the API by slidesStorage.loadUserData()
         })();
