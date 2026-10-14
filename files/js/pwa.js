@@ -17,7 +17,7 @@
 
     window.addEventListener('load', function () {
       navigator.serviceWorker
-        .register('/filebox/service-worker.js', { scope: '/filebox/' })
+        .register('/files/service-worker.js', { scope: '/files/' })
         .then(function (registration) {
           // A waiting worker means a new deploy is ready — offer it.
           registration.addEventListener('updatefound', function () {

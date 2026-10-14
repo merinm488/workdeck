@@ -156,12 +156,12 @@
         });
     }
 
-    /** Detached-but-laid-out container for library renders. */
+    /** Detached-but-laid-out container for library renders . */
     function offstage(cssWidth, cssHeight) {
         var el = document.createElement('div');
-        el.style.cssText = 'position:fixed;left:-99999px;top:0;width:' + cssWidth + 'px;'
-            + (cssHeight ? 'height:' + cssHeight + 'px;' : '')
-            + 'background:#ffffff;overflow:hidden;';
+        el.className = 'fb-offstage';
+        el.style.width = cssWidth + 'px';
+        if (cssHeight) el.style.height = cssHeight + 'px';
         document.body.appendChild(el);
         return el;
     }
@@ -325,10 +325,7 @@
             await window.docx.renderAsync(await blob.arrayBuffer(), stage, null, { inWrapper: true });
             var page = stage.querySelector('.docx-wrapper > section.docx') || stage.firstElementChild;
             if (!page) return null;
-            page.style.boxShadow = 'none';
-            page.style.margin = '0';
-            var wrapper = stage.querySelector('.docx-wrapper');
-            if (wrapper) wrapper.style.background = 'none';
+            // docx-preview's page chrome is stripped in .fb-offstage rules
             return await snapElement(page, THUMB_WIDTH);
         } finally {
             stage.remove();
@@ -1013,7 +1010,7 @@
         video.muted = true;
         video.playsInline = true;
         video.preload = 'auto';
-        video.style.cssText = 'position:fixed;left:-99999px;width:320px;';
+        video.className = 'fb-offstage-video';
         document.body.appendChild(video);
         try {
             video.src = url;

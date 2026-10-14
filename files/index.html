@@ -8,9 +8,9 @@
     <meta name="description" content="Files — your files, organized in folders. Part of Workdeck.">
     <meta name="theme-color" content="#0d9488">
 
-    <link rel="icon" type="image/png" sizes="192x192" href="/filebox/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" sizes="192x192" href="/filebox/icons/icon-192x192.png">
-    <link rel="manifest" href="/filebox/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/files/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/files/icons/icon-192x192.png">
+    <link rel="manifest" href="/files/manifest.json">
 
     <!-- Inter Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,10 +27,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.12.0/styles/github-dark.min.css" id="fbHljsDark" disabled>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/video.js@8.24.1/dist/video-js.css">
 
-    <link rel="stylesheet" href="/filebox/styles.css">
+    <link rel="stylesheet" href="/files/styles.css">
 
     <!-- Deep-link boot veil: when the URL targets a file or folder (?id= or
-         the /filebox/<id> hard link), hide the shell before first paint so
+         the /files/<id> hard link), hide the shell before first paint so
          the homepage never flashes while boot waits on the data load. main.js
          drops the class once the viewer is showing (or the folder opened);
          the CSS rule also self-reveals after 6s in case boot never completes
@@ -38,7 +38,7 @@
     <script>
         (function () {
             var targetsFile = /(?:\?|&)id=[a-z0-9]{14,}/i.test(window.location.search)
-                || /^\/filebox\/[a-z0-9]{14,}\/?$/i.test(window.location.pathname);
+                || /^\/(filebox|files)\/[a-z0-9]{14,}\/?$/i.test(window.location.pathname);
             if (targetsFile) document.documentElement.classList.add('fb-deep-boot');
         })();
     </script>

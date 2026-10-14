@@ -368,10 +368,10 @@ async function loadUserData() {
 // ================================================
 
 function syncUrl() {
-    history.replaceState(null, '', '/filebox/' + (state.currentFolderId || ''));
+    history.replaceState(null, '', '/files/' + (state.currentFolderId || ''));
 }
 
-/** Apply the hard link (/filebox/<id> — file or folder), ?folder= (legacy)
+/** Apply the hard link (/files/<id> — file or folder), ?folder= (legacy)
  *  / ?tag= / ?id= / ?upload=1 after data has loaded. */
 function applyUrlState() {
     const params = new URLSearchParams(window.location.search);
@@ -997,7 +997,7 @@ function closeViewer() {
     fileboxViewer.close();
 }
 
-/** Copy the file's canonical hard link (/filebox/<id>) to the clipboard. */
+/** Copy the file's canonical hard link (/files/<id>) to the clipboard. */
 function copyFileLink(record) {
     if (!window.WDLinks) return;
     const url = window.location.origin + WDLinks.url('filebox', record.id);

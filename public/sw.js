@@ -65,9 +65,9 @@ self.addEventListener('fetch', (event) => {
   // Never intercept API traffic (auth and user data must stay live).
   if (url.pathname.startsWith('/api/')) return;
 
-  // Leave Docs, Sheets and Filebox to their own service workers.
+  // Leave Docs, Sheets and Files to their own service workers.
   if (url.pathname.startsWith('/docs/') || url.pathname.startsWith('/sheets/') ||
-      url.pathname.startsWith('/filebox/')) return;
+      url.pathname.startsWith('/files/')) return;
 
   // Navigation requests: network first so logins land on the fresh page,
   // falling back to the cached shell when offline. respondWith must NEVER

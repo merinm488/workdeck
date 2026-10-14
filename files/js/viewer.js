@@ -123,7 +123,7 @@ class FileboxViewer {
         if ((loc && loc.id) || params.get('id')) {
             params.delete('id');
             const qs = params.toString();
-            history.replaceState(null, '', '/filebox/' + (qs ? '?' + qs : ''));
+            history.replaceState(null, '', '/files/' + (qs ? '?' + qs : ''));
         }
         if (typeof this.onClosed === 'function') this.onClosed();
     }
@@ -152,7 +152,7 @@ class FileboxViewer {
         if (this.state && this.state.currentFolderId) params.set('folder', this.state.currentFolderId);
         const qs = params.toString();
         // Canonical hard link in the address bar while the viewer is open.
-        history.replaceState(null, '', '/filebox/' + encodeURIComponent(fileId) + (qs ? '?' + qs : ''));
+        history.replaceState(null, '', '/files/' + encodeURIComponent(fileId) + (qs ? '?' + qs : ''));
     }
 
     // ================================================
@@ -244,7 +244,7 @@ class FileboxViewer {
                 if ((loc && loc.id) || params.get('id')) {
                     params.delete('id');
                     const qs = params.toString();
-                    history.replaceState(null, '', '/filebox/' + (qs ? '?' + qs : ''));
+                    history.replaceState(null, '', '/files/' + (qs ? '?' + qs : ''));
                 }
                 if (typeof self.onClosed === 'function') self.onClosed();
             });

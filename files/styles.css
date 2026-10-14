@@ -90,7 +90,7 @@ input, select {
 }
 
 /* Deep-link boot veil (class set by the inline <head> script in
-   index.html): while a ?id= / /filebox/<id> URL boots, the shell stays
+   index.html): while a ?id= / /files/<id> URL boots, the shell stays
    hidden so the homepage can't flash before the viewer opens. visibility
    rather than display keeps layout measurable for the viewer's renderers.
    The animation is the no-JS escape hatch — CSS reveals the shell on its
@@ -1654,6 +1654,32 @@ html.fb-deep-boot .fb-app {
 
 @keyframes fb-thumb-skel {
     to { background-position: -200% 0; }
+}
+
+/* Offscreen render surfaces for thumbnail generation (js/thumbs.js) */
+.fb-offstage {
+    position: fixed;
+    left: -99999px;
+    top: 0;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.fb-offstage-video {
+    position: fixed;
+    left: -99999px;
+    width: 320px;
+}
+
+/* docx-preview page chrome stays out of the snap */
+.fb-offstage .docx-wrapper {
+    background: none;
+}
+
+.fb-offstage .docx-wrapper section.docx,
+.fb-offstage > section.docx {
+    box-shadow: none;
+    margin: 0;
 }
 
 /* Markdown thumbnail typography — offscreen render in js/thumbs.js */
