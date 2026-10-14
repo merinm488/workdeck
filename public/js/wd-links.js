@@ -7,9 +7,12 @@
  * has a canonical, pasteable address:
  *
  *   /docs/<id>   /sheets/<id>   /forms/<id>   /slides/<id>   /draw/<id>
- *   /filebox/<id>                (files AND folders — the app tells them apart)
+ *   /files/<id>                  (files AND folders — the app tells them apart)
  *   /f/<id>                      universal resolver -> canonical address
  *
+ * The Files app's internal id stays 'filebox' (data sections, API slugs,
+ * storage keys); only its URL prefix is /files/. Legacy /filebox/... links
+ * keep parsing everywhere.
  */
 
 (function () {
@@ -19,7 +22,7 @@
 
     /** Internal link hrefs -> { app, id, query }. Used to detect mentions. */
     var INTERNAL_LINK_RE = new RegExp(
-        '^/(docs|sheets|forms|slides|draw|filebox)/(' + ID_SOURCE + ')(\\?[^#]*)?(#.*)?$'
+        '^/(docs|sheets|forms|slides|draw|todo|calendar|filebox|files)/(' + ID_SOURCE + ')(\\?[^#]*)?(#.*)?$'
     );
 
     /**
@@ -52,9 +55,13 @@
             id: 'todo', name: 'Todo', label: 'Todo',
             page: '/todo/index.html', param: 'list', prefix: '/todo/'
         },
+        calendar: {
+            id: 'calendar', name: 'Calendar', label: 'Calendar',
+            page: '/calendar/index.html', param: 'cal', prefix: '/calendar/'
+        },
         filebox: {
             id: 'filebox', name: 'Files', label: 'File',
-            page: '/filebox/', param: 'id', prefix: '/filebox/'
+            page: '/files/', param: 'id', prefix: '/files/'
         }
     };
 
@@ -92,6 +99,12 @@
             ['path', { d: 'M13 6h8' }],
             ['path', { d: 'M13 12h8' }],
             ['path', { d: 'M13 18h8' }]
+        ],
+        calendar: [
+            ['rect', { x: 3, y: 4, width: 18, height: 18, rx: 2 }],
+            ['line', { x1: 16, y1: 2, x2: 16, y2: 6 }],
+            ['line', { x1: 8, y1: 2, x2: 8, y2: 6 }],
+            ['line', { x1: 3, y1: 10, x2: 21, y2: 10 }]
         ],
         filebox: [
             ['path', { d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' }]
@@ -139,12 +152,12 @@
     }
 
     /**
-     * Canonical URL for a file. Filebox folders share the file form — the
-     * Files app tells them apart from its data, not from the URL.
+     * Canonical URL for a file. Files-app folders share the file form — the
+     * app tells them apart from its data, not from the URL.
      *   WDLinks.url('sheets', id)                -> '/sheets/<id>'
      *   WDLinks.url('docs', id, { edit: true })  -> '/docs/<id>?edit=1'
      *   WDLinks.url('forms', id, { fill: true }) -> '/forms/<id>?fill=1'
-     *   WDLinks.url('filebox', id)               -> '/filebox/<id>'
+     *   WDLinks.url('filebox', id)               -> '/files/<id>'
      */
     function url(appId, id, opts) {
         opts = opts || {};
@@ -168,12 +181,17 @@
         var pathname = qIndex === -1 ? path : path.slice(0, qIndex);
         var params = new URLSearchParams(query);
 
-        // Pretty path: /<app>/<id>
+        // Pretty path: /<app>/<id> (the URL segment 'files' maps back to the
+        // app's internal id 'filebox')
         var pretty = new RegExp(
-            '^/(docs|sheets|forms|slides|draw|todo|filebox)/(' + ID_SOURCE + ')/?$'
+            '^/(docs|sheets|forms|slides|draw|todo|calendar|filebox|files)/(' + ID_SOURCE + ')/?$'
         ).exec(pathname);
         if (pretty) {
-            return { app: pretty[1], id: pretty[2], query: query };
+            return {
+                app: pretty[1] === 'files' ? 'filebox' : pretty[1],
+                id: pretty[2],
+                query: query
+            };
         }
 
         // Universal resolver: /f/<id> (f.html redirects to the canonical app)
@@ -183,14 +201,17 @@
         }
 
         // Legacy query form — infer the app from the path prefix.
-        var prefix = new RegExp('^/(docs|sheets|forms|slides|draw|todo|filebox)(/|$)').exec(pathname);
+        var prefix = new RegExp('^/(docs|sheets|forms|slides|draw|todo|calendar|filebox|files)(/|$)').exec(pathname);
         if (prefix) {
-            var app = prefix[1];
+            var app = prefix[1] === 'files' ? 'filebox' : prefix[1];
             if (app === 'docs' && params.get('doc') && isValidId(params.get('doc'))) {
                 return { app: 'docs', id: params.get('doc'), query: query };
             }
             if (app === 'todo' && params.get('list') && isValidId(params.get('list'))) {
                 return { app: 'todo', id: params.get('list'), query: query };
+            }
+            if (app === 'calendar' && params.get('cal') && isValidId(params.get('cal'))) {
+                return { app: 'calendar', id: params.get('cal'), query: query };
             }
             if (app === 'filebox' && params.get('folder') && isValidId(params.get('folder'))) {
                 return { app: 'filebox', id: params.get('folder'), kind: 'folder', query: query };
@@ -267,6 +288,13 @@
                     kind: 'file', record: todoLists[p], url: url('todo', id) };
             }
         }
+        var calendars = userData.calendars || [];
+        for (var q = 0; q < calendars.length; q++) {
+            if (calendars[q] && calendars[q].id === id) {
+                return { app: 'calendar', id: id, name: calendars[q].name || 'Untitled Calendar',
+                    kind: 'file', record: calendars[q], url: url('calendar', id) };
+            }
+        }
         var files = userData.files || [];
         for (var n = 0; n < files.length; n++) {
             if (files[n] && files[n].id === id) {
@@ -287,7 +315,8 @@
     /** Session hash: Workdeck's key first, then any app mirror. */
     function sessionHash() {
         var KEYS = ['wd_hash', 'docs_hash', 'sheets_user_hash', 'forms_user_hash',
-            'slides_user_hash', 'draw_user_hash', 'filebox_user_hash', 'todo_user_hash'];
+            'slides_user_hash', 'draw_user_hash', 'filebox_user_hash', 'todo_user_hash',
+            'calendar_user_hash'];
         for (var i = 0; i < KEYS.length; i++) {
             var v = sessionStorage.getItem(KEYS[i]) || localStorage.getItem(KEYS[i]);
             if (v) return v;

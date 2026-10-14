@@ -9,36 +9,50 @@
       "destination": "/api/:path*"
     },
     {
-      "source": "/docs/:id([a-z0-9]{14,})",
+      "source": "/docs/:id([a-z0-9_]{14,})",
       "destination": "/docs/index.html?doc=:id"
     },
     {
-      "source": "/sheets/:id([a-z0-9]{14,})",
+      "source": "/sheets/:id([a-z0-9_]{14,})",
       "destination": "/sheets/editor.html?id=:id"
     },
     {
-      "source": "/forms/:id([a-z0-9]{14,})",
+      "source": "/forms/:id([a-z0-9_]{14,})",
       "destination": "/forms/editor.html?id=:id"
     },
     {
-      "source": "/slides/:id([a-z0-9]{14,})",
+      "source": "/slides/:id([a-z0-9_]{14,})",
       "destination": "/slides/editor.html?id=:id"
     },
     {
-      "source": "/draw/:id([a-z0-9]{14,})",
+      "source": "/draw/:id([a-z0-9_]{14,})",
       "destination": "/draw/editor.html?id=:id"
     },
     {
-      "source": "/todo/:id([a-z0-9]{14,})",
+      "source": "/todo/:id([a-z0-9_]{14,})",
       "destination": "/todo/index.html?list=:id"
     },
     {
-      "source": "/filebox/:id([a-z0-9]{14,})",
-      "destination": "/filebox/index.html?id=:id"
+      "source": "/calendar/:id([a-z0-9_]{14,})",
+      "destination": "/calendar/index.html?cal=:id"
     },
     {
-      "source": "/f/:id([a-z0-9]{14,})",
+      "source": "/files/:id([a-z0-9_]{14,})",
+      "destination": "/files/index.html?id=:id"
+    },
+    {
+      "source": "/f/:id([a-z0-9_]{14,})",
       "destination": "/f.html?id=:id"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/filebox/:path*",
+      "destination": "/files/:path*"
+    },
+    {
+      "source": "/sheets/home.html",
+      "destination": "/sheets/"
     }
   ],
   "headers": [

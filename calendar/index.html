@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+
+    <title>Calendar</title>
+    <meta name="description" content="Calendars and events with recurrence, reminders and ICS import/export. Part of Workdeck.">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#0284c7">
+
+    <!-- App Icons (shared with the rest of Workdeck) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Vendor (MIT): FullCalendar standard bundle, rrule recurrence engine
+         (loaded before its FullCalendar plugin). ical.js is ESM-only and is
+         bridged onto window by js/vendor-ical.js. -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/rrule@2.8.1/dist/es5/rrule.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/rrule@6.1.21/index.global.min.js"></script>
+
+    <!-- WDLinks (suite-wide hard links) -->
+    <script src="/js/wd-links.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav">
+        <div class="top-nav-left">
+            <button id="homeBtn" class="top-nav-btn" aria-label="Back" title="Back">
+                <svg class="top-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
+            <h1 id="pageTitle" class="page-title">Calendar</h1>
+        </div>
+
+        <div class="top-nav-center">
+            <div class="nav-search" id="navSearchWrap">
+                <svg class="nav-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="searchInput" class="nav-search-input" placeholder="Search events  ( / )" autocomplete="off">
+                <button id="searchClear" class="nav-search-clear hidden" aria-label="Clear search">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <div id="searchResults" class="search-results hidden"></div>
+            </div>
+        </div>
+
+        <div class="top-nav-right">
+            <div class="top-nav-settings">
+                <button id="settingsBtn" class="top-nav-btn" aria-label="Settings">
+                    <svg class="top-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
+                <div id="settingsDropdown" class="settings-dropdown">
+                    <div class="theme-dropdown-container">
+                        <button class="settings-dropdown-item" id="themeToggleBtn">
+                            <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="5"></circle>
+                                <line x1="12" y1="1" x2="12" y2="3"></line>
+                                <line x1="12" y1="21" x2="12" y2="23"></line>
+                                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                <line x1="1" y1="12" x2="3" y2="12"></line>
+                                <line x1="21" y1="12" x2="23" y2="12"></line>
+                                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                            </svg>
+                            <span class="item-text" id="themeText">Theme: Light</span>
+                            <svg class="dropdown-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+                        <div class="theme-submenu" id="themeSubmenu">
+                            <button class="theme-option" data-theme="dark">
+                                <svg class="theme-option-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                                </svg>
+                                <span>Dark</span>
+                                <svg class="theme-check" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path>
+                                </svg>
+                            </button>
+                            <button class="theme-option" data-theme="light">
+                                <svg class="theme-option-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                </svg>
+                                <span>Light</span>
+                                <svg class="theme-check" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path>
+                                </svg>
+                            </button>
+                            <button class="theme-option" data-theme="system">
+                                <svg class="theme-option-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                </svg>
+                                <span>System</span>
+                                <svg class="theme-check" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="settings-dropdown-item" id="shortcutsBtn">
+                        <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                            <line x1="6" y1="10" x2="6" y2="10.01"></line>
+                            <line x1="10" y1="10" x2="10" y2="10.01"></line>
+                            <line x1="14" y1="10" x2="14" y2="10.01"></line>
+                            <line x1="18" y1="10" x2="18" y2="10.01"></line>
+                            <line x1="8" y1="14" x2="16" y2="14"></line>
+                        </svg>
+                        <span class="item-text">Keyboard shortcuts</span>
+                    </button>
+                    <button class="settings-dropdown-item" id="notifyToggleBtn">
+                        <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <span class="item-text" id="notifyText">Browser notifications: Off</span>
+                    </button>
+                    <button class="settings-dropdown-item" id="viewKeyBtn">
+                        <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                        </svg>
+                        <span class="item-text">View My Key</span>
+                    </button>
+                    <div class="settings-dropdown-divider"></div>
+                    <button class="settings-dropdown-item text-red-600" id="deleteAccountBtn">
+                        <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                        </svg>
+                        <span class="item-text">Delete Account</span>
+                    </button>
+                    <button class="settings-dropdown-item" id="logoutBtn">
+                        <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <span class="item-text">Logout</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="cal-main">
+        <!-- Sidebar: calendars -->
+        <aside class="cal-sidebar" id="calSidebar">
+            <button id="newCalendarBtn" class="btn btn-primary cal-new-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                New Calendar
+            </button>
+
+            <div class="cal-sidebar-label">Calendars</div>
+            <div id="calendarList" class="cal-list"></div>
+
+            <div class="cal-sidebar-label cal-sidebar-label-spaced">Display</div>
+            <label class="cal-todo-toggle">
+                <input type="checkbox" id="todoToggle">
+                <span class="cal-todo-dot" style="background: #188038;"></span>
+                <span>Todo tasks</span>
+            </label>
+
+            <div class="cal-sidebar-label cal-sidebar-label-spaced">Import / Export</div>
+            <button id="icsImportBtn" class="cal-ics-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Import .ics file
+            </button>
+            <input type="file" id="icsFileInput" accept=".ics,text/calendar" class="hidden">
+            <p class="cal-ics-hint">Export lives in each calendar's menu.</p>
+        </aside>
+
+        <!-- FullCalendar mount -->
+        <div class="cal-canvas">
+            <div id="calendarEl"></div>
+        </div>
+    </main>
+
+    <!-- Status footer -->
+    <footer class="app-footer">
+        <span id="calFooterStats" class="app-footer-stats"></span>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-spinner"></div>
+        <p>Loading Calendar...</p>
+    </div>
+
+    <!-- Notification toast -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Key Info Modal -->
+    <div id="keyModal" class="key-modal">
+        <div class="key-modal-content">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title">Your Access Key</h3>
+                <button class="key-modal-close" id="keyModalClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <div class="key-display-container">
+                    <div class="key-display">
+                        <span class="key-text" id="keyText">-</span>
+                        <button class="key-copy-btn" id="keyCopyBtn" title="Copy key">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="key-copy-feedback" id="keyCopyFeedback">Copied!</p>
+                </div>
+                <button class="key-modal-close-btn" id="keyModalCloseBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Account Confirmation Modal -->
+    <div id="deleteAccountModal" class="key-modal">
+        <div class="key-modal-content">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title">Delete Account</h3>
+                <button class="key-modal-close" id="deleteAccountModalClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <p>
+                    Are you sure you want to delete your account? This cannot be undone.
+                </p>
+                <div class="modal-actions">
+                    <button id="cancelDeleteAccount" class="btn">Cancel</button>
+                    <button id="confirmDeleteAccount" class="btn btn-danger">Delete Account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal (generic) -->
+    <div id="confirmModal" class="key-modal">
+        <div class="key-modal-content">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title" id="confirmTitle">Are you sure?</h3>
+                <button class="key-modal-close" id="confirmModalClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <p id="confirmMessage">This cannot be undone.</p>
+                <div class="modal-actions">
+                    <button id="cancelConfirm" class="btn">Cancel</button>
+                    <button id="confirmAction" class="btn btn-danger">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar (create / edit) Modal -->
+    <div id="calendarModal" class="key-modal">
+        <div class="key-modal-content key-modal-content-narrow">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title" id="calModalTitle">New Calendar</h3>
+                <button class="key-modal-close" id="calModalClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <div class="form-group">
+                    <label for="calNameInput">Name</label>
+                    <input type="text" id="calNameInput" class="text-input" placeholder="Calendar name..."
+                           maxlength="100" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Color</label>
+                    <div id="calColorPicker" class="color-picker"></div>
+                </div>
+                <div class="modal-actions">
+                    <button id="calDeleteBtn" class="btn btn-danger hidden">Delete</button>
+                    <span class="modal-actions-spacer"></span>
+                    <button id="calCancelBtn" class="btn">Cancel</button>
+                    <button id="calSaveBtn" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Editor Modal -->
+    <div id="eventModal" class="key-modal">
+        <div class="key-modal-content event-modal-content">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title" id="evModalTitle">New Event</h3>
+                <button class="key-modal-close" id="evModalClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <form id="evForm">
+                    <div class="form-group">
+                        <label for="evTitle">Title</label>
+                        <input type="text" id="evTitle" class="text-input" placeholder="Add title"
+                               maxlength="300" autocomplete="off" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="evStart">Starts</label>
+                            <div class="ev-datetime-row">
+                                <input type="date" id="evStart" required>
+                                <input type="time" id="evStartTime" step="300">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="evEnd">Ends</label>
+                            <div class="ev-datetime-row">
+                                <input type="date" id="evEnd" required>
+                                <input type="time" id="evEndTime" step="300">
+                            </div>
+                        </div>
+                    </div>
+
+                    <label class="ev-allday-toggle">
+                        <input type="checkbox" id="evAllDay">
+                        <span>All day</span>
+                    </label>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="evRepeat">Repeat</label>
+                            <div class="select-wrap">
+                                <select id="evRepeat">
+                                    <option value="">Doesn't repeat</option>
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                    <option value="yearly">Yearly</option>
+                                    <option value="custom">Custom...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="evCalendar">Calendar</label>
+                            <div class="select-wrap">
+                                <select id="evCalendar"></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Custom recurrence builder -->
+                    <div id="repeatBuilder" class="repeat-builder hidden">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="rbFreq">Repeats</label>
+                                <div class="select-wrap">
+                                    <select id="rbFreq">
+                                        <option value="DAILY">Daily</option>
+                                        <option value="WEEKLY">Weekly</option>
+                                        <option value="MONTHLY">Monthly</option>
+                                        <option value="YEARLY">Yearly</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="rbInterval">Every</label>
+                                <div class="rb-interval-row">
+                                    <input type="number" id="rbInterval" min="1" max="999" value="1">
+                                    <span id="rbIntervalUnit">week(s)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group" id="rbDaysGroup">
+                            <label>Repeat on</label>
+                            <div id="rbDayChecks" class="rb-days"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Ends</label>
+                            <div class="rb-ends">
+                                <label class="rb-end-opt">
+                                    <input type="radio" name="rbEnd" value="never" checked>
+                                    <span>Never</span>
+                                </label>
+                                <label class="rb-end-opt">
+                                    <input type="radio" name="rbEnd" value="until">
+                                    <span>On</span>
+                                    <input type="date" id="rbUntilDate">
+                                </label>
+                                <label class="rb-end-opt">
+                                    <input type="radio" name="rbEnd" value="count">
+                                    <span>After</span>
+                                    <input type="number" id="rbUntilCount" min="1" max="999" value="10">
+                                    <span>occurrences</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="evLocation">Location (optional)</label>
+                        <input type="text" id="evLocation" class="text-input" placeholder="Add location"
+                               maxlength="300" autocomplete="off">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="evDescription">Description (optional)</label>
+                        <textarea id="evDescription" rows="2" placeholder="Add more details..."
+                                  maxlength="2000"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Reminders</label>
+                        <div id="evReminders" class="reminder-chips"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Linked files</label>
+                        <div id="evLinks" class="link-chips"></div>
+                        <button type="button" id="evLinkFileBtn" class="btn btn-small">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                            </svg>
+                            Link a file
+                        </button>
+                    </div>
+
+                    <div class="modal-actions event-modal-actions">
+                        <button type="button" id="evDeleteBtn" class="btn btn-danger hidden">Delete</button>
+                        <span class="modal-actions-spacer"></span>
+                        <button type="button" id="evCancelBtn" class="btn">Cancel</button>
+                        <button type="submit" id="evSaveBtn" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Occurrence scope modal (recurring "this / this and following / all") -->
+    <div id="scopeModal" class="key-modal">
+        <div class="key-modal-content key-modal-content-narrow">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title" id="scopeTitle">Apply changes</h3>
+                <button class="key-modal-close" id="scopeModalClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <p id="scopeMessage" class="scope-message">This event repeats. Which occurrences?</p>
+                <div class="scope-choices">
+                    <button id="scopeThis" class="btn">This event</button>
+                    <button id="scopeFollowing" class="btn">This and following events</button>
+                    <button id="scopeAll" class="btn btn-primary">All events</button>
+                </div>
+                <div class="modal-actions">
+                    <button id="scopeCancel" class="btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File link picker modal -->
+    <div id="linkPickerModal" class="key-modal">
+        <div class="key-modal-content key-modal-content-narrow">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title">Link a file</h3>
+                <button class="key-modal-close" id="linkPickerClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <input type="text" id="lpSearch" class="text-input" placeholder="Search files..."
+                       autocomplete="off">
+                <div id="lpResults" class="lp-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard shortcuts modal -->
+    <div id="shortcutsModal" class="key-modal">
+        <div class="key-modal-content key-modal-content-narrow">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title">Keyboard shortcuts</h3>
+                <button class="key-modal-close" id="shortcutsModalClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <div class="shortcut-grid">
+                    <span class="shortcut-key">c</span><span>Create event</span>
+                    <span class="shortcut-key">d</span><span>Day view</span>
+                    <span class="shortcut-key">w</span><span>Week view</span>
+                    <span class="shortcut-key">m</span><span>Month view</span>
+                    <span class="shortcut-key">a</span><span>Agenda (list) view</span>
+                    <span class="shortcut-key">t</span><span>Jump to today</span>
+                    <span class="shortcut-key">p / n</span><span>Previous / next period</span>
+                    <span class="shortcut-key">/</span><span>Search</span>
+                    <span class="shortcut-key">?</span><span>Show this help</span>
+                    <span class="shortcut-key">Esc</span><span>Close dialogs</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event quick-view popover -->
+    <template id="calPopoverTemplate">
+        <div class="ev-popover">
+            <div class="ev-popover-head">
+                <span class="ev-popover-dot"></span>
+                <div class="ev-popover-titlewrap">
+                    <span class="ev-popover-title"></span>
+                    <span class="ev-popover-time"></span>
+                </div>
+                <div class="ev-popover-actions">
+                    <button class="td-icon-btn ev-popover-edit" title="Edit" aria-label="Edit">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                            <path d="m15 5 4 4"></path>
+                        </svg>
+                    </button>
+                    <button class="td-icon-btn danger ev-popover-delete" title="Delete" aria-label="Delete">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                        </svg>
+                    </button>
+                    <button class="td-icon-btn ev-popover-close" title="Close" aria-label="Close">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="ev-popover-cal">
+                <span class="ev-popover-calname"></span>
+                <span class="ev-popover-repeat hidden">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m17 2 4 4-4 4"></path>
+                        <path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+                        <path d="m7 22-4-4 4-4"></path>
+                        <path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+                    </svg>
+                </span>
+            </div>
+            <div class="ev-popover-desc hidden"></div>
+            <div class="ev-popover-links hidden"></div>
+            <div class="ev-popover-reminders hidden"></div>
+        </div>
+    </template>
+
+    <!-- Sidebar calendar row -->
+    <template id="calRowTemplate">
+        <div class="cal-row" role="button" tabindex="0">
+            <input type="checkbox" class="cal-row-check" aria-label="Show calendar">
+            <span class="cal-row-dot"></span>
+            <span class="cal-row-name"></span>
+            <button class="td-icon-btn cal-row-edit" title="Calendar options" aria-label="Calendar options">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="1"></circle>
+                    <circle cx="19" cy="12" r="1"></circle>
+                    <circle cx="5" cy="12" r="1"></circle>
+                </svg>
+            </button>
+            <div class="cal-row-menu hidden">
+                <button class="cal-row-menu-item cal-row-rename">Rename / color</button>
+                <button class="cal-row-menu-item cal-row-export">Export .ics</button>
+                <button class="cal-row-menu-item cal-row-menu-danger cal-row-delete">Delete calendar</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Color swatch -->
+    <template id="colorSwatchTemplate">
+        <button type="button" class="color-swatch" aria-label="Pick color"></button>
+    </template>
+
+    <!-- Reminder chip -->
+    <template id="reminderChipTemplate">
+        <label class="reminder-chip">
+            <input type="checkbox" class="reminder-check">
+            <span class="reminder-label"></span>
+        </label>
+    </template>
+
+    <!-- Linked file chip -->
+    <template id="linkChipTemplate">
+        <span class="link-chip">
+            <span class="link-chip-icon"></span>
+            <span class="link-chip-name"></span>
+            <button class="link-chip-remove" title="Remove link" aria-label="Remove link">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </span>
+    </template>
+
+    <!-- File picker result row -->
+    <template id="lpRowTemplate">
+        <button type="button" class="lp-row">
+            <span class="lp-row-icon"></span>
+            <span class="lp-row-name"></span>
+        </button>
+    </template>
+
+    <!-- Search result row -->
+    <template id="searchRowTemplate">
+        <button type="button" class="search-row">
+            <span class="search-row-dot"></span>
+            <span class="search-row-main">
+                <span class="search-row-title"></span>
+                <span class="search-row-when"></span>
+            </span>
+        </button>
+    </template>
+
+    <!-- Authentication Check Script -->
+    <script>
+        // Calendar has NO login page of its own: Workdeck's login already wrote
+        // the session mirrors. No session -> back to Workdeck.
+        (function() {
+            try {
+                const userHash = sessionStorage.getItem('calendar_user_hash') ||
+                    localStorage.getItem('calendar_user_hash');
+                const userKey = sessionStorage.getItem('calendar_user_key') ||
+                    localStorage.getItem('calendar_user_key');
+
+                if (!userHash || !userKey) {
+                    window.location.href = '/';
+                }
+            } catch (err) {
+                window.location.href = '/';
+            }
+            // Session is verified against the API by calendarStorage.loadUserData()
+        })();
+    </script>
+
+    <!-- Custom JavaScript -->
+    <script src="config/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/themes.js"></script>
+    <script type="module" src="js/vendor-ical.js"></script>
+    <script src="js/editor.js"></script>
+</body>
+</html>

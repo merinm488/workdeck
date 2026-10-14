@@ -333,6 +333,23 @@ export default async function handler(req, res) {
           break;
         }
 
+        // Create empty calendar
+        case 'createCalendar': {
+          const id = data?.id || generateId();
+          const now = new Date().toISOString();
+          userData.calendars = userData.calendars || [];
+          userData.calendars.unshift({
+            id,
+            name: (data?.name || '').trim() || 'Untitled Calendar',
+            color: data?.color || '#0284c7',
+            visible: true,
+            tagId: data?.tagId || null,
+            createdAt: now,
+            updatedAt: now
+          });
+          break;
+        }
+
         // ---- Projects (tags) ----
         // origin marks where a tag was born. All tags list in Workdeck;
         // Filebox lists its own plus any tag currently carried by at least
@@ -377,7 +394,8 @@ export default async function handler(req, res) {
             ...taggedIn(userData.forms),
             ...taggedIn(userData.slides),
             ...taggedIn(userData.draws),
-            ...taggedIn(userData.todo || [])
+            ...taggedIn(userData.todo || []),
+            ...taggedIn(userData.calendars || [])
           ];
           for (const file of doomed) {
             if (file.sharedId) {
@@ -397,6 +415,12 @@ export default async function handler(req, res) {
           userData.slides = userData.slides.filter(f => !f || f.tagId !== tagId);
           userData.draws = userData.draws.filter(f => !f || f.tagId !== tagId);
           userData.todo = (userData.todo || []).filter(f => !f || f.tagId !== tagId);
+          // Deleting a calendar takes its events with it.
+          const doomedCalIds = new Set(doomed.filter(f => (userData.calendars || []).includes(f)).map(f => f.id));
+          if (doomedCalIds.size) {
+            userData.events = (userData.events || []).filter(e => !e || !doomedCalIds.has(e.calId));
+          }
+          userData.calendars = (userData.calendars || []).filter(f => !f || f.tagId !== tagId);
           (userData.files || []).forEach(f => {
             if (Array.isArray(f.tags)) f.tags = f.tags.filter(id => id !== tagId);
           });
@@ -559,7 +583,8 @@ export default async function handler(req, res) {
           const isDeck = app === 'slides';
           const isDrawing = app === 'draw';
           const isTodo = app === 'todo';
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isTodo ? (userData.todo || []) : userData.docs;
+          const isCalendar = app === 'calendar';
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -592,6 +617,8 @@ export default async function handler(req, res) {
                   ? userData.draws.find(d => d.id === fileId)
                   : app === 'todo'
                   ? (userData.todo || []).find(l => l.id === fileId)
+                  : app === 'calendar'
+                  ? (userData.calendars || []).find(c => c.id === fileId)
                   : userData.docs.find(n => n.id === fileId)
             );
           }
@@ -618,7 +645,8 @@ export default async function handler(req, res) {
           const isDrawing = app === "draw";
           const isFileboxFile = app === "filebox";
           const isTodo = app === "todo";
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : isTodo ? (userData.todo || []) : userData.docs;
+          const isCalendar = app === "calendar";
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -636,6 +664,8 @@ export default async function handler(req, res) {
           } else if (isFileboxFile) {
             target.name = cleanName;
           } else if (isTodo) {
+            target.name = cleanName;
+          } else if (isCalendar) {
             target.name = cleanName;
           } else {
             target.title = cleanName;
@@ -677,6 +707,10 @@ export default async function handler(req, res) {
             userData.draws = userData.draws.filter(d => d.id !== fileId);
           } else if (app === 'todo') {
             userData.todo = (userData.todo || []).filter(l => l.id !== fileId);
+          } else if (app === 'calendar') {
+            // A calendar takes its events with it.
+            userData.calendars = (userData.calendars || []).filter(c => c.id !== fileId);
+            userData.events = (userData.events || []).filter(e => !e || e.calId !== fileId);
           } else if (app === 'filebox') {
             const file = (userData.files || []).find(f => f.id === fileId);
             if (file?.storageKey) {
@@ -724,6 +758,8 @@ export default async function handler(req, res) {
         files: userData.files,
         folders: userData.folders,
         todo: userData.todo,
+        calendars: userData.calendars,
+        events: userData.events,
         settings: userData.settings
       });
 

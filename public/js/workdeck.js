@@ -171,12 +171,28 @@ const WD_APPS = [
         contentSearch: true                 // search matches task text
     },
     {
+        id: 'calendar',
+        name: 'Calendar',
+        label: 'Calendar',
+        accent: 'calendar',
+        icon: 'calendar',
+        route: '/calendar/',
+        editorParam: 'cal',
+        create: {
+            action: 'createCalendar',
+            payload: {},
+            // The API unshifts, so the newest calendar is first.
+            pickNewest: function (data) { return data.calendars && data.calendars[0]; }
+        },
+        contentSearch: false
+    },
+    {
         id: 'filebox',
         name: 'Files',
         label: 'File',
         accent: 'filebox',
         icon: 'filebox',
-        route: '/filebox/',
+        route: '/files/',
         editorParam: 'id',
         create: null,
         chooserOpensApp: true,
@@ -232,6 +248,7 @@ const state = {
     files: [],           // Filebox file metadata
     folders: [],         // Filebox folders
     todo: [],            // Todo task lists
+    calendars: [],       // Calendar app calendars
     settings: {},
     searchQuery: '',
     filter: 'all',       // 'all' | app id from WD_APPS
@@ -369,6 +386,19 @@ function getAllFiles() {
         };
     });
 
+    const calendarFiles = (state.calendars || []).map(function (c) {
+        return {
+            id: c.id,
+            app: 'calendar',
+            name: c.name || 'Untitled Calendar',
+            updatedAt: c.updatedAt,
+            lastOpened: lastOpened[c.id] || null,
+            tagId: getTag(c.tagId) ? c.tagId : null,
+            content: '',
+            raw: c
+        };
+    });
+
     const fileboxFiles = (state.files || []).map(function (f) {
         return {
             id: f.id,
@@ -409,7 +439,7 @@ function getAllFiles() {
         });
 
     return docs.concat(sheetFiles).concat(formFiles).concat(slideFiles).concat(drawFiles)
-        .concat(todoFiles).concat(fileboxFiles).concat(folderCards)
+        .concat(todoFiles).concat(calendarFiles).concat(fileboxFiles).concat(folderCards)
         .sort(function (a, b) {
             const aTime = a.lastOpened || a.updatedAt || '';
             const bTime = b.lastOpened || b.updatedAt || '';
@@ -491,6 +521,7 @@ function applyUserData(data) {
     state.files = data.files || [];
     state.folders = data.folders || [];
     state.todo = data.todo || [];
+    state.calendars = data.calendars || [];
     state.settings = data.settings || {};
     render();
 }
@@ -1095,12 +1126,12 @@ function openInNewTab(url) {
 /**
  * Open a file in its app (new tab) and record lastOpened fire-and-forget —
  * the Workdeck tab stays open and refreshes on visibilitychange, so the
- * recents ordering picks it up then. Filebox folder cards share the
- * /filebox/<id> hard link with files; the Files app opens them inside
+ * recents ordering picks it up then. Files-app folder cards share the
+ * /files/<id> hard link with files; the Files app opens them inside
  * the folder.
  */
 function openFile(file) {
-    // Canonical hard link (/sheets/<id>, /filebox/<id>, ...).
+    // Canonical hard link (/sheets/<id>, /files/<id>, ...).
     const url = WDLinks.url(file.app, file.id);
     openInNewTab(url);
     api('recordOpen', { fileId: file.id, app: file.app })
@@ -1115,8 +1146,7 @@ function copyFileLink(file) {
     const fallbackCopy = function () {
         const ta = document.createElement('textarea');
         ta.value = absolute;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
+        ta.classList.add('wd-clipboard-helper');
         document.body.appendChild(ta);
         ta.select();
         let ok = false;
@@ -1287,6 +1317,8 @@ async function confirmDelete() {
         state.draws = state.draws.filter(function (d) { return d.id !== file.id });
     } else if (file.app === 'todo') {
         state.todo = state.todo.filter(function (l) { return l.id !== file.id });
+    } else if (file.app === 'calendar') {
+        state.calendars = state.calendars.filter(function (c) { return c.id !== file.id });
     } else if (file.app === 'filebox') {
         state.files = state.files.filter(function (f) { return f.id !== file.id; });
     } else {
@@ -1426,6 +1458,7 @@ async function confirmDeleteProject() {
     state.slides = dropTagged(state.slides);
     state.draws = dropTagged(state.draws);
     state.todo = dropTagged(state.todo);
+    state.calendars = dropTagged(state.calendars);
     state.files = stripTag(state.files);
     state.folders = stripTag(state.folders);
     render();

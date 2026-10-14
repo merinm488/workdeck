@@ -30,7 +30,9 @@ const WD_AUTH_CONFIG = {
         fileboxHash: 'filebox_user_hash',
         fileboxKey: 'filebox_user_key',
         todoHash: 'todo_user_hash',
-        todoKey: 'todo_user_key'
+        todoKey: 'todo_user_key',
+        calendarHash: 'calendar_user_hash',
+        calendarKey: 'calendar_user_key'
     }
 };
 
@@ -69,6 +71,8 @@ class WdAuthManager {
             localStorage.setItem(s.fileboxKey, key);
             localStorage.setItem(s.todoHash, hash);
             localStorage.setItem(s.todoKey, key);
+            localStorage.setItem(s.calendarHash, hash);
+            localStorage.setItem(s.calendarKey, key);
         } catch (err) {
             console.warn('[AUTH] localStorage seed failed (private mode?):', err);
         }
@@ -159,6 +163,8 @@ class WdAuthManager {
         sessionStorage.setItem(s.fileboxKey, key);
         sessionStorage.setItem(s.todoHash, hash);
         sessionStorage.setItem(s.todoKey, key);
+        sessionStorage.setItem(s.calendarHash, hash);
+        sessionStorage.setItem(s.calendarKey, key);
 
         this.seedMirrors(hash, key);
 

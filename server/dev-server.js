@@ -12,7 +12,8 @@
  *   /forms/*       -> Forms app (static)
  *   /slides/*      -> Slides app (static)
  *   /draw/*        -> Draw app (static)
- *   /filebox/*     -> Filebox app (static)
+ *   /filebox/*     -> 301 to /files/*
+ *   /files/*       -> Files app (static)
  *   /todo/*        -> Todo app (static)
  *   /docs/*        -> Docs build (static, vite base '/docs/')
  *   /api/workdeck  -> api/workdeck.js     (Workdeck API)
@@ -61,6 +62,7 @@ const { default: slidesHandler } = await import('../api/slides.js');
 const { default: drawHandler } = await import('../api/draw.js');
 const { default: fileboxHandler } = await import('../api/filebox.js');
 const { default: todoHandler } = await import('../api/todo.js');
+const { default: calendarHandler } = await import('../api/calendar.js');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -119,9 +121,11 @@ app.all('/api/slides', (req, res) => slidesHandler(req, res));
 app.all('/api/draw', (req, res) => drawHandler(req, res));
 app.all('/api/filebox', (req, res) => fileboxHandler(req, res));
 app.all('/api/todo', (req, res) => todoHandler(req, res));
+app.all('/api/calendar', (req, res) => calendarHandler(req, res));
 
 // ---------- Pretty file URLs ----------
-const WD_ID_RE = /^[a-z0-9]{14,}$/;
+// Underscore allowed: legacy client-created sheets have ids like mv7xyz_ab12cde
+const WD_ID_RE = /^[a-z0-9_]{14,}$/;
 const WD_PRETTY_PAGES = {
   docs: '/docs/index.html',
   sheets: '/sheets/editor.html',
@@ -129,9 +133,10 @@ const WD_PRETTY_PAGES = {
   slides: '/slides/editor.html',
   draw: '/draw/editor.html',
   todo: '/todo/index.html',
-  filebox: '/filebox/index.html'
+  calendar: '/calendar/index.html',
+  files: '/files/index.html'
 };
-const WD_PRETTY_PARAMS = { docs: 'doc', todo: 'list' };
+const WD_PRETTY_PARAMS = { docs: 'doc', todo: 'list', calendar: 'cal' };
 
 Object.keys(WD_PRETTY_PAGES).forEach((prettyApp) => {
   app.get('/' + prettyApp + '/:id', (req, res, next) => {
@@ -150,6 +155,16 @@ app.get('/f/:id', (req, res, next) => {
   if (!WD_ID_RE.test(req.params.id)) return next();
   req.url = '/f.html?id=' + encodeURIComponent(req.params.id);
   next();
+});
+
+// Legacy /filebox URLs -> /files (301, path and query preserved)
+app.use('/filebox', (req, res) => {
+  res.redirect(301, '/files' + req.url);
+});
+
+// Legacy Sheets home path (the home now lives at /sheets/)
+app.get('/sheets/home.html', (req, res) => {
+  res.redirect(301, '/sheets/');
 });
 
 // ---------- Static apps ----------
@@ -174,11 +189,14 @@ app.use('/slides', express.static(path.join(ROOT_DIR, 'slides'), { index: 'index
 // Draw (plain static)
 app.use('/draw', express.static(path.join(ROOT_DIR, 'draw'), { index: 'index.html' }));
 
-// Filebox (plain static)
-app.use('/filebox', express.static(path.join(ROOT_DIR, 'filebox'), { index: 'index.html' }));
+// Files (plain static)
+app.use('/files', express.static(path.join(ROOT_DIR, 'files'), { index: 'index.html' }));
 
 // Todo (plain static)
 app.use('/todo', express.static(path.join(ROOT_DIR, 'todo'), { index: 'index.html' }));
+
+// Calendar (plain static)
+app.use('/calendar', express.static(path.join(ROOT_DIR, 'calendar'), { index: 'index.html' }));
 
 // Root redirect to the Workdeck landing page
 app.get('/', (req, res) => {
@@ -194,9 +212,10 @@ app.listen(PORT, () => {
   console.log(`📋 Forms:      http://localhost:${PORT}/forms/`);
   console.log(`🎬 Slides:     http://localhost:${PORT}/slides/`);
   console.log(`✏️  Draw:       http://localhost:${PORT}/draw/`);
-  console.log(`🗂️  Filebox:    http://localhost:${PORT}/filebox/`);
+  console.log(`🗂️  Files:      http://localhost:${PORT}/files/`);
   console.log(`✅ Todo:       http://localhost:${PORT}/todo/`);
-  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw, /api/filebox, /api/todo`);
+  console.log(`📅 Calendar:   http://localhost:${PORT}/calendar/`);
+  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw, /api/filebox, /api/todo, /api/calendar`);
   console.log(`📁 Local DB:   ${path.join(ROOT_DIR, 'db')}`);
   console.log('\nPress Ctrl+C to stop\n');
 });

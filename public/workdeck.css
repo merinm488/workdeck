@@ -28,6 +28,8 @@
     --draw-accent-soft: rgba(225, 29, 72, 0.12);
     --todo-accent: #188038;       /* Todo green */
     --todo-accent-soft: rgba(24, 128, 56, 0.15);
+    --calendar-accent: #0284c7;   /* Calendar sky */
+    --calendar-accent-soft: rgba(2, 132, 199, 0.13);
     --danger: #ef4444;
     --danger-soft: rgba(239, 68, 68, 0.12);
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
@@ -675,6 +677,16 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
     color: var(--draw-accent);
 }
 
+.wd-app-icon-todo {
+    background: var(--todo-accent-soft);
+    color: var(--todo-accent);
+}
+
+.wd-app-icon-calendar {
+    background: var(--calendar-accent-soft);
+    color: var(--calendar-accent);
+}
+
 .wd-dropdown-item-text {
     display: flex;
     flex-direction: column;
@@ -977,6 +989,11 @@ html[data-theme="dark"] .wd-theme-option-icon {
     color: var(--todo-accent);
 }
 
+.wd-file-icon-calendar {
+    background: var(--calendar-accent-soft);
+    color: var(--calendar-accent);
+}
+
 .wd-file-actions {
     display: flex;
     gap: 4px;
@@ -1060,6 +1077,16 @@ html[data-theme="dark"] .wd-theme-option-icon {
 .wd-file-app-badge.draw {
     background: var(--draw-accent-soft);
     color: var(--draw-accent);
+}
+
+.wd-file-app-badge.todo {
+    background: var(--todo-accent-soft);
+    color: var(--todo-accent);
+}
+
+.wd-file-app-badge.calendar {
+    background: var(--calendar-accent-soft);
+    color: var(--calendar-accent);
 }
 
 /* ---------- Card content preview ---------- */
@@ -1552,6 +1579,22 @@ html[data-theme="dark"] .wd-theme-option-icon {
 
 .wd-key-close {
     width: 100%;
+}
+
+/* ---------- Offscreen helpers ---------- */
+/* Hidden sandboxed iframe that previews.js renders documents in */
+.wd-sandbox-frame {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: 0;
+    visibility: hidden;
+}
+
+/* execCommand clipboard fallback target */
+.wd-clipboard-helper {
+    position: fixed;
+    opacity: 0;
 }
 
 /* ---------- Loading overlay ---------- */
