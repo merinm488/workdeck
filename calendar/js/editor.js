@@ -21,8 +21,6 @@ let calendar = null;          // FullCalendar instance
 let editing = null;           // { recordId, occKey } while the editor is open
 let pendingLinks = [];        // [{ app, id, name }] in the open editor
 let pendingScope = null;      // { kind: 'save'|'delete', recordId, occKey, record }
-let calModalMode = null;      // null | { mode: 'create' } | { mode: 'edit', calId }
-let calModalColor = null;
 let linkPickerTarget = null;  // null | function(link)
 let searchTimer = null;
 let reminderTimer = null;
@@ -286,8 +284,14 @@ function findRecord(recordId) {
     return (userData.events || []).find(e => e && e.id === recordId) || null;
 }
 
-function visibleCalendars() {
-    return (userData.calendars || []).filter(c => c && c.visible !== false);
+/**
+ * The app has one main calendar: every event lives in it. Legacy
+ * accounts may still carry extra calendars (their events keep the old
+ * colors) — new events always go into the first one.
+ */
+function mainCalendarId() {
+    const first = (userData.calendars || []).find(c => c);
+    return first ? first.id : null;
 }
 
 /** One FC event for a record (+ optional occurrence key). */
@@ -318,11 +322,9 @@ function fcEventFor(record, occKey) {
 /** Everything the grid should show in [start, end]. */
 function computeFcEvents(start, end) {
     const out = [];
-    const visibleIds = new Set(visibleCalendars().map(c => c.id));
 
     (userData.events || []).forEach(record => {
         if (!record) return;
-        if (!visibleIds.has(record.calId)) return;
         if (record.parentEventId) {
             out.push(fcEventFor(record, null));
             return;
@@ -531,47 +533,39 @@ function setUserData(doc) {
 }
 
 function refreshAll() {
-    renderSidebar();
+    renderEvents();
     if (calendar) calendar.refetchEvents();
     renderFooter();
 }
 
 function renderFooter() {
     const events = (userData.events || []).length;
-    const cals = (userData.calendars || []).length;
     $('calFooterStats').textContent =
-        events + ' event' + (events === 1 ? '' : 's') + ' · ' +
-        cals + ' calendar' + (cals === 1 ? '' : 's');
+        events + ' event' + (events === 1 ? '' : 's');
 }
 
 // ================================================
 // Event editor modal
 // ================================================
 
-function ensureSomeCalendar() {
-    if ((userData.calendars || []).length > 0) return Promise.resolve(null);
+/** Make sure the main calendar exists (fresh accounts); returns its id. */
+function ensureMainCalendar() {
+    if ((userData.calendars || []).length > 0) {
+        return Promise.resolve(mainCalendarId());
+    }
     return calendarStorage.createCalendar('Personal', APP_CONFIG.colors[0]).then(result => {
         if (result) setUserData(result);
-        return null;
+        return mainCalendarId();
     });
-}
-
-function defaultCalendarId() {
-    const last = localStorage.getItem('calendar_last_cal');
-    const lastCal = getCalendar(last);
-    if (lastCal) return lastCal.id;
-    const first = visibleCalendars()[0] || (userData.calendars || [])[0];
-    return first ? first.id : null;
 }
 
 /** Fresh editor for a click/drag-created slot. */
 function openEditorForNew(start, end, allDay) {
-    const calId = defaultCalendarId();
+    const calId = mainCalendarId();
     if (!calId) {
-        showNotification('Create a calendar first.', 'error');
+        showNotification('Your calendar is still loading — try again.', 'error');
         return;
     }
-    localStorage.setItem('calendar_last_cal', calId);
 
     const startD = start instanceof Date ? start : new Date();
     // Round to the next half hour for timed slots.
@@ -637,18 +631,6 @@ function populateEditor({ record, occKey }) {
     $('evEnd').value = endParts.date;
     $('evEndTime').value = endParts.time;
     syncAllDayFields();
-
-    // Calendar select
-    const sel = $('evCalendar');
-    sel.replaceChildren();
-    (userData.calendars || []).forEach(cal => {
-        if (!cal) return;
-        const opt = document.createElement('option');
-        opt.value = cal.id;
-        opt.textContent = cal.name;
-        sel.appendChild(opt);
-    });
-    sel.value = record.calId || defaultCalendarId();
 
     // Repeat
     syncRepeatSelect(record.rrule || '', record.start);
@@ -746,7 +728,7 @@ function collectEditor() {
     reminders.sort((a, b) => a - b);
 
     const record = {
-        calId: $('evCalendar').value,
+        calId: mainCalendarId(),
         title: $('evTitle').value.trim() || '(no title)',
         description: $('evDescription').value.trim(),
         location: $('evLocation').value.trim(),
@@ -769,8 +751,6 @@ function collectEditor() {
 async function saveEditor() {
     const record = collectEditor();
     if (!record) return;
-
-    localStorage.setItem('calendar_last_cal', record.calId);
 
     if (!editing) {
         const result = await calendarStorage.createEvent({
@@ -1075,12 +1055,11 @@ function checkReminders() {
     const now = Date.now();
     const winStart = new Date(now - 120000);
     const winEnd = new Date(now + 24 * 3600000);
-    const visibleIds = new Set(visibleCalendars().map(c => c.id));
     const log = loadFiredLog();
     let dirty = false;
 
     (userData.events || []).forEach(record => {
-        if (!record || !visibleIds.has(record.calId)) return;
+        if (!record) return;
         if (record.parentEventId) return;
         const keys = occurrenceKeys(record, winStart, winEnd);
         keys.forEach(key => {
@@ -1104,10 +1083,10 @@ function checkReminders() {
 }
 
 function fireReminder(record, minutes) {
-    const cal = getCalendar(record.calId);
     const title = record.title || '(no title)';
-    const body = (cal ? cal.name + ' · ' : '') +
-        (minutes === 0 ? 'Starting now' : 'Starts ' + reminderLabel(minutes).replace(' before', ''));
+    const body = minutes === 0
+        ? 'Starting now'
+        : 'Starts ' + reminderLabel(minutes).replace(' before', '');
     showNotification('⏰ ' + title + ' — ' + body);
 
     try {
@@ -1142,7 +1121,6 @@ function showPopover(fcEvent, anchorEl) {
     node.querySelector('.ev-popover-title').textContent = fcEvent.title;
     node.querySelector('.ev-popover-time').textContent = fmtWhen(
         fcEvent.start, fcEvent.end, fcEvent.allDay);
-    node.querySelector('.ev-popover-calname').textContent = cal ? cal.name : 'Calendar';
     node.querySelector('.ev-popover-repeat').classList.toggle('hidden', !props.recurring);
 
     if (record.description) {
@@ -1227,146 +1205,73 @@ function requestDelete(recordId, occKey) {
 }
 
 // ================================================
-// Sidebar: calendars
+// Sidebar: upcoming events
 // ================================================
 
-function renderSidebar() {
-    const list = $('calendarList');
+const EVENT_LIST_LIMIT = 25;
+
+/** Next occurrences across the calendar (masters + moved exceptions). */
+function upcomingOccurrences() {
+    const now = new Date();
+    const winStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const winEnd = new Date(winStart.getTime() + 365 * 86400000);
+    const rows = [];
+
+    (userData.events || []).forEach(record => {
+        if (!record) return;
+        if (record.parentEventId) {
+            rows.push({ record, occKey: null });
+            return;
+        }
+        occurrenceKeys(record, winStart, winEnd).forEach(key => {
+            rows.push({ record, occKey: record.rrule ? key : null });
+        });
+    });
+
+    rows.forEach(row => {
+        const times = occurrenceTimes(row.record, row.occKey);
+        row.startMs = isDateStr(times.start)
+            ? parseDateStr(times.start).getTime()
+            : new Date(times.start).getTime();
+    });
+    return rows
+        .filter(row => row.startMs >= winStart.getTime() && row.startMs <= winEnd.getTime())
+        .sort((a, b) => a.startMs - b.startMs);
+}
+
+function renderEvents() {
+    const list = $('eventList');
     list.replaceChildren();
 
-    (userData.calendars || []).forEach(cal => {
-        if (!cal) return;
-        const row = $('calRowTemplate').content.firstElementChild.cloneNode(true);
-        row.dataset.calId = cal.id;
-
-        const check = row.querySelector('.cal-row-check');
-        check.checked = cal.visible !== false;
-        check.addEventListener('change', async () => {
-            const result = await calendarStorage.updateCalendar(cal.id, { visible: check.checked });
-            if (result) {
-                setUserData(result);
-                refreshAll();
-            } else {
-                check.checked = !check.checked;
-            }
-        });
-
-        row.querySelector('.cal-row-dot').style.background = cal.color || '#0284c7';
-        row.querySelector('.cal-row-name').textContent = cal.name;
-
-        row.querySelector('.cal-row-edit').addEventListener('click', (e) => {
-            e.stopPropagation();
-            closeRowMenus(row);
-            row.querySelector('.cal-row-menu').classList.remove('hidden');
-        });
-
-        row.querySelector('.cal-row-rename').addEventListener('click', () => {
-            closeRowMenus();
-            openCalendarModal({ mode: 'edit', calId: cal.id });
-        });
-
-        row.querySelector('.cal-row-export').addEventListener('click', () => {
-            closeRowMenus();
-            exportCalendarIcs(cal.id);
-        });
-
-        row.querySelector('.cal-row-delete').addEventListener('click', () => {
-            closeRowMenus();
-            const count = (userData.events || []).filter(ev => ev && ev.calId === cal.id).length;
-            openConfirm(
-                'Delete calendar?',
-                '"' + cal.name + '" and its ' + count + ' event' + (count === 1 ? '' : 's') +
-                ' will be permanently deleted.',
-                'Delete',
-                async () => {
-                    const result = await calendarStorage.deleteCalendar(cal.id);
-                    if (!result) {
-                        showNotification('Could not delete the calendar.', 'error');
-                        return;
-                    }
-                    setUserData(result);
-                    refreshAll();
-                    showNotification('Calendar deleted', 'success');
-                }
-            );
-        });
-
-        list.appendChild(row);
-    });
-}
-
-function closeRowMenus(except) {
-    document.querySelectorAll('.cal-row-menu').forEach(menu => {
-        if (menu.parentElement !== except) menu.classList.add('hidden');
-    });
-}
-
-document.addEventListener('click', (e) => {
-    if (!e.target.closest('.cal-row')) closeRowMenus();
-});
-
-// ----- Calendar create/edit modal -----
-
-function renderColorPicker(container, selected, colors) {
-    container.replaceChildren();
-    colors.forEach(color => {
-        const swatch = $('colorSwatchTemplate').content.firstElementChild.cloneNode(true);
-        swatch.style.background = color;
-        swatch.classList.toggle('selected', color === selected);
-        swatch.setAttribute('aria-label', 'Pick color ' + color);
-        swatch.addEventListener('click', () => {
-            calModalColor = color;
-            container.querySelectorAll('.color-swatch').forEach(sw => {
-                sw.classList.toggle('selected', sw === swatch);
-            });
-        });
-        container.appendChild(swatch);
-    });
-}
-
-function openCalendarModal(mode) {
-    calModalMode = mode;
-    const isEdit = mode.mode === 'edit';
-    const cal = isEdit ? getCalendar(mode.calId) : null;
-    calModalColor = cal ? cal.color : APP_CONFIG.colors[0];
-
-    $('calModalTitle').textContent = isEdit ? 'Edit Calendar' : 'New Calendar';
-    $('calNameInput').value = cal ? cal.name : '';
-    $('calDeleteBtn').classList.toggle('hidden', !isEdit);
-    renderColorPicker($('calColorPicker'), calModalColor, APP_CONFIG.colors);
-    openModal($('calendarModal'));
-    setTimeout(() => $('calNameInput').focus(), 80);
-}
-
-async function saveCalendarModal() {
-    const name = $('calNameInput').value.trim();
-    if (!name) {
-        $('calNameInput').focus();
+    const rows = upcomingOccurrences().slice(0, EVENT_LIST_LIMIT);
+    if (!rows.length) {
+        const empty = document.createElement('div');
+        empty.className = 'cal-events-empty';
+        empty.textContent = 'No upcoming events';
+        list.appendChild(empty);
         return;
     }
 
-    if (calModalMode && calModalMode.mode === 'edit') {
-        const result = await calendarStorage.updateCalendar(calModalMode.calId, {
-            name, color: calModalColor
+    rows.forEach(row => {
+        const node = $('eventRowTemplate').content.firstElementChild.cloneNode(true);
+        const cal = getCalendar(row.record.calId);
+        node.querySelector('.cal-row-dot').style.background = (cal && cal.color) || '#0284c7';
+        node.querySelector('.cal-event-title').textContent = row.record.title || '(no title)';
+        const times = occurrenceTimes(row.record, row.occKey);
+        node.querySelector('.cal-event-when').textContent = fmtWhen(
+            times.start, times.end, isDateStr(times.start));
+        node.querySelector('.cal-event-repeat').classList.toggle('hidden', !row.record.rrule);
+
+        const open = () => openEditorForRecord(row.record.id, row.occKey);
+        node.addEventListener('click', open);
+        node.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                open();
+            }
         });
-        if (!result) {
-            showNotification('Could not save the calendar.', 'error');
-            return;
-        }
-        setUserData(result);
-        showNotification('Calendar saved', 'success');
-    } else {
-        const result = await calendarStorage.createCalendar(name, calModalColor);
-        if (!result) {
-            showNotification('Could not create the calendar.', 'error');
-            return;
-        }
-        setUserData(result);
-        if (result.calendar) localStorage.setItem('calendar_last_cal', result.calendar.id);
-        showNotification('Calendar created', 'success');
-    }
-    closeModal($('calendarModal'));
-    refreshAll();
+        list.appendChild(node);
+    });
 }
 
 // ================================================
@@ -1492,11 +1397,10 @@ function runSearch(query) {
     const now = new Date();
     const winStart = new Date(now.getTime() - 90 * 86400000);
     const winEnd = new Date(now.getTime() + 365 * 86400000);
-    const visibleIds = new Set(visibleCalendars().map(c => c.id));
     const matches = [];
 
     (userData.events || []).forEach(record => {
-        if (!record || !visibleIds.has(record.calId)) return;
+        if (!record) return;
         const haystack = ((record.title || '') + ' ' + (record.description || '') + ' ' +
             (record.location || '')).toLowerCase();
         if (!haystack.includes(q)) return;
@@ -1588,16 +1492,15 @@ function importIcsFile(file) {
                 return;
             }
 
-            await ensureSomeCalendar();
-            const target = visibleCalendars()[0] || (userData.calendars || [])[0];
-            if (!target) {
-                showNotification('Create a calendar first.', 'error');
+            const targetId = await ensureMainCalendar();
+            if (!targetId) {
+                showNotification('Could not reach your calendar. Try again.', 'error');
                 return;
             }
 
             const imported = [];
             for (const vev of vevents.slice(0, 500)) {
-                const record = icsVeventToRecord(vev, target.id);
+                const record = icsVeventToRecord(vev, targetId);
                 if (record) imported.push(record);
             }
             if (!imported.length) {
@@ -1611,7 +1514,7 @@ function importIcsFile(file) {
             }
             refreshAll();
             showNotification('Imported ' + imported.length + ' event' +
-                (imported.length === 1 ? '' : 's') + ' into "' + target.name + '"', 'success');
+                (imported.length === 1 ? '' : 's'), 'success');
         } catch (err) {
             console.error('[ICS] Import failed:', err);
             showNotification('That file could not be read as an .ics calendar.', 'error');
@@ -1709,11 +1612,9 @@ function icalTimeToIso(t) {
     return d.toISOString();
 }
 
-function exportCalendarIcs(calId) {
-    const cal = getCalendar(calId);
-    if (!cal) return;
-
-    const records = (userData.events || []).filter(ev => ev && ev.calId === calId);
+/** Export every event as a single .ics download (settings menu). */
+function exportIcs() {
+    const records = (userData.events || []).filter(Boolean);
     const masters = records.filter(r => !r.parentEventId);
     const exceptions = records.filter(r => r.parentEventId);
 
@@ -1787,12 +1688,13 @@ function exportCalendarIcs(calId) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = (cal.name || 'calendar').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') + '.ics';
+    a.download = 'workdeck-calendar.ics';
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    showNotification('Exported "' + cal.name + '" (' + records.length + ' events)', 'success');
+    showNotification('Exported ' + records.length + ' event' +
+        (records.length === 1 ? '' : 's'), 'success');
 }
 
 // ================================================
@@ -1801,6 +1703,7 @@ function exportCalendarIcs(calId) {
 
 function closeSettingsMenus() {
     $('settingsDropdown').classList.remove('active');
+    $('themeSubmenu').classList.remove('active');
     document.querySelector('.theme-dropdown-container').classList.remove('active');
 }
 
@@ -1854,7 +1757,6 @@ function switchView(type) {
 function handleShortcut(e) {
     if (e.key === 'Escape') {
         hidePopover();
-        closeRowMenus();
         closeSettingsMenus();
         if (anyModalOpen()) {
             document.querySelectorAll('.key-modal.active').forEach(m => {
@@ -1900,7 +1802,9 @@ function bindUi() {
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.top-nav-settings')) closeSettingsMenus();
     });
-    $('themeToggleBtn').addEventListener('click', () => {
+    $('themeToggleBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        $('themeSubmenu').classList.toggle('active');
         document.querySelector('.theme-dropdown-container').classList.toggle('active');
     });
     document.querySelectorAll('.theme-option').forEach(btn => {
@@ -1916,6 +1820,10 @@ function bindUi() {
     $('notifyToggleBtn').addEventListener('click', () => {
         closeSettingsMenus();
         toggleNotifications();
+    });
+    $('exportIcsBtn').addEventListener('click', () => {
+        closeSettingsMenus();
+        exportIcs();
     });
     $('viewKeyBtn').addEventListener('click', () => {
         closeSettingsMenus();
@@ -1963,43 +1871,12 @@ function bindUi() {
     });
 
     // Sidebar
-    $('newCalendarBtn').addEventListener('click', () => openCalendarModal({ mode: 'create' }));
+    $('newEventBtn').addEventListener('click', () => openEditorForNew(new Date(), null, false));
     $('icsImportBtn').addEventListener('click', () => $('icsFileInput').click());
     $('icsFileInput').addEventListener('change', () => {
         const file = $('icsFileInput').files[0];
         if (file) importIcsFile(file);
         $('icsFileInput').value = '';
-    });
-
-    // Calendar modal
-    $('calModalClose').addEventListener('click', () => closeModal($('calendarModal')));
-    $('calCancelBtn').addEventListener('click', () => closeModal($('calendarModal')));
-    $('calSaveBtn').addEventListener('click', saveCalendarModal);
-    $('calNameInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') saveCalendarModal();
-    });
-    $('calDeleteBtn').addEventListener('click', () => {
-        if (!calModalMode || calModalMode.mode !== 'edit') return;
-        const cal = getCalendar(calModalMode.calId);
-        closeModal($('calendarModal'));
-        if (!cal) return;
-        const count = (userData.events || []).filter(ev => ev && ev.calId === cal.id).length;
-        openConfirm(
-            'Delete calendar?',
-            '"' + cal.name + '" and its ' + count + ' event' + (count === 1 ? '' : 's') +
-            ' will be permanently deleted.',
-            'Delete',
-            async () => {
-                const result = await calendarStorage.deleteCalendar(cal.id);
-                if (!result) {
-                    showNotification('Could not delete the calendar.', 'error');
-                    return;
-                }
-                setUserData(result);
-                refreshAll();
-                showNotification('Calendar deleted', 'success');
-            }
-        );
     });
 
     // Event editor
@@ -2078,20 +1955,10 @@ async function init() {
 
     calendarThemeManager.applyFromServer(userData.settings && userData.settings.theme);
 
-    await ensureSomeCalendar();
-    renderSidebar();
+    await ensureMainCalendar();
+    renderEvents();
     renderFooter();
     initCalendar();
-
-    // ?cal=<id> deep link (landing page cards): highlight + record recency.
-    const params = new URLSearchParams(window.location.search);
-    const calId = params.get('cal');
-    if (calId && getCalendar(calId)) {
-        localStorage.setItem('calendar_last_cal', calId);
-        if (typeof WDLinks !== 'undefined') WDLinks.recordOpen('calendar', calId);
-        const row = document.querySelector('.cal-row[data-cal-id="' + calId + '"]');
-        if (row) row.style.background = 'var(--accent-light)';
-    }
 
     reminderTimer = setInterval(checkReminders, APP_CONFIG.reminders.tickMs);
     checkReminders();

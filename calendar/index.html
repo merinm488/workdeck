@@ -135,6 +135,14 @@
                         </svg>
                         <span class="item-text" id="notifyText">Browser notifications: Off</span>
                     </button>
+                    <button class="settings-dropdown-item" id="exportIcsBtn">
+                        <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span class="item-text">Export .ics</span>
+                    </button>
                     <button class="settings-dropdown-item" id="viewKeyBtn">
                         <svg class="item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
@@ -167,16 +175,16 @@
     <main class="cal-main">
         <!-- Sidebar: calendars -->
         <aside class="cal-sidebar" id="calSidebar">
-            <button id="newCalendarBtn" class="btn btn-primary cal-new-btn">
+            <button id="newEventBtn" class="btn btn-primary cal-new-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-                New Calendar
+                New Event
             </button>
 
-            <div class="cal-sidebar-label">Calendars</div>
-            <div id="calendarList" class="cal-list"></div>
+            <div class="cal-sidebar-label">Events</div>
+            <div id="eventList" class="cal-list"></div>
 
             <div class="cal-sidebar-label cal-sidebar-label-spaced">Display</div>
             <label class="cal-todo-toggle">
@@ -195,7 +203,7 @@
                 Import .ics file
             </button>
             <input type="file" id="icsFileInput" accept=".ics,text/calendar" class="hidden">
-            <p class="cal-ics-hint">Export lives in each calendar's menu.</p>
+            <p class="cal-ics-hint">Export lives in the settings menu.</p>
         </aside>
 
         <!-- FullCalendar mount -->
@@ -279,33 +287,6 @@
         </div>
     </div>
 
-    <!-- Calendar (create / edit) Modal -->
-    <div id="calendarModal" class="key-modal">
-        <div class="key-modal-content key-modal-content-narrow">
-            <div class="key-modal-header">
-                <h3 class="key-modal-title" id="calModalTitle">New Calendar</h3>
-                <button class="key-modal-close" id="calModalClose">&times;</button>
-            </div>
-            <div class="key-modal-body">
-                <div class="form-group">
-                    <label for="calNameInput">Name</label>
-                    <input type="text" id="calNameInput" class="text-input" placeholder="Calendar name..."
-                           maxlength="100" autocomplete="off">
-                </div>
-                <div class="form-group">
-                    <label>Color</label>
-                    <div id="calColorPicker" class="color-picker"></div>
-                </div>
-                <div class="modal-actions">
-                    <button id="calDeleteBtn" class="btn btn-danger hidden">Delete</button>
-                    <span class="modal-actions-spacer"></span>
-                    <button id="calCancelBtn" class="btn">Cancel</button>
-                    <button id="calSaveBtn" class="btn btn-primary">Save</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Event Editor Modal -->
     <div id="eventModal" class="key-modal">
         <div class="key-modal-content event-modal-content">
@@ -355,12 +336,6 @@
                                     <option value="yearly">Yearly</option>
                                     <option value="custom">Custom...</option>
                                 </select>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="evCalendar">Calendar</label>
-                            <div class="select-wrap">
-                                <select id="evCalendar"></select>
                             </div>
                         </div>
                     </div>
@@ -546,7 +521,6 @@
                 </div>
             </div>
             <div class="ev-popover-cal">
-                <span class="ev-popover-calname"></span>
                 <span class="ev-popover-repeat hidden">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m17 2 4 4-4 4"></path>
@@ -562,30 +536,21 @@
         </div>
     </template>
 
-    <!-- Sidebar calendar row -->
-    <template id="calRowTemplate">
-        <div class="cal-row" role="button" tabindex="0">
-            <input type="checkbox" class="cal-row-check" aria-label="Show calendar">
+    <!-- Sidebar upcoming event row -->
+    <template id="eventRowTemplate">
+        <div class="cal-row cal-event-row" role="button" tabindex="0">
             <span class="cal-row-dot"></span>
-            <span class="cal-row-name"></span>
-            <button class="td-icon-btn cal-row-edit" title="Calendar options" aria-label="Calendar options">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="1"></circle>
-                    <circle cx="19" cy="12" r="1"></circle>
-                    <circle cx="5" cy="12" r="1"></circle>
-                </svg>
-            </button>
-            <div class="cal-row-menu hidden">
-                <button class="cal-row-menu-item cal-row-rename">Rename / color</button>
-                <button class="cal-row-menu-item cal-row-export">Export .ics</button>
-                <button class="cal-row-menu-item cal-row-menu-danger cal-row-delete">Delete calendar</button>
-            </div>
+            <span class="cal-event-main">
+                <span class="cal-event-title"></span>
+                <span class="cal-event-when"></span>
+            </span>
+            <svg class="cal-event-repeat hidden" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m17 2 4 4-4 4"></path>
+                <path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+                <path d="m7 22-4-4 4-4"></path>
+                <path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+            </svg>
         </div>
-    </template>
-
-    <!-- Color swatch -->
-    <template id="colorSwatchTemplate">
-        <button type="button" class="color-swatch" aria-label="Pick color"></button>
     </template>
 
     <!-- Reminder chip -->
