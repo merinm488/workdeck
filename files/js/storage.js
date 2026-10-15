@@ -15,7 +15,7 @@
  *
  * Unified document sections used (see api/_lib/store.js):
  *   files:   [{ id, name, mime, size, folderId, tags, thumbnail,
- *               storage: 'textdb', storageKey: 'file_<id>',
+ *               storageKey: 'file_<id>',
  *               createdAt, updatedAt }]
  *   folders: [{ id, name, color, parentId, tags, createdAt, updatedAt }]
  *   tags:    [{ id, name, color, origin? }]  // shared with the whole suite;

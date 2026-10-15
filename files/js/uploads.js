@@ -18,6 +18,11 @@
 // Encoding helpers
 // ================================================
 
+/** Server's cap once known (GET ?limits=1), else the config fallback. */
+function effectiveMaxFileSize() {
+    return (window.fileboxLimits && window.fileboxLimits.maxFileSize) || APP_CONFIG.maxFileSize;
+}
+
 function blobToBase64(blob, withPrefix) {
     return new Promise(function (resolve, reject) {
         const reader = new FileReader();
@@ -102,7 +107,7 @@ class FileboxJsonUploader extends Uppy.BasePlugin {
             const overCap = response.status === 413 || result.error === 'FILE_TOO_LARGE';
             if (!response.ok || !result.success) {
                 throw new Error(overCap
-                    ? 'Over the ' + Math.round(APP_CONFIG.maxFileSize / 1024) + ' KB limit'
+                    ? (result.message || 'Over the ' + Math.round(effectiveMaxFileSize() / 1024) + ' KB limit')
                     : result.error || 'Upload failed (' + response.status + ')');
             }
 
@@ -144,7 +149,7 @@ class FileboxUploads {
 
         this.uppy = new window.Uppy.Uppy({
             autoProceed: false,
-            restrictions: { maxFileSize: APP_CONFIG.maxFileSize }
+            restrictions: { maxFileSize: effectiveMaxFileSize() }
         });
 
         this.uppy.use(window.Uppy.Dashboard, {
@@ -178,6 +183,22 @@ class FileboxUploads {
             // Dismissal drops a pending selection; a run in flight keeps going.
             if (!this.busy) this.uppy.cancelAll();
         }.bind(this));
+
+        this.refreshLimits();
+    }
+
+    /** Adopt the server's cap (FILES_MAX_FILE_SIZE) into Uppy's restrictions. */
+    refreshLimits() {
+        fetch(APP_CONFIG.apiEndpoint + '?limits=1')
+            .then(function (response) { return response.json(); })
+            .then(function (result) {
+                if (!result || !result.success || !(result.limits && result.limits.maxFileSize > 0)) return;
+                window.fileboxLimits = result.limits;
+                if (this.uppy) {
+                    this.uppy.setOptions({ restrictions: { maxFileSize: result.limits.maxFileSize } });
+                }
+            }.bind(this))
+            .catch(function () { });   // unreachable server -> config fallback stays
     }
 
     /** Feed files in from the window-wide drop overlay. */

@@ -22,7 +22,8 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
   Account (deletes the unified account).
 - ✏️ **Rename & delete files** from the landing page (including shared
   copies cleanup).
-- 🗃️ **Files** — upload files (up to 300 KB each) and organize them in
+- 🗃️ **Files** — upload files (300 KB each by default, env-tunable via
+  `FILES_MAX_FILE_SIZE`) and organize them in
   nested folders of unlimited depth; folder-aware dashboard, drag-to-move,
   search, list/grid views, and a PWA. Files and folders are taggable from
   the landing page's Tags sidebar or inside Files.
@@ -104,7 +105,7 @@ workdeck/
 │   └── js/                 # auth/storage/themes/editor (+ rrule.js, ical.js via CDN)
 ├── server/dev-server.js    # one Express server mirroring the prod layout
 ├── vercel.json             # routing for production
-├── .env                    # PEPPER_SECRET for local dev
+├── .env                    # PEPPER_SECRET, FILES_MAX_FILE_SIZE for local dev
 └── package.json
 ```
 
@@ -155,8 +156,12 @@ every file across every app.
 A Drive-style file manager at `/files/` — upload via picker or full-window
 drag-drop, organize in nested folders of unlimited depth, browse as cards.
 
-- **300 KB cap per file** — gated client-side with a toast before reading,
-  enforced server-side with `413 FILE_TOO_LARGE`.
+- **300 KB default cap per file** — gated client-side with a toast before
+  reading, enforced server-side with `413 FILE_TOO_LARGE`. Configurable via
+  the `FILES_MAX_FILE_SIZE` env var (`"300KB"`, `"10MB"`, or plain bytes) for
+  when the storage backend outgrows textdb.dev's 1 MB docs; the server
+  reports its cap to the client via `GET /api/filebox?limits=1`. On Vercel,
+  request bodies cap near 4.5 MB, which bounds how far this can go.
 - **Per-file content records** — bytes are base64 in separate
   `file_<id>` records (raw-key siblings of the shared-doc helpers in
   `api/_lib/store.js`), never inside the ~1 MB user doc. Upload writes the

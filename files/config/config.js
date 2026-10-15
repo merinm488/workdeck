@@ -38,6 +38,8 @@ const APP_CONFIG = {
         storageKey: 'filebox_theme'
     },
 
+    // Client-side fallback only — the server's value (FILES_MAX_FILE_SIZE
+    // env var, reported via GET /api/filebox?limits=1) overrides it.
     maxFileSize: 300 * 1024,
 
     // Poll the unified doc while the tab is visible (plus visibilitychange).

@@ -6,15 +6,14 @@
  * This route only moves FILE BYTES. All metadata lives in the unified 
  * document and is handled by api/workdeck.js.
  *
- * Storage (via api/_lib/store.js):
- *   development -> db/<storageKey>.json          (server/dev-server.js)
- *   production  -> textdb.dev doc <storageKey>   (gzip envelope handled by
- *                                                  store.js transparently)
  *
  * Content record shape (one per file, keyed `file_<fileId>`):
  *   { "bytes": "<base64>" }
  *
  * Request shapes:
+ *   GET  ?limits=1                    -> { limits: { maxFileSize } } — no
+ *                                        auth; deployment constant so the
+ *                                        client's Uppy restrictions match
  *   GET  ?hash=<hash>                 -> whole unified user document
  *                                        (same response shape as
  *                                        GET /api/workdeck?hash=)
@@ -42,8 +41,23 @@ import {
   applyCorsHeaders
 } from './_lib/store.js';
 
-// Hard cap on decoded file size.
-const MAX_FILE_SIZE = 300 * 1024;
+// Hard cap on decoded file size. Default is sized for textdb.dev (bytes
+// live base64-encoded in their own 1 MB doc); override with the
+// FILES_MAX_FILE_SIZE env var when the storage backend changes —
+// plain bytes ("1500000") or a suffix ("300KB", "10MB").
+function parseMaxFileSize(raw) {
+  const match = /^(\d+)\s*(b|kb|mb)?$/i.exec(String(raw || '').trim());
+  if (!match) return null;
+  const mult = { b: 1, kb: 1024, mb: 1024 * 1024 }[(match[2] || 'b').toLowerCase()];
+  const value = Number(match[1]) * mult;
+  return value > 0 ? Math.floor(value) : null;
+}
+
+const MAX_FILE_SIZE = parseMaxFileSize(process.env.FILES_MAX_FILE_SIZE) ?? 300 * 1024;
+if (process.env.FILES_MAX_FILE_SIZE && parseMaxFileSize(process.env.FILES_MAX_FILE_SIZE) === null) {
+  console.warn('[FILEBOX API] Ignoring invalid FILES_MAX_FILE_SIZE:', process.env.FILES_MAX_FILE_SIZE,
+    `— using the ${Math.floor(MAX_FILE_SIZE / 1024)} KB default`);
+}
 
 // Thumbnails ride INSIDE the ~1 MB unified user doc, so each data URL must
 // stay small. Larger values are nulled, never rejected — an upload must not
@@ -89,7 +103,6 @@ function buildFileRecord(data, tagIds, size) {
     thumbnail,
     thumbnailCover: thumbnail ? data.thumbnailCover === true : false,
     thumbVer: thumbnail && data.thumbVer > 0 ? data.thumbVer : 0,
-    storage: 'textdb',
     storageKey: `file_${id}`,
     createdAt: now,
     updatedAt: now
@@ -120,9 +133,14 @@ export default async function handler(req, res) {
 
   try {
     // ============================================================
-    // GET - whole user doc, or one file's bytes
+    // GET - upload limits, whole user doc, or one file's bytes
     // ============================================================
     if (req.method === 'GET') {
+      // Deployment constant, not user data — no hash required.
+      if (req.query.limits) {
+        return res.status(200).json({ success: true, limits: { maxFileSize: MAX_FILE_SIZE } });
+      }
+
       const { hash, fileId, dl } = req.query;
 
       // --- Whole user document (app bootstrap / poll) ---
@@ -148,9 +166,6 @@ export default async function handler(req, res) {
       const file = (userData.files || []).find(f => f.id === fileId);
       if (!file) {
         return res.status(404).json({ success: false, error: 'File not found' });
-      }
-      if (file.storage !== 'textdb') {
-        return res.status(400).json({ success: false, error: 'Unsupported storage backend' });
       }
 
       const doc = await getRawDoc(file.storageKey);
