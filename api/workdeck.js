@@ -618,7 +618,10 @@ export default async function handler(req, res) {
                   : app === 'todo'
                   ? (userData.todo || []).find(l => l.id === fileId)
                   : app === 'calendar'
-                  ? (userData.calendars || []).find(c => c.id === fileId)
+                  // 'calendar' is the app-level card id (one card for the
+                  // whole app); real ids still resolve for old deep links.
+                  ? (fileId === 'calendar' ||
+                     (userData.calendars || []).some(c => c.id === fileId))
                   : userData.docs.find(n => n.id === fileId)
             );
           }

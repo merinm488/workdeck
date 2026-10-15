@@ -178,12 +178,7 @@ const WD_APPS = [
         icon: 'calendar',
         route: '/calendar/',
         editorParam: 'cal',
-        create: {
-            action: 'createCalendar',
-            payload: {},
-            // The API unshifts, so the newest calendar is first.
-            pickNewest: function (data) { return data.calendars && data.calendars[0]; }
-        },
+        create: null,
         contentSearch: false
     },
     {
@@ -249,6 +244,7 @@ const state = {
     folders: [],         // Filebox folders
     todo: [],            // Todo task lists
     calendars: [],       // Calendar app calendars
+    events: [],          // Calendar app events
     settings: {},
     searchQuery: '',
     filter: 'all',       // 'all' | app id from WD_APPS
@@ -386,18 +382,26 @@ function getAllFiles() {
         };
     });
 
-    const calendarFiles = (state.calendars || []).map(function (c) {
-        return {
-            id: c.id,
+    // One card for the whole Calendar app — not one per calendar. Every
+    // calendar or event edit refreshes its timestamp so the card bubbles
+    // back up in the recency sort.
+    const calActivity = (state.calendars || []).concat(state.events || [])
+        .reduce(function (latest, item) {
+            return (item && item.updatedAt && item.updatedAt > latest) ? item.updatedAt : latest;
+        }, '');
+    const calendarFiles = (state.calendars || []).length || (state.events || []).length
+        ? [{
+            id: 'calendar',      // app-level id, not a real calendar id
             app: 'calendar',
-            name: c.name || 'Untitled Calendar',
-            updatedAt: c.updatedAt,
-            lastOpened: lastOpened[c.id] || null,
-            tagId: getTag(c.tagId) ? c.tagId : null,
+            kind: 'app',
+            name: 'Calendar',
+            updatedAt: calActivity,
+            lastOpened: lastOpened['calendar'] || null,
+            tagId: null,
             content: '',
-            raw: c
-        };
-    });
+            raw: null
+        }]
+        : [];
 
     const fileboxFiles = (state.files || []).map(function (f) {
         return {
@@ -522,6 +526,7 @@ function applyUserData(data) {
     state.folders = data.folders || [];
     state.todo = data.todo || [];
     state.calendars = data.calendars || [];
+    state.events = data.events || [];
     state.settings = data.settings || {};
     render();
 }
@@ -946,6 +951,17 @@ function buildCard(file) {
     card.addEventListener('click', function (e) {
         if (!e.target.closest('.wd-file-action-btn')) openFile(file);
     });
+    if (file.kind === 'app') {
+        // App-level card: nothing to tag, rename or delete.
+        ['move', 'rename', 'delete'].forEach(function (action) {
+            card.querySelector('.' + action).remove();
+        });
+        card.querySelector('.copylink').addEventListener('click', function (e) {
+            e.stopPropagation();
+            copyFileLink(file);
+        });
+        return card;
+    }
     card.querySelector('.move').addEventListener('click', function (e) {
         e.stopPropagation();
         showMoveModal(file);
@@ -1031,6 +1047,17 @@ function buildListRow(file) {
     row.addEventListener('click', function (e) {
         if (!e.target.closest('.wd-file-action-btn')) openFile(file);
     });
+    if (file.kind === 'app') {
+        // App-level row: nothing to tag, rename or delete.
+        ['move', 'rename', 'delete'].forEach(function (action) {
+            row.querySelector('.' + action).remove();
+        });
+        row.querySelector('.copylink').addEventListener('click', function (e) {
+            e.stopPropagation();
+            copyFileLink(file);
+        });
+        return row;
+    }
     row.querySelector('.move').addEventListener('click', function (e) {
         e.stopPropagation();
         showMoveModal(file);
@@ -1131,6 +1158,10 @@ function openInNewTab(url) {
  * the folder.
  */
 function openFile(file) {
+    if (file.kind === 'app') {
+        openApp(file);
+        return;
+    }
     // Canonical hard link (/sheets/<id>, /files/<id>, ...).
     const url = WDLinks.url(file.app, file.id);
     openInNewTab(url);
@@ -1138,9 +1169,19 @@ function openFile(file) {
         .catch(function (err) { console.error('[WORKDECK] recordOpen failed:', err); });
 }
 
+/**
+ * App-level cards (Calendar) have no per-file hard link: open the app
+ * itself and bump its recency under the app id.
+ */
+function openApp(file) {
+    openInNewTab(getApp(file.app).route);
+    api('recordOpen', { fileId: file.id, app: file.app })
+        .catch(function (err) { console.error('[WORKDECK] recordOpen failed:', err); });
+}
+
 /** Copy a file's canonical hard link (absolute URL) to the clipboard. */
 function copyFileLink(file) {
-    const path = WDLinks.url(file.app, file.id);
+    const path = file.kind === 'app' ? getApp(file.app).route : WDLinks.url(file.app, file.id);
     const absolute = window.location.origin + path;
     const done = ok => showNotification(ok ? 'Link copied' : 'Could not copy link', ok ? 'success' : 'error');
     const fallbackCopy = function () {
@@ -1169,8 +1210,11 @@ function copyFileLink(file) {
 async function createFile(appId) {
     const app = getApp(appId);
     if (!app.create) {
-        const tagQs = state.activeTag ? '&tag=' + encodeURIComponent(state.activeTag) : '';
-        openInNewTab(app.route + '?upload=1' + tagQs);
+        // No server-side create (Files upload, Calendar): open the app.
+        const uploadQs = app.id === 'filebox' ? '?upload=1' : '';
+        const tagQs = app.id === 'filebox' && state.activeTag
+            ? '&tag=' + encodeURIComponent(state.activeTag) : '';
+        openInNewTab(app.route + uploadQs + tagQs);
         return;
     }
     showLoading('Creating ' + app.label.toLowerCase() + '...');
