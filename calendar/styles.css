@@ -581,6 +581,26 @@ body {
     color: var(--text-secondary);
 }
 
+/* Mobile drawer toggle + scrim (inert on desktop) */
+.cal-sidebar-toggle {
+    display: none;
+}
+
+.cal-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 250;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.cal-scrim.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 /* ============================================================
    FullCalendar theming
    ============================================================ */
@@ -1686,15 +1706,28 @@ input[type="time"]::-webkit-calendar-picker-indicator {
         overflow: auto;
     }
 
-    .cal-main {
-        flex-direction: column;
+    .cal-sidebar-toggle {
+        display: inline-flex;
     }
 
+    /* Sidebar becomes an off-canvas drawer; the calendar fills the screen */
     .cal-sidebar {
-        width: 100%;
-        border-right: none;
-        border-bottom: 1px solid var(--border-color);
-        padding: 10px 12px;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 260;
+        width: min(300px, 86vw);
+        padding: 14px 12px;
+        padding-top: max(14px, env(safe-area-inset-top));
+        border-right: 1px solid var(--border-color);
+        transform: translateX(-105%);
+        transition: transform 0.22s ease;
+    }
+
+    .cal-sidebar.open {
+        transform: translateX(0);
+        box-shadow: 0 0 44px var(--shadow-color);
     }
 
     .cal-sidebar-label-spaced {

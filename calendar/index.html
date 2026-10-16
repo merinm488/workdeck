@@ -40,6 +40,13 @@
                     <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
             </button>
+            <button id="sidebarToggleBtn" class="top-nav-btn cal-sidebar-toggle" aria-label="Events and options" aria-expanded="false" title="Events and options">
+                <svg class="top-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
             <h1 id="pageTitle" class="page-title">Calendar</h1>
         </div>
 
@@ -211,6 +218,9 @@
             <div id="calendarEl"></div>
         </div>
     </main>
+
+    <!-- Mobile sidebar scrim -->
+    <div id="sidebarScrim" class="cal-scrim"></div>
 
     <!-- Status footer -->
     <footer class="app-footer">

@@ -1287,6 +1287,40 @@ function initTodoToggle() {
 }
 
 // ================================================
+// Sidebar drawer (mobile)
+// ================================================
+
+function sidebarDrawerOpen() {
+    return $('calSidebar').classList.contains('open');
+}
+
+function openSidebarDrawer() {
+    $('calSidebar').classList.add('open');
+    $('sidebarScrim').classList.add('show');
+    $('sidebarToggleBtn').setAttribute('aria-expanded', 'true');
+}
+
+function closeSidebarDrawer() {
+    $('calSidebar').classList.remove('open');
+    $('sidebarScrim').classList.remove('show');
+    $('sidebarToggleBtn').setAttribute('aria-expanded', 'false');
+}
+
+function initSidebarDrawer() {
+    $('sidebarToggleBtn').addEventListener('click', () =>
+        sidebarDrawerOpen() ? closeSidebarDrawer() : openSidebarDrawer());
+    $('sidebarScrim').addEventListener('click', closeSidebarDrawer);
+    $('newEventBtn').addEventListener('click', closeSidebarDrawer);
+    document.addEventListener('click', (e) => {
+        if (sidebarDrawerOpen() && e.target.closest('.cal-event-row')) closeSidebarDrawer();
+    });
+    const desktop = window.matchMedia('(min-width: 701px)');
+    desktop.addEventListener('change', (e) => {
+        if (e.matches) closeSidebarDrawer();
+    });
+}
+
+// ================================================
 // File links (WDLinks integration)
 // ================================================
 
@@ -1758,6 +1792,7 @@ function handleShortcut(e) {
     if (e.key === 'Escape') {
         hidePopover();
         closeSettingsMenus();
+        closeSidebarDrawer();
         if (anyModalOpen()) {
             document.querySelectorAll('.key-modal.active').forEach(m => {
                 if (m.id !== 'deleteAccountModal') closeModal(m);
@@ -1942,6 +1977,7 @@ async function init() {
     bindUi();
     renderBuilderDays();
     initTodoToggle();
+    initSidebarDrawer();
     updateNotifyLabel();
     $('loadingOverlay').classList.remove('hidden');
 
