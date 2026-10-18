@@ -1774,4 +1774,16 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     .ev-datetime-row {
         flex-wrap: wrap;
     }
+
+    /* Month-grid chips: title only, ellipsized inside the cell — the time
+       is nowrap and otherwise paints across into the next day's tile */
+    .fc .fc-daygrid-event .fc-event-time {
+        display: none;
+    }
+
+    .fc .fc-daygrid-dot-event .fc-event-title,
+    .fc .fc-daygrid-block-event .fc-event-title {
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 }
