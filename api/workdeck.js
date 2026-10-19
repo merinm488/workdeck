@@ -165,6 +165,24 @@ function createDefaultTodoList(id) {
   };
 }
 
+function createDefaultKanbanBoard(id) {
+  const now = new Date().toISOString();
+  return {
+    id,
+    name: 'Untitled Board',
+    columns: [
+      { id: 'todo', label: 'To Do' },
+      { id: 'progress', label: 'In Progress' },
+      { id: 'done', label: 'Done' }
+    ],
+    rows: [],
+    cards: [],
+    links: [],
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
 /**
  * Merge settings and stamp defaults so clients can rely on the shape.
  */
@@ -330,6 +348,17 @@ export default async function handler(req, res) {
           if (data?.name) list.name = data.name;
           if (data?.tagId) list.tagId = data.tagId;
           userData.todo.unshift(list);
+          break;
+        }
+
+        // Create empty kanban board
+        case 'createKanban': {
+          const id = data?.id || generateId();
+          const board = createDefaultKanbanBoard(id);
+          if (data?.name) board.name = data.name;
+          if (data?.tagId) board.tagId = data.tagId;
+          userData.kanban = userData.kanban || [];
+          userData.kanban.unshift(board);
           break;
         }
 
@@ -649,7 +678,8 @@ export default async function handler(req, res) {
           const isFileboxFile = app === "filebox";
           const isTodo = app === "todo";
           const isCalendar = app === "calendar";
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : userData.docs;
+          const isKanban = app === "kanban";
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : isKanban ? (userData.kanban || []) : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -669,6 +699,8 @@ export default async function handler(req, res) {
           } else if (isTodo) {
             target.name = cleanName;
           } else if (isCalendar) {
+            target.name = cleanName;
+          } else if (isKanban) {
             target.name = cleanName;
           } else {
             target.title = cleanName;
@@ -710,6 +742,8 @@ export default async function handler(req, res) {
             userData.draws = userData.draws.filter(d => d.id !== fileId);
           } else if (app === 'todo') {
             userData.todo = (userData.todo || []).filter(l => l.id !== fileId);
+          } else if (app === 'kanban') {
+            userData.kanban = (userData.kanban || []).filter(b => b.id !== fileId);
           } else if (app === 'calendar') {
             // A calendar takes its events with it.
             userData.calendars = (userData.calendars || []).filter(c => c.id !== fileId);

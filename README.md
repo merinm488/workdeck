@@ -37,6 +37,12 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
   + browser notifications), search, keyboard shortcuts,
   Todo tasks rendered on the grid, file links via the suite's WDLinks,
   and .ics import/export (rrule.js + ical.js).
+- 🗂️ **Kanban** — boards with columns and swimlanes (DHTMLX Kanban,
+  GPL edition via CDN): drag-and-drop cards between columns, inline/modal
+  card editor (title, description, priority, due date, color), checklists
+  with a mirrored progress bar, comments, undo/redo, search/sort toolbar,
+  column WIP limits, multi-select, and the suite's light/dark theme
+  bridged onto the widget via its CSS variables.
 - 📱 **Mobile-friendly** — touch devices open files in the same tab.
 
 ## 🏗️ Architecture
@@ -61,7 +67,8 @@ workdeck/
 │   ├── draw.js             # Draw API (drawing records + public share snapshots)
 │   ├── filebox.js          # Files API (file bytes: upload + download)
 │   ├── todo.js             # Todo API (task list records)
-│   └── calendar.js         # Calendar API (calendars + event records)
+│   ├── calendar.js         # Calendar API (calendars + event records)
+│   └── kanban.js           # Kanban API (board records)
 ├── docs/                   # Docs build output (from docs-src, base /docs/)
 ├── docs-src/               # Docs source (React+Vite, with:
 │                           #   base '/docs/', ?doc= deep link, shared sessions)

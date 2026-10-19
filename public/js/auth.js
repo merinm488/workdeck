@@ -32,7 +32,9 @@ const WD_AUTH_CONFIG = {
         todoHash: 'todo_user_hash',
         todoKey: 'todo_user_key',
         calendarHash: 'calendar_user_hash',
-        calendarKey: 'calendar_user_key'
+        calendarKey: 'calendar_user_key',
+        kanbanHash: 'kanban_user_hash',
+        kanbanKey: 'kanban_user_key'
     }
 };
 
@@ -73,6 +75,8 @@ class WdAuthManager {
             localStorage.setItem(s.todoKey, key);
             localStorage.setItem(s.calendarHash, hash);
             localStorage.setItem(s.calendarKey, key);
+            localStorage.setItem(s.kanbanHash, hash);
+            localStorage.setItem(s.kanbanKey, key);
         } catch (err) {
             console.warn('[AUTH] localStorage seed failed (private mode?):', err);
         }

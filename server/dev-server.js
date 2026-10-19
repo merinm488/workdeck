@@ -63,6 +63,7 @@ const { default: drawHandler } = await import('../api/draw.js');
 const { default: fileboxHandler } = await import('../api/filebox.js');
 const { default: todoHandler } = await import('../api/todo.js');
 const { default: calendarHandler } = await import('../api/calendar.js');
+const { default: kanbanHandler } = await import('../api/kanban.js');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -122,6 +123,7 @@ app.all('/api/draw', (req, res) => drawHandler(req, res));
 app.all('/api/filebox', (req, res) => fileboxHandler(req, res));
 app.all('/api/todo', (req, res) => todoHandler(req, res));
 app.all('/api/calendar', (req, res) => calendarHandler(req, res));
+app.all('/api/kanban', (req, res) => kanbanHandler(req, res));
 
 // ---------- Pretty file URLs ----------
 // Underscore allowed: legacy client-created sheets have ids like mv7xyz_ab12cde
@@ -134,9 +136,10 @@ const WD_PRETTY_PAGES = {
   draw: '/draw/editor.html',
   todo: '/todo/index.html',
   calendar: '/calendar/index.html',
+  kanban: '/kanban/index.html',
   files: '/files/index.html'
 };
-const WD_PRETTY_PARAMS = { docs: 'doc', todo: 'list', calendar: 'cal' };
+const WD_PRETTY_PARAMS = { docs: 'doc', todo: 'list', calendar: 'cal', kanban: 'board' };
 
 Object.keys(WD_PRETTY_PAGES).forEach((prettyApp) => {
   app.get('/' + prettyApp + '/:id', (req, res, next) => {
@@ -198,6 +201,9 @@ app.use('/todo', express.static(path.join(ROOT_DIR, 'todo'), { index: 'index.htm
 // Calendar (plain static)
 app.use('/calendar', express.static(path.join(ROOT_DIR, 'calendar'), { index: 'index.html' }));
 
+// Kanban (plain static)
+app.use('/kanban', express.static(path.join(ROOT_DIR, 'kanban'), { index: 'index.html' }));
+
 // Root redirect to the Workdeck landing page
 app.get('/', (req, res) => {
   res.sendFile(path.join(ROOT_DIR, 'public', 'index.html'));
@@ -215,7 +221,8 @@ app.listen(PORT, () => {
   console.log(`🗂️  Files:      http://localhost:${PORT}/files/`);
   console.log(`✅ Todo:       http://localhost:${PORT}/todo/`);
   console.log(`📅 Calendar:   http://localhost:${PORT}/calendar/`);
-  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw, /api/filebox, /api/todo, /api/calendar`);
+  console.log(`🗂️  Kanban:     http://localhost:${PORT}/kanban/`);
+  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw, /api/filebox, /api/todo, /api/calendar, /api/kanban`);
   console.log(`📁 Local DB:   ${path.join(ROOT_DIR, 'db')}`);
   console.log('\nPress Ctrl+C to stop\n');
 });

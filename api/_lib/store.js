@@ -185,7 +185,7 @@ async function postTextdbDoc(id, value) {
 // User documents
 // ================================================
 
-const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders', 'todo', 'calendars', 'events', 'settings'];
+const KNOWN_SECTIONS = ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders', 'todo', 'calendars', 'events', 'kanban', 'settings'];
 
 /** A stored doc counts as an existing account if it has any known section. */
 export function isValidUserDoc(doc) {
@@ -223,6 +223,7 @@ export async function getUserDoc(hash) {
   if (!Array.isArray(doc.todo)) doc.todo = [];
   if (!Array.isArray(doc.calendars)) doc.calendars = [];
   if (!Array.isArray(doc.events)) doc.events = [];
+  if (!Array.isArray(doc.kanban)) doc.kanban = [];
   if (!doc.settings || typeof doc.settings !== 'object') doc.settings = {};
 
   return doc;
@@ -248,7 +249,7 @@ export async function overwriteDoc(hash, doc) {
  * without clobbering each other.
  *
  * @param {string} hash
- * @param {{docs?:Array, tags?:Array, sheets?:Array, forms?:Array, slides?:Array, draws?:Array, files?:Array, folders?:Array, todo?:Array, calendars?:Array, events?:Array, settings?:Object}} owned
+ * @param {{docs?:Array, tags?:Array, sheets?:Array, forms?:Array, slides?:Array, draws?:Array, files?:Array, folders?:Array, todo?:Array, calendars?:Array, events?:Array, kanban?:Array, settings?:Object}} owned
  * @returns {Promise<boolean>}
  */
 export async function saveOwnedSections(hash, owned) {
@@ -265,7 +266,7 @@ export async function saveOwnedSections(hash, owned) {
 
   const next = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : {};
 
-  for (const key of ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders', 'todo', 'calendars', 'events']) {
+  for (const key of ['docs', 'tags', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders', 'todo', 'calendars', 'events', 'kanban']) {
     if (owned[key] !== undefined) next[key] = owned[key];
   }
 
@@ -293,6 +294,7 @@ export async function createUserDoc(hash, defaults = {}) {
     todo: [],
     calendars: [],
     events: [],
+    kanban: [],
     settings: {
       theme: 'dark',
       viewMode: 'grid',

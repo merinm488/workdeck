@@ -37,6 +37,10 @@
       "destination": "/calendar/index.html?cal=:id"
     },
     {
+      "source": "/kanban/:id([a-z0-9_]{14,})",
+      "destination": "/kanban/index.html?board=:id"
+    },
+    {
       "source": "/files/:id([a-z0-9_]{14,})",
       "destination": "/files/index.html?id=:id"
     },

@@ -171,6 +171,22 @@ const WD_APPS = [
         contentSearch: true                 // search matches task text
     },
     {
+        id: 'kanban',
+        name: 'Kanban',
+        label: 'Board',
+        accent: 'kanban',
+        icon: 'kanban',
+        route: '/kanban/',
+        editorParam: 'board',
+        create: {
+            action: 'createKanban',
+            payload: {},
+            // The API unshifts, so the newest board is first.
+            pickNewest: function (data) { return data.kanban && data.kanban[0]; }
+        },
+        contentSearch: false
+    },
+    {
         id: 'calendar',
         name: 'Calendar',
         label: 'Calendar',
@@ -243,6 +259,7 @@ const state = {
     files: [],           // Filebox file metadata
     folders: [],         // Filebox folders
     todo: [],            // Todo task lists
+    kanban: [],          // Kanban boards
     calendars: [],       // Calendar app calendars
     events: [],          // Calendar app events
     settings: {},
@@ -382,6 +399,19 @@ function getAllFiles() {
         };
     });
 
+    const kanbanFiles = (state.kanban || []).map(function (b) {
+        return {
+            id: b.id,
+            app: 'kanban',
+            name: b.name || 'Untitled Board',
+            updatedAt: b.updatedAt,
+            lastOpened: lastOpened[b.id] || null,
+            tagId: getTag(b.tagId) ? b.tagId : null,
+            content: '',
+            raw: b
+        };
+    });
+
     // One card for the whole Calendar app — not one per calendar. Every
     // calendar or event edit refreshes its timestamp so the card bubbles
     // back up in the recency sort.
@@ -443,7 +473,7 @@ function getAllFiles() {
         });
 
     return docs.concat(sheetFiles).concat(formFiles).concat(slideFiles).concat(drawFiles)
-        .concat(todoFiles).concat(calendarFiles).concat(fileboxFiles).concat(folderCards)
+        .concat(todoFiles).concat(kanbanFiles).concat(calendarFiles).concat(fileboxFiles).concat(folderCards)
         .sort(function (a, b) {
             const aTime = a.lastOpened || a.updatedAt || '';
             const bTime = b.lastOpened || b.updatedAt || '';
@@ -525,6 +555,7 @@ function applyUserData(data) {
     state.files = data.files || [];
     state.folders = data.folders || [];
     state.todo = data.todo || [];
+    state.kanban = data.kanban || [];
     state.calendars = data.calendars || [];
     state.events = data.events || [];
     state.settings = data.settings || {};
