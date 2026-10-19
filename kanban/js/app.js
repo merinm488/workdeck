@@ -97,15 +97,39 @@ function renderBoards() {
     );
 
     const lastOpened = (state.settings && state.settings.lastOpened) || {};
+
+    if (!q) {
+        const create = document.getElementById('kbBoardCreateTemplate')
+            .content.firstElementChild.cloneNode(true);
+        create.addEventListener('click', () => {
+            openNameModal('New Board', '', (name) => createBoard(name));
+        });
+        create.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openNameModal('New Board', '', (name) => createBoard(name));
+            }
+        });
+        grid.appendChild(create);
+    }
+
     visible.forEach(board => {
         const card = document.getElementById('kbBoardCardTemplate')
             .content.firstElementChild.cloneNode(true);
         card.dataset.id = board.id;
+
+        const color = window.kbBoardColor
+            ? kbBoardColor(board)
+            : 'var(--accent-color)';
+        const cover = card.querySelector('.kb-board-cover');
+        cover.style.background =
+            `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color} 72%, #1e293b))`;
         card.querySelector('.kb-board-name').textContent = board.name || 'Untitled Board';
+
         const cardCount = Array.isArray(board.cards) ? board.cards.length : 0;
         const colCount = Array.isArray(board.columns) ? board.columns.length : 0;
         card.querySelector('.kb-board-meta').textContent =
-            `${cardCount} card${cardCount === 1 ? '' : 's'} · ${colCount} column${colCount === 1 ? '' : 's'}`;
+            `${cardCount} card${cardCount === 1 ? '' : 's'} · ${colCount} list${colCount === 1 ? '' : 's'}`;
 
         card.addEventListener('click', () => openBoard(board.id));
         card.addEventListener('keydown', (e) => {
@@ -227,6 +251,7 @@ async function runConfirm() {
 function closeAllPopovers() {
     document.getElementById('checklistModal').classList.remove('open');
     document.getElementById('wipLimitModal').classList.remove('open');
+    if (window.KanbanBoard) KanbanBoard.closeOverlays();
     closeNameModal();
     closeConfirm();
     document.getElementById('keyModal').classList.remove('open');

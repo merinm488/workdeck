@@ -77,9 +77,9 @@ class KanbanThemeManager {
     }
 
     applyFromServer(serverTheme) {
-        if (this.isValidTheme(serverTheme) && !this.getPreference()) {
-            this.setPreference(serverTheme);
-        }
+        if (!this.isValidTheme(serverTheme) || this.getPreference()) return;
+        this.setPreference(serverTheme);
+        this.applyTheme(serverTheme);
     }
 
     watchSystemTheme() {
