@@ -795,6 +795,7 @@ export default async function handler(req, res) {
         files: userData.files,
         folders: userData.folders,
         todo: userData.todo,
+        kanban: userData.kanban,
         calendars: userData.calendars,
         events: userData.events,
         settings: userData.settings

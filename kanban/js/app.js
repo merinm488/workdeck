@@ -44,7 +44,9 @@ async function init() {
     state.settings = doc.settings || {};
     state.boards = doc.kanban || [];
 
-    const boardId = new URLSearchParams(window.location.search).get('board');
+    const pathId = (/^\/kanban\/([a-z0-9]{14,})\/?$/.exec(window.location.pathname) || [])[1];
+    const boardId = pathId ||
+        new URLSearchParams(window.location.search).get('board');
     if (boardId) {
         showBoardView();
         const opened = await KanbanBoard.open(boardId, doc);
