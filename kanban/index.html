@@ -330,6 +330,14 @@
         </div>
     </template>
 
+    <!-- Inline checklist preview row (card modal, below comments) -->
+    <template id="cardChecklistRowTemplate">
+        <div class="checklist-item card-checklist-item">
+            <input type="checkbox" class="checklist-check" aria-label="Mark item done">
+            <span class="checklist-preview-text"></span>
+        </div>
+    </template>
+
     <!-- WIP Limit Modal -->
     <div id="wipLimitModal" class="key-modal">
         <div class="key-modal-content">
@@ -371,14 +379,14 @@
     <template id="kbColumnTemplate">
         <div class="kb-col" data-column-id="">
             <div class="kb-col-head">
-                <button type="button" class="kb-icon-btn kb-col-collapse" title="Collapse" aria-label="Collapse column">
+                <button type="button" class="kb-icon-btn kb-col-collapse" title="Collapse" aria-label="Collapse list">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="15 18 9 12 15 6"></polyline>
                     </svg>
                 </button>
                 <span class="kb-col-title" role="button" tabindex="0"></span>
                 <span class="kb-col-count"></span>
-                <button type="button" class="kb-icon-btn kb-col-menu-btn" title="Column menu" aria-label="Column menu">
+                <button type="button" class="kb-icon-btn kb-col-menu-btn" title="List menu" aria-label="List menu">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
                         <circle cx="12" cy="5" r="1.8"></circle>
                         <circle cx="12" cy="12" r="1.8"></circle>
@@ -460,12 +468,12 @@
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-                <span>Add column</span>
+                <span>Add list</span>
             </button>
             <div class="kb-addcol-composer hidden">
-                <input type="text" class="modal-input kb-addcol-input" placeholder="Column name..." maxlength="60" autocomplete="off">
+                <input type="text" class="modal-input kb-addcol-input" placeholder="List name..." maxlength="60" autocomplete="off">
                 <div class="kb-composer-actions">
-                    <button type="button" class="btn btn-primary kb-addcol-confirm">Add column</button>
+                    <button type="button" class="btn btn-primary kb-addcol-confirm">Add list</button>
                     <button type="button" class="kb-icon-btn kb-addcol-cancel" title="Cancel" aria-label="Cancel">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -613,15 +621,6 @@
                     </div>
                 </div>
 
-                <div class="card-field card-checklist-field">
-                    <span class="card-field-label">Checklist</span>
-                    <div class="card-checklist-row">
-                        <progress id="cardChecklistProgress" class="checklist-progress" max="100" value="0"></progress>
-                        <span id="cardChecklistStats" class="checklist-stats"></span>
-                        <button type="button" id="cardChecklistBtn" class="btn">Open</button>
-                    </div>
-                </div>
-
                 <div class="card-field">
                     <span class="card-field-label">Comments</span>
                     <div id="cardCommentsList" class="card-comments"></div>
@@ -629,6 +628,16 @@
                         <input type="text" id="cardCommentInput" class="modal-input" placeholder="Write a comment..." maxlength="500" autocomplete="off">
                         <button type="button" id="cardCommentAdd" class="btn btn-primary">Send</button>
                     </div>
+                </div>
+
+                <div class="card-field card-checklist-field">
+                    <span class="card-field-label">Checklist</span>
+                    <div class="card-checklist-row">
+                        <progress id="cardChecklistProgress" class="checklist-progress" max="100" value="0"></progress>
+                        <span id="cardChecklistStats" class="checklist-stats"></span>
+                        <button type="button" id="cardChecklistBtn" class="btn">Open</button>
+                    </div>
+                    <div id="cardChecklistItems" class="checklist-items card-checklist-items hidden"></div>
                 </div>
 
                 <div class="modal-actions card-modal-actions">

@@ -155,7 +155,7 @@ class BoardController {
                 this.scheduleSave();
                 return;
             }
-            openNameModal('Rename Column', col.label, (name) => {
+            openNameModal('Rename List', col.label, (name) => {
                 col.label = name;
                 this.render();
                 this.scheduleSave();
@@ -478,7 +478,7 @@ class BoardController {
             if (colEl) colEl.querySelector('.kb-col-add').click();
         }
         if (action === 'rename') {
-            openNameModal('Rename Column', col.label, (name) => {
+            openNameModal('Rename List', col.label, (name) => {
                 col.label = name;
                 this.render();
                 this.scheduleSave();
@@ -489,7 +489,7 @@ class BoardController {
         if (action === 'move-right') this.moveColumn(columnId, 1);
         if (action === 'delete') {
             const count = this.board.cards.filter(c => c.column === columnId).length;
-            openConfirm('Delete Column',
+            openConfirm('Delete List',
                 `"${col.label}"${count ? ` and ${count} card${count === 1 ? '' : 's'}` : ''} will be deleted. This cannot be undone.`,
                 () => {
                     this.board.columns = this.board.columns.filter(c => c.id !== columnId);
@@ -664,6 +664,27 @@ class BoardController {
         document.getElementById('cardChecklistProgress').value = pct;
         document.getElementById('cardChecklistStats').textContent =
             items.length ? `${done} / ${items.length}` : 'No items';
+        this.renderInlineChecklist(card);
+    }
+
+    renderInlineChecklist(card) {
+        const list = document.getElementById('cardChecklistItems');
+        const items = Array.isArray(card.checklist) ? card.checklist : [];
+        list.innerHTML = '';
+        list.classList.toggle('hidden', !items.length);
+        items.forEach(item => {
+            const row = kbClone('cardChecklistRowTemplate');
+            const check = row.querySelector('.checklist-check');
+            const text = row.querySelector('.checklist-preview-text');
+            check.checked = !!item.done;
+            text.textContent = item.text || '';
+            text.classList.toggle('done', !!item.done);
+            check.addEventListener('change', () => {
+                item.done = check.checked;
+                this.syncChecklist(card);
+            });
+            list.appendChild(row);
+        });
     }
 
     renderComments(card) {

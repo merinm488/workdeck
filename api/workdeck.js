@@ -171,9 +171,7 @@ function createDefaultKanbanBoard(id) {
     id,
     name: 'Untitled Board',
     columns: [
-      { id: 'todo', label: 'To Do' },
-      { id: 'progress', label: 'In Progress' },
-      { id: 'done', label: 'Done' }
+      { id: generateId(), label: 'Untitled List' }
     ],
     rows: [],
     cards: [],

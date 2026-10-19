@@ -29,9 +29,7 @@ import {
 const DEFAULT_BOARD_NAME = 'Untitled Board';
 
 const DEFAULT_COLUMNS = () => ([
-  { id: 'todo', label: 'To Do' },
-  { id: 'progress', label: 'In Progress' },
-  { id: 'done', label: 'Done' }
+  { id: generateId(), label: 'Untitled List' }
 ]);
 
 /** Persist only the sections Kanban owns (kanban) + settings changes. */

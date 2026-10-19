@@ -1253,6 +1253,26 @@ body:has(#boardView:not(.hidden)) .app-footer {
     min-width: auto;
 }
 
+.card-checklist-items {
+    margin-top: 10px;
+    margin-bottom: 0;
+}
+
+.checklist-preview-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 13.5px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.checklist-preview-text.done {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+}
+
 .card-comments {
     display: flex;
     flex-direction: column;
@@ -1320,6 +1340,13 @@ body:has(#boardView:not(.hidden)) .app-footer {
 
 .key-modal.open {
     display: flex;
+}
+
+/* Dialogs that can open on top of the card editor */
+#checklistModal,
+#confirmModal,
+#wipLimitModal {
+    z-index: 210;
 }
 
 .key-modal-content {
