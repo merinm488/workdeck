@@ -53,6 +53,8 @@ class BoardController {
         this.editingCardId = null;
         this.sortables = [];
         this.todoSortables = [];
+        this.placing = null;
+        this._placeHandler = null;
         this.searchQuery = '';
         this._chromeWired = false;
         this._modalWired = false;
@@ -86,7 +88,7 @@ class BoardController {
         });
 
         document.getElementById('pageTitle').textContent = this.board.name;
-        document.getElementById('boardRoot').style.setProperty('--board-accent', kbBoardColor(this.board));
+        document.getElementById('boardView').style.setProperty('--board-accent', kbBoardColor(this.board));
         this.bumpLastOpened();
 
         this.wireChrome();
@@ -831,11 +833,12 @@ class BoardController {
             animation: 150,
             ghostClass: 'kb-ghost',
             dragClass: 'kb-drag',
-            filter: '.kb-todo-open, .kb-todo-remove',
+            filter: '.kb-todo-open, .kb-todo-remove, .kb-todo-add',
             preventOnFilter: false,
             delay: 120,
             delayOnTouchOnly: true,
             onStart: () => {
+                this.cancelPlacement();
                 document.getElementById('kbSidebarScrim').classList.add('dragging');
             },
             onEnd: (evt) => {
@@ -879,6 +882,16 @@ class BoardController {
             due.classList.remove('hidden');
         }
 
+        el.querySelector('.kb-todo-add').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.startPlacement(listRec.id, task.id);
+        });
+        el.addEventListener('click', () => {
+            // Dragging from the drawer is impractical on touch; tap the task instead
+            if (window.matchMedia('(max-width: 700px)').matches) {
+                this.startPlacement(listRec.id, task.id);
+            }
+        });
         el.querySelector('.kb-todo-open').addEventListener('click', (e) => {
             e.stopPropagation();
             if (window.WDLinks) WDLinks.open('todo', listRec.id, { newTab: true });
@@ -933,6 +946,7 @@ class BoardController {
         this.syncSidebarAria();
 
         document.getElementById('kbTodoPickBtn').addEventListener('click', () => this.openTodoPicker());
+        document.getElementById('kbPlaceCancel').addEventListener('click', () => this.cancelPlacement());
         document.getElementById('todoPickerClose').addEventListener('click', () => this.closeTodoPicker());
         document.getElementById('todoPickerCancel').addEventListener('click', () => this.closeTodoPicker());
         document.getElementById('kbTodoPickSearch').addEventListener('input', (e) => {
@@ -945,6 +959,7 @@ class BoardController {
     // ================================================
 
     openTodoPicker() {
+        this.closeSidebarDrawer();
         const input = document.getElementById('kbTodoPickSearch');
         input.value = '';
         this.renderTodoPickerResults('');
@@ -1010,6 +1025,75 @@ class BoardController {
         this.syncSidebarAria();
     }
 
+    addTodoCard(list, task, col, rowId) {
+        const card = {
+            id: kbNewId(),
+            label: task.title || 'Untitled',
+            column: col.id,
+            createdAt: new Date().toISOString(),
+            todoListId: list.id,
+            todoTaskId: task.id
+        };
+        if (rowId) card.row = rowId;
+        if (task.description) card.description = task.description;
+        if (task.priority) card.priority = task.priority;
+        if (task.dueDate) card.end_date = task.dueDate;
+        this.board.cards.push(card);
+        return card;
+    }
+
+    // Tap-to-place: touch users tap a staged task, then tap the target list
+    startPlacement(listId, taskId) {
+        const found = this.findTodoTask(taskId);
+        if (!found || this.board.cards.some(c => c.todoTaskId === taskId)) return;
+        this.placing = { list: found.list, task: found.task };
+        document.getElementById('kbPlaceTitle').textContent = found.task.title || 'Untitled';
+        document.getElementById('kbPlaceBar').classList.remove('hidden');
+        document.getElementById('boardView').classList.add('placing');
+        this.closeSidebarDrawer();
+        if (!this._placeHandler) {
+            this._placeHandler = (e) => {
+                const colEl = e.target.closest('.kb-col');
+                // Collapsed lists expand instead of receiving the card
+                if (!colEl || colEl.classList.contains('collapsed')) return;
+                e.preventDefault();
+                e.stopPropagation();
+                this.placeTodoCard(colEl);
+            };
+        }
+        document.getElementById('boardRoot').addEventListener('click', this._placeHandler, true);
+    }
+
+    cancelPlacement() {
+        if (!this.placing) return;
+        this.placing = null;
+        document.getElementById('kbPlaceBar').classList.add('hidden');
+        document.getElementById('boardView').classList.remove('placing');
+        document.getElementById('boardRoot').removeEventListener('click', this._placeHandler, true);
+    }
+
+    placeTodoCard(colEl) {
+        const placing = this.placing;
+        if (!placing) return;
+        const col = this.board.columns.find(c => c.id === colEl.dataset.columnId);
+        if (!col) return;
+        const lane = colEl.closest('.kb-lane');
+        const rowId = (this.board.rows.length && lane.dataset.rowId) || null;
+        if (col.limit && this.cardsIn(col.id, rowId).length >= col.limit) {
+            showNotification(`"${col.label}" is at its WIP limit`, 'error');
+            return;
+        }
+        const card = this.addTodoCard(placing.list, placing.task, col, rowId);
+        colEl.querySelector('.kb-col-cards').appendChild(this.buildCard(card));
+        this.syncCardsFromDom();
+        this.refreshCounts();
+        this.applyFilter();
+        this.scheduleSave();
+        this.cancelPlacement();
+        this.renderSidebar();
+        showNotification(`Added to "${col.label}"`);
+    }
+
     onTodoDrop(evt) {
         const node = evt.item;
         const todoId = node.dataset.todoId;
@@ -1051,20 +1135,8 @@ class BoardController {
         }
 
         const lane = colEl.closest('.kb-lane');
-        const card = {
-            id: kbNewId(),
-            label: task.title || 'Untitled',
-            column: col.id,
-            createdAt: new Date().toISOString(),
-            todoListId: list.id,
-            todoTaskId: task.id
-        };
-        if (this.board.rows.length && lane && lane.dataset.rowId) card.row = lane.dataset.rowId;
-        if (task.description) card.description = task.description;
-        if (task.priority) card.priority = task.priority;
-        if (task.dueDate) card.end_date = task.dueDate;
-
-        this.board.cards.push(card);
+        const rowId = (this.board.rows.length && lane && lane.dataset.rowId) || null;
+        const card = this.addTodoCard(list, task, col, rowId);
         node.replaceWith(this.buildCard(card));
         this.syncCardsFromDom();
         this.refreshCounts();
@@ -1310,10 +1382,12 @@ class BoardController {
         if (document.getElementById('cardModal').classList.contains('open')) this.closeCardModal();
         this.closeTodoPicker();
         this.closeSidebarDrawer();
+        this.cancelPlacement();
     }
 
     destroy() {
         clearTimeout(this.saveTimer);
+        this.cancelPlacement();
         this.destroySortables();
         this.destroyTodoSortables();
         document.getElementById('boardRoot').innerHTML = '';

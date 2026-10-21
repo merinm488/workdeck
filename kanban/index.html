@@ -209,6 +209,19 @@
                 <div id="kbTodoList" class="kb-todo-list"></div>
             </aside>
             <div class="kb-board-main">
+                <!-- Tap-to-place banner (mobile) -->
+                <div id="kbPlaceBar" class="kb-place-bar hidden">
+                    <svg class="kb-place-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path>
+                    </svg>
+                    <span class="kb-place-text">Tap a list to add "<span id="kbPlaceTitle" class="kb-place-title"></span>"</span>
+                    <button type="button" id="kbPlaceCancel" class="kb-icon-btn" title="Cancel" aria-label="Cancel placing">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
                 <div id="boardToolbar" class="board-toolbar">
                     <button type="button" id="kbSidebarToggle" class="kb-icon-btn" title="Cards panel" aria-label="Toggle cards panel" aria-expanded="true">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -676,6 +689,12 @@
             </div>
             <span class="kb-todo-due hidden"></span>
             <span class="kb-todo-actions">
+                <button type="button" class="kb-icon-btn kb-todo-add" title="Add to board" aria-label="Add to board">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
                 <button type="button" class="kb-icon-btn kb-todo-open" title="Open in To-Do" aria-label="Open in To-Do">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
