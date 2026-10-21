@@ -7,6 +7,8 @@
  *   forms  -> simplified component rows
  *   slides -> first slide rendered offscreen by fabric@6 in a sandboxed iframe
  *   draw   -> content-fit render by fabric@7 in a sandboxed iframe
+ *   kanban -> mini board: columns with header + stacked cards
+ *   todo   -> checklist rows
  *
  * Canvas results are cached per file revision ("app:id:updatedAt"), so grid
  * re-renders (search, filter, reloads) reuse them until a file changes.
@@ -15,9 +17,12 @@
 (function () {
     'use strict';
 
-    const VIRTUAL_WIDTH = { docs: 720, forms: 420, todo: 420 };
+    const VIRTUAL_WIDTH = { docs: 720, forms: 420, todo: 420, kanban: 640 };
     const MAX_SHEET_COLS = 9;
     const MAX_SHEET_ROWS = 8;
+    const MAX_KANBAN_COLS = 4;
+    const MAX_KANBAN_CARDS = 4;
+    const KANBAN_PRIORITY = { high: '#dc2626', medium: '#b45309', low: '#15803d' };
     const CACHE_LIMIT = 300;
     const JOB_TIMEOUT = 10000;
 
@@ -176,6 +181,13 @@
     function registerScaledPage(inner, virtualWidth) {
         scaledPages.push({ el: inner, w: virtualWidth });
         scalePage(inner, virtualWidth);
+        // Cards mount before their grid append, so clientWidth is still 0
+        // (fallback 280) — re-scale once connected.
+        if (!inner.isConnected) {
+            requestAnimationFrame(function () {
+                if (inner.isConnected) scalePage(inner, virtualWidth);
+            });
+        }
     }
 
     function scalePage(inner, virtualWidth) {
@@ -646,6 +658,78 @@
     }
 
     // ================================================
+    // Kanban preview (mini board)
+    // ================================================
+
+    function kanbanCard(parent, card) {
+        const el = document.createElement('div');
+        el.className = 'wd-kanban-card';
+        if (card.color) {
+            const strip = document.createElement('span');
+            strip.className = 'wd-kanban-strip';
+            strip.style.background = card.color;
+            el.append(strip);
+        }
+
+        const title = document.createElement('div');
+        title.className = 'wd-kanban-card-title';
+        title.textContent = card.label || 'Untitled';
+        el.append(title);
+
+        const meta = document.createElement('div');
+        meta.className = 'wd-kanban-card-meta';
+        const dot = KANBAN_PRIORITY[card.priority];
+        if (dot) {
+            const pri = document.createElement('span');
+            pri.className = 'wd-kanban-dot';
+            pri.style.background = dot;
+            meta.append(pri);
+        }
+        if (Array.isArray(card.checklist) && card.checklist.length) {
+            const done = card.checklist.filter(function (i) { return i && i.done; }).length;
+            meta.append(formEl('wd-kanban-check', done + '/' + card.checklist.length));
+        }
+        if (meta.children.length) el.append(meta);
+
+        parent.append(el);
+    }
+
+    function renderKanban(page, file) {
+        const board = file.raw || {};
+        const columns = Array.isArray(board.columns) ? board.columns : [];
+        if (!columns.length) return;
+        const cards = Array.isArray(board.cards) ? board.cards : [];
+
+        const wrap = document.createElement('div');
+        wrap.className = 'wd-preview-kanban';
+
+        columns.slice(0, MAX_KANBAN_COLS).forEach(function (col) {
+            if (!col) return;
+            const inCol = cards.filter(function (c) { return c && c.column === col.id; });
+
+            const head = document.createElement('div');
+            head.className = 'wd-kanban-col-head';
+            head.append(
+                formEl('wd-kanban-col-title', col.label || 'Untitled list'),
+                formEl('wd-kanban-col-count', String(inCol.length))
+            );
+
+            const body = document.createElement('div');
+            body.className = 'wd-kanban-cards';
+            inCol.slice(0, MAX_KANBAN_CARDS).forEach(function (card) { kanbanCard(body, card); });
+            if (!inCol.length) body.append(formEl('wd-kanban-empty'));
+
+            const lane = document.createElement('div');
+            lane.className = 'wd-kanban-col';
+            lane.append(head, body);
+            wrap.append(lane);
+        });
+
+        page.replaceChildren(wrap);
+        registerScaledPage(page.firstChild, VIRTUAL_WIDTH.kanban);
+    }
+
+    // ================================================
     // Resize: keep DOM previews scaled to their card
     // ================================================
 
@@ -675,6 +759,7 @@
             case 'slides':
             case 'draw': renderFabric(page, file); break;
             case 'todo': renderTodo(page, file); break;
+            case 'kanban': renderKanban(page, file); break;
             case 'filebox': renderFilebox(page, file); break;
         }
     }

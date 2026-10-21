@@ -1142,7 +1142,8 @@ html[data-theme="dark"] .wd-theme-option-icon {
 }
 
 .wd-preview-doc,
-.wd-preview-form {
+.wd-preview-form,
+.wd-preview-kanban {
     transform-origin: 0 0;
     background: #ffffff;
     color: #24292f;
@@ -1331,6 +1332,112 @@ html[data-theme="dark"] .wd-theme-option-icon {
     font-weight: 600;
     color: #57606a;
     background: #eef0f2;
+}
+
+/* Kanban preview: mini board columns */
+.wd-preview-kanban {
+    display: flex;
+    width: 640px;
+    padding: 18px 16px;
+    font-size: 12px;
+    gap: 12px;
+}
+
+.wd-kanban-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 7px 7px 8px;
+}
+
+.wd-kanban-col-head {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 2px 7px;
+}
+
+.wd-kanban-col-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 11.5px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wd-kanban-col-count {
+    flex: none;
+    font-size: 10px;
+    font-weight: 700;
+    color: #6b7280;
+    background: #e7e9ed;
+    border-radius: 999px;
+    padding: 1px 6px;
+}
+
+.wd-kanban-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wd-kanban-card {
+    position: relative;
+    background: #ffffff;
+    border: 1px solid #e1e4ea;
+    border-radius: 8px;
+    padding: 8px 8px 7px;
+    overflow: hidden;
+}
+
+.wd-kanban-strip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+}
+
+.wd-kanban-card-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 11px;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.wd-kanban-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 5px;
+}
+
+.wd-kanban-dot {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+}
+
+.wd-kanban-check {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.wd-kanban-empty {
+    height: 26px;
+    border: 1.5px dashed #d3d7de;
+    border-radius: 7px;
 }
 
 /* Touch devices have no hover: keep rename/delete visible. */
