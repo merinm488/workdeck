@@ -1396,6 +1396,8 @@ async function confirmDelete() {
         state.calendars = state.calendars.filter(function (c) { return c.id !== file.id });
     } else if (file.app === 'filebox') {
         state.files = state.files.filter(function (f) { return f.id !== file.id; });
+    } else if (file.app === 'kanban') {
+        state.kanban = state.kanban.filter(function (b) { return b.id !== file.id; });
     } else {
         state.docs = state.docs.filter(function (n) { return n.id !== file.id; });
     }
@@ -1534,6 +1536,7 @@ async function confirmDeleteProject() {
     state.draws = dropTagged(state.draws);
     state.todo = dropTagged(state.todo);
     state.calendars = dropTagged(state.calendars);
+    state.kanban = dropTagged(state.kanban);
     state.files = stripTag(state.files);
     state.folders = stripTag(state.folders);
     render();

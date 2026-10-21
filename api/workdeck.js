@@ -422,7 +422,8 @@ export default async function handler(req, res) {
             ...taggedIn(userData.slides),
             ...taggedIn(userData.draws),
             ...taggedIn(userData.todo || []),
-            ...taggedIn(userData.calendars || [])
+            ...taggedIn(userData.calendars || []),
+            ...taggedIn(userData.kanban || [])
           ];
           for (const file of doomed) {
             if (file.sharedId) {
@@ -448,6 +449,7 @@ export default async function handler(req, res) {
             userData.events = (userData.events || []).filter(e => !e || !doomedCalIds.has(e.calId));
           }
           userData.calendars = (userData.calendars || []).filter(f => !f || f.tagId !== tagId);
+          userData.kanban = (userData.kanban || []).filter(f => !f || f.tagId !== tagId);
           (userData.files || []).forEach(f => {
             if (Array.isArray(f.tags)) f.tags = f.tags.filter(id => id !== tagId);
           });
@@ -611,7 +613,8 @@ export default async function handler(req, res) {
           const isDrawing = app === 'draw';
           const isTodo = app === 'todo';
           const isCalendar = app === 'calendar';
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : userData.docs;
+          const isKanban = app === 'kanban';
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : isKanban ? (userData.kanban || []) : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -649,6 +652,8 @@ export default async function handler(req, res) {
                   // whole app); real ids still resolve for old deep links.
                   ? (fileId === 'calendar' ||
                      (userData.calendars || []).some(c => c.id === fileId))
+                  : app === 'kanban'
+                  ? (userData.kanban || []).find(b => b.id === fileId)
                   : userData.docs.find(n => n.id === fileId)
             );
           }
