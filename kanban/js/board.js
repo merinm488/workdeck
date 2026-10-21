@@ -6,7 +6,7 @@
  */
 
 const CARD_FIELDS = ['label', 'description', 'row', 'priority', 'color', 'progress',
-    'end_date', 'createdAt'];
+    'end_date', 'todoListId', 'todoTaskId', 'createdAt'];
 
 const CARD_COLORS = [
     '#2563eb', '#7c3aed', '#c026d3', '#dc2626', '#ea580c',
@@ -46,20 +46,24 @@ class BoardController {
     constructor() {
         this.board = null;
         this.userDoc = null;
+        this.todos = [];
         this.saveTimer = null;
         this.saving = false;
         this.checklistCardId = null;
         this.editingCardId = null;
         this.sortables = [];
+        this.todoSortables = [];
         this.searchQuery = '';
         this._chromeWired = false;
         this._modalWired = false;
         this._toolbarWired = false;
+        this._sidebarWired = false;
     }
 
     open(boardId, userDoc) {
         this.board = (userDoc.kanban || []).find(b => b && b.id === boardId);
         this.userDoc = userDoc;
+        this.todos = userDoc.todo || [];
         if (!this.board) return false;
 
         this.board.columns = this.board.columns || [];
@@ -87,6 +91,7 @@ class BoardController {
 
         this.wireChrome();
         this.wireCardModal();
+        this.wireSidebar();
         this.render();
         return true;
     }
@@ -124,6 +129,7 @@ class BoardController {
         root.appendChild(this.buildAddColumn());
         this.wireSortables();
         this.applyFilter();
+        this.renderSidebar();
     }
 
     fillLane(lane, rowId) {
@@ -300,6 +306,12 @@ class BoardController {
             commChip.classList.remove('hidden');
         }
 
+        const todoChip = el.querySelector('.chip-todo');
+        if (card.todoTaskId) {
+            todoChip.querySelector('span').textContent = 'To-Do';
+            todoChip.classList.remove('hidden');
+        }
+
         el.addEventListener('click', () => this.openCardModal(card.id));
         el.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -312,6 +324,8 @@ class BoardController {
             this.openMenu(e.currentTarget, 'kbCardMenuTemplate', (action) => {
                 this.cardAction(action, card.id);
             });
+            const todoItem = document.querySelector('#kbMenu .kb-menu-item[data-action="open-todo"]');
+            if (todoItem) todoItem.classList.toggle('hidden', !card.todoListId);
         });
         return el;
     }
@@ -459,6 +473,12 @@ class BoardController {
         if (action === 'edit') this.openCardModal(cardId);
         if (action === 'checklist') this.openChecklist({ cardId });
         if (action === 'duplicate') this.duplicateCard(cardId);
+        if (action === 'open-todo') {
+            const card = this.getCard(cardId);
+            if (card && card.todoListId && window.WDLinks) {
+                WDLinks.open('todo', card.todoListId, { newTab: true });
+            }
+        }
         if (action === 'delete') {
             const card = this.getCard(cardId);
             openConfirm('Delete Card', `"${card.label || 'Untitled'}" will be deleted. This cannot be undone.`, () => {
@@ -753,6 +773,320 @@ class BoardController {
     }
 
     // ================================================
+    // Sidebar (To Do tasks, drag onto the board)
+    // ================================================
+
+    renderSidebar() {
+        const list = document.getElementById('kbTodoList');
+        if (!list) return;
+        this.destroyTodoSortables();
+        list.innerHTML = '';
+
+        const used = new Set(this.board.cards.map(c => c.todoTaskId).filter(Boolean));
+        let total = 0;
+
+        this.stagedTaskIds().forEach(taskId => {
+            const found = this.findTodoTask(taskId);
+            if (!found || found.task.completed || used.has(taskId)) return;
+            list.appendChild(this.buildTodoItem(found.list, found.task));
+            total++;
+        });
+
+        document.getElementById('kbTodoEmpty').classList.toggle('hidden', total > 0);
+        this.wireTodoSortables();
+    }
+
+    stagedTaskIds() {
+        const ids = this.userDoc && this.userDoc.settings && this.userDoc.settings.kanbanCards;
+        return Array.isArray(ids) ? ids : [];
+    }
+
+    findTodoTask(taskId) {
+        for (const list of (this.todos || [])) {
+            const task = (list.items || []).find(i => i.id === taskId);
+            if (task) return { list, task };
+        }
+        return null;
+    }
+
+    async setTaskStaged(taskId, staged) {
+        const settings = (this.userDoc && this.userDoc.settings) || {};
+        const ids = Array.isArray(settings.kanbanCards) ? settings.kanbanCards : [];
+        const has = ids.includes(taskId);
+        if (staged === has) return true;
+        const next = staged ? ids.concat(taskId) : ids.filter(id => id !== taskId);
+        const ok = await kanbanStorage.saveSettings({ kanbanCards: next });
+        if (!ok) return false;
+        settings.kanbanCards = next;
+        return true;
+    }
+
+    wireTodoSortables() {
+        if (typeof Sortable === 'undefined') return;
+        const list = document.getElementById('kbTodoList');
+        if (!list) return;
+        this.todoSortables.push(new Sortable(list, {
+            group: { name: 'kb-cards', pull: 'clone', put: false },
+            sort: false,
+            animation: 150,
+            ghostClass: 'kb-ghost',
+            dragClass: 'kb-drag',
+            filter: '.kb-todo-open, .kb-todo-remove',
+            preventOnFilter: false,
+            delay: 120,
+            delayOnTouchOnly: true,
+            onStart: () => {
+                document.getElementById('kbSidebarScrim').classList.add('dragging');
+            },
+            onEnd: (evt) => {
+                document.getElementById('kbSidebarScrim').classList.remove('dragging');
+                setTimeout(() => this.onTodoDrop(evt), 0);
+            }
+        }));
+    }
+
+    destroyTodoSortables() {
+        this.todoSortables.forEach(s => {
+            try { s.destroy(); } catch (err) { /* already gone */ }
+        });
+        this.todoSortables = [];
+    }
+
+    buildTodoItem(listRec, task) {
+        const el = kbClone('kbTodoItemTemplate');
+        el.dataset.todoId = task.id;
+        el.dataset.listId = listRec.id;
+
+        const dot = el.querySelector('.kb-todo-dot');
+        const pri = (APP_CONFIG.priorities || []).find(p => p.id === (task.priority || 'medium'));
+        if (pri) dot.style.background = pri.color;
+
+        el.querySelector('.kb-todo-title').textContent = task.title || 'Untitled';
+
+        const desc = el.querySelector('.kb-todo-desc');
+        if (task.description) {
+            desc.textContent = task.description;
+            desc.classList.remove('hidden');
+        }
+
+        const due = el.querySelector('.kb-todo-due');
+        const date = kbParseDate(task.dueDate);
+        if (date) {
+            due.textContent = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            due.classList.toggle('overdue', date < today);
+            due.classList.remove('hidden');
+        }
+
+        el.querySelector('.kb-todo-open').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (window.WDLinks) WDLinks.open('todo', listRec.id, { newTab: true });
+        });
+        el.querySelector('.kb-todo-remove').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.unstageTodoTask(task.id);
+        });
+        return el;
+    }
+
+    async unstageTodoTask(taskId) {
+        const ok = await this.setTaskStaged(taskId, false);
+        if (!ok) {
+            showNotification('Could not update the card list', 'error');
+            return;
+        }
+        this.renderSidebar();
+    }
+
+    wireSidebar() {
+        if (this._sidebarWired) return;
+        this._sidebarWired = true;
+
+        const sidebar = document.getElementById('kbSidebar');
+        const scrim = document.getElementById('kbSidebarScrim');
+        const toggle = document.getElementById('kbSidebarToggle');
+        const isDrawer = () => window.matchMedia('(max-width: 700px)').matches;
+
+        const setSidebarOpen = (open) => {
+            sidebar.classList.toggle('hidden', !open);
+            sidebar.classList.toggle('open', isDrawer() && open);
+            scrim.classList.toggle('show', isDrawer() && open);
+            this.syncSidebarAria();
+            try { localStorage.setItem('kanban_sidebar', open ? 'on' : 'off'); } catch (err) { /* private mode */ }
+        };
+        this.setSidebarOpen = setSidebarOpen;
+
+        toggle.addEventListener('click', () => {
+            setSidebarOpen(isDrawer() || sidebar.classList.contains('hidden'));
+        });
+        document.getElementById('kbSidebarClose').addEventListener('click', () => setSidebarOpen(false));
+        document.getElementById('kbTodoRefresh').addEventListener('click', () => this.refreshTodos());
+        scrim.addEventListener('click', () => this.closeSidebarDrawer());
+
+        let pref = 'on';
+        try { pref = localStorage.getItem('kanban_sidebar') || 'on'; } catch (err) { /* private mode */ }
+        setSidebarOpen(pref !== 'off');
+        // The drawer starts closed on phones even when the panel is open on desktop
+        sidebar.classList.remove('open');
+        scrim.classList.remove('show');
+        this.syncSidebarAria();
+
+        document.getElementById('kbTodoPickBtn').addEventListener('click', () => this.openTodoPicker());
+        document.getElementById('todoPickerClose').addEventListener('click', () => this.closeTodoPicker());
+        document.getElementById('todoPickerCancel').addEventListener('click', () => this.closeTodoPicker());
+        document.getElementById('kbTodoPickSearch').addEventListener('input', (e) => {
+            this.renderTodoPickerResults(e.target.value);
+        });
+    }
+
+    // ================================================
+    // Choose from To Do (sidebar staging)
+    // ================================================
+
+    openTodoPicker() {
+        const input = document.getElementById('kbTodoPickSearch');
+        input.value = '';
+        this.renderTodoPickerResults('');
+        document.getElementById('todoPickerModal').classList.add('open');
+        input.focus();
+    }
+
+    closeTodoPicker() {
+        document.getElementById('todoPickerModal').classList.remove('open');
+    }
+
+    renderTodoPickerResults(query) {
+        const wrap = document.getElementById('kbTodoPickResults');
+        wrap.innerHTML = '';
+        const staged = new Set(this.stagedTaskIds());
+        const q = (query || '').toLowerCase().trim();
+        let count = 0;
+
+        (this.todos || []).forEach(list => {
+            (list.items || []).forEach(task => {
+                if (task.completed) return;
+                if (q && !((task.title || '').toLowerCase().includes(q) ||
+                    (task.description || '').toLowerCase().includes(q))) return;
+
+                const row = kbClone('kbTodoPickRowTemplate');
+                row.querySelector('.kb-pick-title').textContent = task.title || 'Untitled';
+                row.querySelector('.kb-pick-list').textContent = list.name || 'Untitled';
+                const isStaged = staged.has(task.id);
+                row.querySelector('.kb-pick-state').classList.toggle('hidden', !isStaged);
+                row.disabled = isStaged;
+                row.addEventListener('click', () => this.pickTodoTask(task.id));
+                wrap.appendChild(row);
+                count++;
+            });
+        });
+
+        document.getElementById('kbTodoPickEmpty').classList.toggle('hidden', count > 0);
+    }
+
+    async pickTodoTask(taskId) {
+        const ok = await this.setTaskStaged(taskId, true);
+        if (!ok) {
+            showNotification('Could not save', 'error');
+            return;
+        }
+        this.renderTodoPickerResults(document.getElementById('kbTodoPickSearch').value);
+        this.renderSidebar();
+        showNotification('Added to Cards');
+    }
+
+    syncSidebarAria() {
+        const sidebar = document.getElementById('kbSidebar');
+        const drawer = window.matchMedia('(max-width: 700px)').matches;
+        const visible = drawer
+            ? sidebar.classList.contains('open')
+            : !sidebar.classList.contains('hidden');
+        document.getElementById('kbSidebarToggle').setAttribute('aria-expanded', String(visible));
+    }
+
+    closeSidebarDrawer() {
+        document.getElementById('kbSidebar').classList.remove('open');
+        document.getElementById('kbSidebarScrim').classList.remove('show');
+        this.syncSidebarAria();
+    }
+
+    onTodoDrop(evt) {
+        const node = evt.item;
+        const todoId = node.dataset.todoId;
+        if (evt.to === evt.from) return;
+        if (!todoId) {
+            node.remove();
+            this.renderSidebar();
+            return;
+        }
+
+        const colEl = evt.to.closest('.kb-col');
+        const col = colEl && this.board.columns.find(c => c.id === colEl.dataset.columnId);
+        if (!col) {
+            node.remove();
+            this.renderSidebar();
+            return;
+        }
+
+        // Over WIP limit — task goes back to the sidebar
+        if (col.limit && evt.to.children.length > col.limit) {
+            node.remove();
+            showNotification(`"${col.label}" is at its WIP limit`, 'error');
+            this.renderSidebar();
+            return;
+        }
+
+        if (this.board.cards.some(c => c.todoTaskId === todoId)) {
+            node.remove();
+            this.renderSidebar();
+            return;
+        }
+
+        const list = (this.todos || []).find(l => l.id === node.dataset.listId);
+        const task = list && (list.items || []).find(i => i.id === todoId);
+        if (!list || !task) {
+            node.remove();
+            this.renderSidebar();
+            return;
+        }
+
+        const lane = colEl.closest('.kb-lane');
+        const card = {
+            id: kbNewId(),
+            label: task.title || 'Untitled',
+            column: col.id,
+            createdAt: new Date().toISOString(),
+            todoListId: list.id,
+            todoTaskId: task.id
+        };
+        if (this.board.rows.length && lane && lane.dataset.rowId) card.row = lane.dataset.rowId;
+        if (task.description) card.description = task.description;
+        if (task.priority) card.priority = task.priority;
+        if (task.dueDate) card.end_date = task.dueDate;
+
+        this.board.cards.push(card);
+        node.replaceWith(this.buildCard(card));
+        this.syncCardsFromDom();
+        this.refreshCounts();
+        this.applyFilter();
+        this.scheduleSave();
+        this.renderSidebar();
+        if (window.matchMedia('(max-width: 700px)').matches) this.closeSidebarDrawer();
+    }
+
+    async refreshTodos() {
+        const doc = await kanbanStorage.loadUserData();
+        if (!doc) {
+            showNotification('Could not refresh tasks', 'error');
+            return;
+        }
+        // Only the sidebar reads fresh data — the board model stays as-is
+        this.userDoc = doc;
+        this.todos = doc.todo || [];
+        this.renderSidebar();
+    }
+
+    // ================================================
     // Persistence
     // ================================================
 
@@ -974,11 +1308,14 @@ class BoardController {
     closeOverlays() {
         this.closeMenu();
         if (document.getElementById('cardModal').classList.contains('open')) this.closeCardModal();
+        this.closeTodoPicker();
+        this.closeSidebarDrawer();
     }
 
     destroy() {
         clearTimeout(this.saveTimer);
         this.destroySortables();
+        this.destroyTodoSortables();
         document.getElementById('boardRoot').innerHTML = '';
     }
 }

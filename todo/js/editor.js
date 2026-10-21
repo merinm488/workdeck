@@ -16,6 +16,7 @@ let lists = [];          // the account's task lists (userData.todo)
 let currentList = null;  // the open list, or null in the lists view
 let sortable = null;
 let listsLayout = APP_CONFIG.layout.default;  // 'cards' | 'list'
+let userSettings = {};   // userData.settings (kanbanCards staging lives here)
 
 // ================================================
 // DOM
@@ -431,6 +432,16 @@ function renderTasks() {
         badge.classList.add(task.priority || 'medium');
         badge.textContent = task.priority || 'medium';
 
+        const kanbanBtn = row.querySelector('.td-task-kanban');
+        if (task.completed) {
+            kanbanBtn.classList.add('hidden');
+        } else {
+            const staged = kanbanStagedIds().includes(task.id);
+            kanbanBtn.classList.toggle('active', staged);
+            kanbanBtn.title = staged ? 'Remove from Kanban' : 'Add to Kanban';
+            kanbanBtn.addEventListener('click', () => toggleKanbanStaged(task.id));
+        }
+
         row.querySelector('.td-task-edit').addEventListener('click', () => openEditModal(task.id));
         row.querySelector('.td-task-delete').addEventListener('click', () => deleteTodo(task.id));
 
@@ -483,6 +494,26 @@ async function toggleTodo(id) {
     if (saved) {
         renderTasks();
     }
+}
+
+// Tasks staged for the Kanban sidebar ("Cards" panel) — shared via settings
+function kanbanStagedIds() {
+    return Array.isArray(userSettings.kanbanCards) ? userSettings.kanbanCards : [];
+}
+
+async function toggleKanbanStaged(id) {
+    const ids = kanbanStagedIds();
+    const staged = ids.includes(id);
+    const next = staged ? ids.filter(x => x !== id) : ids.concat(id);
+
+    const ok = await todoStorage.saveSettings({ kanbanCards: next });
+    if (!ok) {
+        showNotification('Could not update the Kanban list', 'error');
+        return;
+    }
+    userSettings.kanbanCards = next;
+    renderTasks();
+    showNotification(staged ? 'Removed from Kanban' : 'Added to Kanban');
 }
 
 function openEditModal(id) {
@@ -849,6 +880,7 @@ async function init() {
     todoThemeManager.applyFromServer(userData.settings && userData.settings.theme);
 
     lists = Array.isArray(userData.todo) ? userData.todo : [];
+    userSettings = userData.settings || {};
 
     let storedLayout = null;
     try {

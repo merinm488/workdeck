@@ -21,6 +21,8 @@
     <!-- SortableJS (MIT, UMD) — drag & drop engine for the board surface -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 
+    <script src="/js/wd-links.js"></script>
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -178,25 +180,66 @@
 
         <!-- Board view (one board) -->
         <div id="boardView" class="hidden">
-            <div id="boardToolbar" class="board-toolbar">
-                <div class="board-search">
-                    <svg class="board-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <aside id="kbSidebar" class="kb-sidebar">
+                <div class="kb-sidebar-head">
+                    <span class="kb-sidebar-label">Cards</span>
+                    <span class="kb-sidebar-actions">
+                        <button type="button" id="kbTodoRefresh" class="kb-icon-btn" title="Refresh tasks" aria-label="Refresh tasks">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                        </button>
+                        <button type="button" id="kbSidebarClose" class="kb-icon-btn" title="Hide panel" aria-label="Hide panel">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </span>
+                </div>
+                <button type="button" id="kbTodoPickBtn" class="btn btn-primary kb-todo-pick-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
-                    <input type="text" id="boardSearchInput" class="board-search-input" placeholder="Filter cards..." autocomplete="off">
-                    <button id="boardSearchClear" class="lists-search-clear hidden" aria-label="Clear filter">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                    Choose from To Do
+                </button>
+                <p id="kbTodoEmpty" class="kb-todo-empty hidden">No cards yet. Choose from To Do, or add tasks from the To-Do app.</p>
+                <div id="kbTodoList" class="kb-todo-list"></div>
+            </aside>
+            <div class="kb-board-main">
+                <div id="boardToolbar" class="board-toolbar">
+                    <button type="button" id="kbSidebarToggle" class="kb-icon-btn" title="Cards panel" aria-label="Toggle cards panel" aria-expanded="true">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                            <line x1="9" y1="4" x2="9" y2="20"></line>
                         </svg>
                     </button>
+                    <div class="board-search">
+                        <svg class="board-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="boardSearchInput" class="board-search-input" placeholder="Filter cards..." autocomplete="off">
+                        <button id="boardSearchClear" class="lists-search-clear hidden" aria-label="Clear filter">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <span class="board-toolbar-right">
+                        <span id="boardCardCount" class="board-card-count"></span>
+                    </span>
                 </div>
-                <span id="boardCardCount" class="board-card-count"></span>
+                <div id="boardRoot" class="board-root"></div>
             </div>
-            <div id="boardRoot" class="board-root"></div>
         </div>
     </main>
+
+    <!-- Mobile sidebar scrim -->
+    <div id="kbSidebarScrim" class="kb-scrim"></div>
 
     <!-- Status footer -->
     <footer class="app-footer">
@@ -269,6 +312,24 @@
                 <div class="modal-actions">
                     <button id="cancelNameModal" class="btn">Cancel</button>
                     <button id="confirmNameModal" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Choose from To Do (sidebar staging) -->
+    <div id="todoPickerModal" class="key-modal">
+        <div class="key-modal-content todo-picker-content">
+            <div class="key-modal-header">
+                <h3 class="key-modal-title">Choose from To Do</h3>
+                <button class="key-modal-close" id="todoPickerClose">&times;</button>
+            </div>
+            <div class="key-modal-body">
+                <input type="text" id="kbTodoPickSearch" class="modal-input" placeholder="Search tasks..." autocomplete="off">
+                <p id="kbTodoPickEmpty" class="kb-todo-empty hidden">No matching tasks</p>
+                <div id="kbTodoPickResults" class="todo-picker-results"></div>
+                <div class="modal-actions">
+                    <button type="button" id="todoPickerCancel" class="btn">Close</button>
                 </div>
             </div>
         </div>
@@ -448,6 +509,16 @@
                         </svg>
                         <span></span>
                     </span>
+                    <span class="chip chip-todo hidden">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m3 17 2 2 4-4"></path>
+                            <path d="m3 7 2 2 4-4"></path>
+                            <path d="M13 6h8"></path>
+                            <path d="M13 12h8"></path>
+                            <path d="M13 18h8"></path>
+                        </svg>
+                        <span></span>
+                    </span>
                 </div>
             </div>
             <button type="button" class="kb-icon-btn kb-card-menu-btn" title="Card menu" aria-label="Card menu">
@@ -500,6 +571,16 @@
                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
             </svg>
             <span>Checklist</span>
+        </button>
+        <button type="button" class="kb-menu-item hidden" data-action="open-todo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m3 17 2 2 4-4"></path>
+                <path d="m3 7 2 2 4-4"></path>
+                <path d="M13 6h8"></path>
+                <path d="M13 12h8"></path>
+                <path d="M13 18h8"></path>
+            </svg>
+            <span>Open in To-Do</span>
         </button>
         <button type="button" class="kb-menu-item" data-action="duplicate">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -582,6 +663,44 @@
             <svg class="swatch-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
+        </button>
+    </template>
+
+    <!-- Sidebar: staged task row -->
+    <template id="kbTodoItemTemplate">
+        <div class="kb-todo-item" data-todo-id="" data-list-id="">
+            <span class="kb-todo-dot"></span>
+            <div class="kb-todo-body">
+                <div class="kb-todo-title"></div>
+                <div class="kb-todo-desc hidden"></div>
+            </div>
+            <span class="kb-todo-due hidden"></span>
+            <span class="kb-todo-actions">
+                <button type="button" class="kb-icon-btn kb-todo-open" title="Open in To-Do" aria-label="Open in To-Do">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
+                </button>
+                <button type="button" class="kb-icon-btn kb-todo-remove" title="Remove from list" aria-label="Remove from list">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </span>
+        </div>
+    </template>
+
+    <!-- Choose from To Do: result row -->
+    <template id="kbTodoPickRowTemplate">
+        <button type="button" class="kb-pick-row">
+            <span class="kb-pick-main">
+                <span class="kb-pick-title"></span>
+                <span class="kb-pick-list"></span>
+            </span>
+            <span class="kb-pick-state hidden">Added</span>
         </button>
     </template>
 

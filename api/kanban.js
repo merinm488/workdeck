@@ -10,7 +10,8 @@
  *   { id, name, columns: [{ id, label, limit?, collapsed? }],
  *     rows: [{ id, label, collapsed? }],
  *     cards: [{ id, label, description, column, row?, priority?, color?,
- *       progress?, end_date?, checklist?: [{ id, text, done }],
+ *       progress?, end_date?, todoListId?, todoTaskId?,
+ *       checklist?: [{ id, text, done }],
  *       comments?: [{ id, cardId, userId?, text, date }],
  *       votes?: [], attached?: [], createdAt }],
  *     links: [], createdAt, updatedAt }

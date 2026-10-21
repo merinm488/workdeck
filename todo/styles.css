@@ -539,6 +539,11 @@ body {
     color: var(--danger);
 }
 
+.td-task-kanban.active {
+    background: var(--accent-light);
+    color: var(--accent-color);
+}
+
 /* ============================================================
    List view — tabs
    ============================================================ */

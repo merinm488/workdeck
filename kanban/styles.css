@@ -5,51 +5,63 @@
 /* ---------- Suite variables ---------- */
 :root {
     /* Light Theme (Default) */
-    --bg-primary: #fafafa;
+    --bg-primary: #f5f6fa;
     --bg-secondary: #ffffff;
-    --bg-tertiary: #f0f0ee;
-    --text-primary: #1a1a1a;
-    --text-secondary: #737373;
-    --border-color: #e5e5e0;
-    --accent-color: #2563eb;
-    --accent-hover: #1d4ed8;
-    --accent-light: rgba(37, 99, 235, 0.12);
+    --bg-tertiary: #eceff5;
+    --text-primary: #1c2333;
+    --text-secondary: #64748b;
+    --border-color: #e3e7f0;
+    --accent-color: #a21caf;
+    --accent-hover: #86198f;
+    --accent-light: rgba(162, 28, 175, 0.12);
     --danger: #dc2626;
     --danger-light: rgba(220, 38, 38, 0.10);
-    --shadow-color: rgba(0, 0, 0, 0.08);
+    --shadow-color: rgba(15, 23, 42, 0.10);
     --radius: 12px;
     --radius-sm: 8px;
 
     /* Board canvas (board.js sets --board-accent per board) */
     --board-accent: #64748b;
-    --board-tint: color-mix(in srgb, var(--board-accent) 9%, #eef0f3);
-    --kb-column: rgba(15, 23, 42, 0.055);
-    --kb-column-hover: rgba(15, 23, 42, 0.085);
-    --kb-card-border: rgba(15, 23, 42, 0.07);
-    --kb-card-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.08);
-    --kb-card-shadow-hover: 0 4px 8px rgba(16, 24, 40, 0.08), 0 6px 16px rgba(16, 24, 40, 0.10);
+    --board-canvas: radial-gradient(120% 90% at 50% 0%,
+            color-mix(in srgb, var(--board-accent) 14%, #fdfdff) 0%,
+            color-mix(in srgb, var(--board-accent) 6%, #f3f5fa) 55%,
+            color-mix(in srgb, var(--board-accent) 4%, #eef1f7) 100%);
+    --kb-column: rgba(255, 255, 255, 0.78);
+    --kb-column-border: rgba(15, 23, 42, 0.06);
+    --kb-column-hover: rgba(15, 23, 42, 0.06);
+    --kb-column-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 16px rgba(16, 24, 40, 0.05);
+    --kb-card-border: rgba(15, 23, 42, 0.08);
+    --kb-card-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.09);
+    --kb-card-shadow-hover: 0 6px 12px rgba(16, 24, 40, 0.10), 0 10px 24px rgba(16, 24, 40, 0.10);
+    --bg-nav: rgba(255, 255, 255, 0.82);
 }
 
 [data-theme="dark"] {
-    --bg-primary: #0a0a0a;
-    --bg-secondary: #1a1a1a;
-    --bg-tertiary: #2a2a2a;
-    --text-primary: #e5e5e5;
-    --text-secondary: #737373;
-    --border-color: #2a2a2a;
-    --accent-color: #60a5fa;
-    --accent-hover: #93c5fd;
-    --accent-light: rgba(96, 165, 250, 0.14);
+    --bg-primary: #0c0e13;
+    --bg-secondary: #161a23;
+    --bg-tertiary: #1f2431;
+    --text-primary: #e6e9f0;
+    --text-secondary: #8a93a8;
+    --border-color: #272e3d;
+    --accent-color: #e879f9;
+    --accent-hover: #f0abfc;
+    --accent-light: rgba(232, 121, 249, 0.14);
     --danger: #ef4444;
     --danger-light: rgba(239, 68, 68, 0.14);
-    --shadow-color: rgba(0, 0, 0, 0.25);
+    --shadow-color: rgba(0, 0, 0, 0.40);
 
-    --board-tint: color-mix(in srgb, var(--board-accent) 10%, #0e1013);
-    --kb-column: rgba(255, 255, 255, 0.06);
+    --board-canvas: radial-gradient(120% 90% at 50% 0%,
+            color-mix(in srgb, var(--board-accent) 16%, #10131b) 0%,
+            color-mix(in srgb, var(--board-accent) 8%, #0b0d13) 55%,
+            color-mix(in srgb, var(--board-accent) 5%, #090b10) 100%);
+    --kb-column: rgba(255, 255, 255, 0.045);
+    --kb-column-border: rgba(255, 255, 255, 0.08);
     --kb-column-hover: rgba(255, 255, 255, 0.09);
-    --kb-card-border: rgba(255, 255, 255, 0.06);
+    --kb-column-shadow: 0 1px 2px rgba(0, 0, 0, 0.30);
+    --kb-card-border: rgba(255, 255, 255, 0.08);
     --kb-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-    --kb-card-shadow-hover: 0 4px 10px rgba(0, 0, 0, 0.45);
+    --kb-card-shadow-hover: 0 6px 14px rgba(0, 0, 0, 0.50);
+    --bg-nav: rgba(13, 16, 23, 0.80);
 }
 
 * {
@@ -129,8 +141,23 @@ body {
     flex: 1;
     min-height: 0;
     display: flex;
+    flex-direction: row;
+    background: var(--board-canvas, var(--bg-primary));
+}
+
+.kb-board-main {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
     flex-direction: column;
-    background: var(--board-tint, var(--bg-primary));
+}
+
+.board-toolbar-right {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 /* Full-bleed board: footer steps aside while a board is open */
@@ -158,6 +185,242 @@ body:has(#boardView:not(.hidden)) .app-footer {
 .board-root::-webkit-scrollbar-thumb {
     background: var(--border-color);
     border-radius: 999px;
+}
+
+/* ============================================================
+   Sidebar (To Do tasks)
+   ============================================================ */
+
+.kb-sidebar {
+    width: 264px;
+    flex: none;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 10px;
+    border-right: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    overflow-y: auto;
+}
+
+.kb-sidebar-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.kb-sidebar-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-secondary);
+    margin-left: 6px;
+}
+
+.kb-sidebar-actions {
+    display: inline-flex;
+    gap: 2px;
+}
+
+.kb-sidebar-actions .kb-icon-btn {
+    width: 26px;
+    height: 26px;
+}
+
+.kb-todo-pick-btn {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 0 2px 12px;
+    padding: 7px 10px;
+    font-size: 13px;
+}
+
+.kb-todo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.kb-todo-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 9px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: grab;
+    transition: border-color 0.15s ease;
+}
+
+.kb-todo-item:hover {
+    border-color: var(--accent-color);
+}
+
+.kb-todo-item:active {
+    cursor: grabbing;
+}
+
+.kb-todo-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    flex-shrink: 0;
+    margin-top: 5px;
+}
+
+.kb-todo-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.kb-todo-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.kb-todo-desc {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin-top: 2px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.kb-todo-due {
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.kb-todo-due.overdue {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.kb-todo-actions {
+    display: inline-flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+
+.kb-todo-item:hover .kb-todo-actions {
+    opacity: 1;
+}
+
+.kb-todo-actions .kb-icon-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.kb-todo-empty {
+    margin: 4px 6px 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+/* ---------- Choose from To Do picker ---------- */
+
+.todo-picker-content {
+    max-width: 420px;
+}
+
+.todo-picker-results {
+    margin-top: 10px;
+    max-height: 46vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.kb-pick-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    text-align: left;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.kb-pick-row:hover:not(:disabled) {
+    border-color: var(--accent-color);
+}
+
+.kb-pick-row:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.kb-pick-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.kb-pick-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kb-pick-list {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.kb-pick-state {
+    flex-shrink: 0;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: #188038;
+}
+
+/* Mobile drawer scrim */
+.kb-scrim {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 255;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.kb-scrim.show {
+    display: block;
+}
+
+/* Let drawer drags land on the board beneath the scrim */
+.kb-scrim.dragging {
+    pointer-events: none;
 }
 
 /* ---------- Swimlanes ---------- */
@@ -214,8 +477,10 @@ body:has(#boardView:not(.hidden)) .app-footer {
     display: flex;
     flex-direction: column;
     background: var(--kb-column);
+    border: 1px solid var(--kb-column-border);
     border-radius: 14px;
-    transition: background 0.15s ease;
+    box-shadow: var(--kb-column-shadow);
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .kb-col-head {
@@ -350,25 +615,29 @@ body:has(#boardView:not(.hidden)) .app-footer {
     text-align: center;
     font-size: 11.5px;
     color: var(--text-secondary);
-    opacity: 0.7;
-    padding: 12px 0;
+    opacity: 0.8;
+    margin: 2px 2px 6px;
+    padding: 14px 8px;
+    border: 1.5px dashed color-mix(in srgb, var(--text-secondary) 32%, transparent);
+    border-radius: 10px;
 }
 
 .kb-card {
     position: relative;
     background: var(--bg-secondary);
     border: 1px solid var(--kb-card-border);
-    border-radius: 10px;
+    border-radius: 12px;
     box-shadow: var(--kb-card-shadow);
-    padding: 10px 12px;
+    padding: 11px 12px;
     margin-bottom: 8px;
     cursor: pointer;
-    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 }
 
 .kb-card:hover {
+    border-color: color-mix(in srgb, var(--board-accent) 35%, var(--kb-card-border));
     box-shadow: var(--kb-card-shadow-hover);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
 }
 
 .kb-card:focus-visible {
@@ -382,7 +651,7 @@ body:has(#boardView:not(.hidden)) .app-footer {
     left: 0;
     right: 0;
     height: 5px;
-    border-radius: 9px 9px 0 0;
+    border-radius: 11px 11px 0 0;
     pointer-events: none;
 }
 
@@ -467,6 +736,15 @@ body:has(#boardView:not(.hidden)) .app-footer {
     color: var(--danger);
 }
 
+.chip-todo {
+    background: color-mix(in srgb, #188038 15%, transparent);
+    color: #188038;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
 .kb-card.filtered-out {
     display: none !important;
 }
@@ -522,9 +800,14 @@ body:has(#boardView:not(.hidden)) .app-footer {
     flex: none;
     margin: 4px 8px 6px;
     background: var(--bg-secondary);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 8px;
     box-shadow: var(--kb-card-shadow);
+    transition: box-shadow 0.15s ease;
+}
+
+.kb-col-composer:focus-within {
+    box-shadow: 0 0 0 3px var(--accent-light), var(--kb-card-shadow);
 }
 
 .kb-composer-input {
@@ -560,18 +843,19 @@ body:has(#boardView:not(.hidden)) .app-footer {
     gap: 8px;
     padding: 13px 14px;
     background: var(--kb-column);
-    border: none;
+    border: 1.5px dashed var(--kb-column-border);
     border-radius: 14px;
     color: var(--text-secondary);
     font-family: inherit;
     font-size: 13.5px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
 .kb-addcol-btn:hover {
     background: var(--kb-column-hover);
+    border-color: color-mix(in srgb, var(--accent-color) 45%, transparent);
     color: var(--text-primary);
 }
 
@@ -646,7 +930,9 @@ body:has(#boardView:not(.hidden)) .app-footer {
     justify-content: space-between;
     gap: 12px;
     padding: 10px 16px;
-    background: var(--bg-secondary);
+    background: var(--bg-nav);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
     border-bottom: 1px solid var(--border-color);
     position: sticky;
     top: 0;
@@ -891,16 +1177,25 @@ body:has(#boardView:not(.hidden)) .app-footer {
 }
 
 .btn-primary {
-    background: var(--accent-color);
-    border-color: var(--accent-color);
+    background: linear-gradient(180deg, #c026d3, #a21caf);
+    border-color: #a21caf;
     color: #fff;
+    box-shadow: 0 1px 2px rgba(162, 28, 175, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 [data-theme="dark"] .btn-primary {
-    color: #0a0a0a;
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    box-shadow: none;
+    color: #0c0e13;
 }
 
 .btn-primary:hover {
+    background: linear-gradient(180deg, #a21caf, #86198f);
+    border-color: #86198f;
+}
+
+[data-theme="dark"] .btn-primary:hover {
     background: var(--accent-hover);
     border-color: var(--accent-hover);
 }
@@ -984,7 +1279,9 @@ body:has(#boardView:not(.hidden)) .app-footer {
     flex: 1;
     overflow-y: auto;
     padding: 28px 16px 40px;
-    background: var(--bg-primary);
+    background:
+        radial-gradient(900px 320px at 50% -80px, var(--accent-light), transparent 70%),
+        var(--bg-primary);
 }
 
 .lists-toolbar {
@@ -1038,7 +1335,9 @@ body:has(#boardView:not(.hidden)) .app-footer {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(0, 0, 0, 0.14));
+    background:
+        radial-gradient(130% 100% at 18% 0%, rgba(255, 255, 255, 0.24), transparent 55%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(0, 0, 0, 0.18));
     pointer-events: none;
 }
 
@@ -1331,6 +1630,8 @@ body:has(#boardView:not(.hidden)) .app-footer {
     position: fixed;
     inset: 0;
     background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
     display: none;
     align-items: center;
     justify-content: center;
@@ -1340,6 +1641,23 @@ body:has(#boardView:not(.hidden)) .app-footer {
 
 .key-modal.open {
     display: flex;
+}
+
+.key-modal.open .key-modal-content {
+    animation: kb-modal-in 0.16s ease;
+}
+
+@keyframes kb-modal-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.985);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .key-modal.open .key-modal-content {
+        animation: none;
+    }
 }
 
 /* Dialogs that can open on top of the card editor */
@@ -1743,5 +2061,23 @@ body:has(#boardView:not(.hidden)) .app-footer {
     .theme-submenu {
         right: 0;
         top: calc(100% + 6px);
+    }
+
+    /* Sidebar becomes an off-canvas drawer; the board fills the screen */
+    .kb-sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 260;
+        width: min(300px, 86vw);
+        padding-top: max(12px, env(safe-area-inset-top));
+        transform: translateX(-105%);
+        transition: transform 0.22s ease;
+    }
+
+    .kb-sidebar.open {
+        transform: translateX(0);
+        box-shadow: 0 0 44px var(--shadow-color);
     }
 }
