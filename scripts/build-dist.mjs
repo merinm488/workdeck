@@ -12,6 +12,7 @@
  *   dist/files/      <- files/             (Files app at /files/)
  *   dist/todo/       <- todo/              (Todo app at /todo/)
  *   dist/calendar/   <- calendar/          (Calendar app at /calendar/)
+ *   dist/kanban/     <- kanban/            (Kanban app at /kanban/)
  *   dist/docs/       <- docs-src/dist/     (Docs vite build, base '/docs/')
  *
  * The api/ directory is NOT copied — Vercel picks it up from the repo root
@@ -36,6 +37,7 @@ cpSync(path.join(ROOT, 'draw'), path.join(DIST, 'draw'), { recursive: true });
 cpSync(path.join(ROOT, 'files'), path.join(DIST, 'files'), { recursive: true });
 cpSync(path.join(ROOT, 'todo'), path.join(DIST, 'todo'), { recursive: true });
 cpSync(path.join(ROOT, 'calendar'), path.join(DIST, 'calendar'), { recursive: true });
+cpSync(path.join(ROOT, 'kanban'), path.join(DIST, 'kanban'), { recursive: true });
 cpSync(path.join(ROOT, 'docs-src', 'dist'), path.join(DIST, 'docs'), { recursive: true });
 
-console.log('[build-dist] Assembled dist/ (public -> /, sheets -> /sheets/, forms -> /forms/, slides -> /slides/, draw -> /draw/, files -> /files/, todo -> /todo/, calendar -> /calendar/, docs -> /docs/)');
+console.log('[build-dist] Assembled dist/ (public -> /, sheets -> /sheets/, forms -> /forms/, slides -> /slides/, draw -> /draw/, files -> /files/, todo -> /todo/, calendar -> /calendar/, kanban -> /kanban/, docs -> /docs/)');
