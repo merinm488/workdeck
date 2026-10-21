@@ -137,7 +137,11 @@
 .wdm-app-forms  { color: #7248b9; background: rgba(114, 72, 185, 0.18); }
 .wdm-app-slides { color: #ea580c; background: rgba(234, 88, 12, 0.15); }
 .wdm-app-draw   { color: #e11d48; background: rgba(225, 29, 72, 0.12); }
+.wdm-app-kanban { color: #a21caf; background: rgba(162, 28, 175, 0.13); }
 .wdm-app-filebox { color: #ca8a04; background: rgba(250, 204, 21, 0.18); }
+
+[data-theme="dark"] .wdm-app-kanban,
+.dark .wdm-app-kanban { color: #e879f9; background: rgba(232, 121, 249, 0.14); }
 
 [data-theme="dark"] .wdm-app-filebox,
 .dark .wdm-app-filebox { color: #facc15; background: rgba(250, 204, 21, 0.12); }

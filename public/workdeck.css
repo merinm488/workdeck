@@ -30,6 +30,8 @@
     --todo-accent-soft: rgba(24, 128, 56, 0.15);
     --calendar-accent: #0284c7;   /* Calendar sky */
     --calendar-accent-soft: rgba(2, 132, 199, 0.13);
+    --kanban-accent: #a21caf;     /* Kanban fuchsia */
+    --kanban-accent-soft: rgba(162, 28, 175, 0.12);
     --danger: #ef4444;
     --danger-soft: rgba(239, 68, 68, 0.12);
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
@@ -687,6 +689,11 @@ html[data-theme="light"] .wd-login-theme-toggle .moon-icon { opacity: 1; }
     color: var(--calendar-accent);
 }
 
+.wd-app-icon-kanban {
+    background: var(--kanban-accent-soft);
+    color: var(--kanban-accent);
+}
+
 .wd-dropdown-item-text {
     display: flex;
     flex-direction: column;
@@ -994,6 +1001,11 @@ html[data-theme="dark"] .wd-theme-option-icon {
     color: var(--calendar-accent);
 }
 
+.wd-file-icon-kanban {
+    background: var(--kanban-accent-soft);
+    color: var(--kanban-accent);
+}
+
 .wd-file-actions {
     display: flex;
     gap: 4px;
@@ -1087,6 +1099,11 @@ html[data-theme="dark"] .wd-theme-option-icon {
 .wd-file-app-badge.calendar {
     background: var(--calendar-accent-soft);
     color: var(--calendar-accent);
+}
+
+.wd-file-app-badge.kanban {
+    background: var(--kanban-accent-soft);
+    color: var(--kanban-accent);
 }
 
 /* ---------- Card content preview ---------- */
