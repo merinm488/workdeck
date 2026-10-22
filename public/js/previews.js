@@ -9,6 +9,7 @@
  *   draw   -> content-fit render by fabric@7 in a sandboxed iframe
  *   kanban -> mini board: columns with header + stacked cards
  *   todo   -> checklist rows
+ *   calendar -> snapshot of the app's current view, captured at save
  *
  * Canvas results are cached per file revision ("app:id:updatedAt"), so grid
  * re-renders (search, filter, reloads) reuse them until a file changes.
@@ -730,6 +731,15 @@
     }
 
     // ================================================
+    // Calendar preview (snapshot captured by the app at save)
+    // ================================================
+
+    function renderCalendar(page, file) {
+        const thumb = file.raw && typeof file.raw.thumbnail === 'string' && file.raw.thumbnail;
+        if (thumb) setImage(page, thumb);
+    }
+
+    // ================================================
     // Resize: keep DOM previews scaled to their card
     // ================================================
 
@@ -760,6 +770,7 @@
             case 'draw': renderFabric(page, file); break;
             case 'todo': renderTodo(page, file); break;
             case 'kanban': renderKanban(page, file); break;
+            case 'calendar': renderCalendar(page, file); break;
             case 'filebox': renderFilebox(page, file); break;
         }
     }

@@ -429,7 +429,7 @@ function getAllFiles() {
             lastOpened: lastOpened['calendar'] || null,
             tagId: null,
             content: '',
-            raw: null
+            raw: { thumbnail: (state.settings && state.settings.calendarThumbnail) || null }
         }]
         : [];
 

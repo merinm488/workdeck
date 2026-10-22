@@ -458,6 +458,12 @@ function initCalendar() {
     });
 
     calendar.render();
+
+    // Accounts that predate card snapshots get one on their first open;
+    // afterwards the snapshot refreshes on writes (storage.js).
+    if (!(userData.settings && userData.settings.calendarThumbnail)) {
+        calendarStorage.scheduleThumbnail();
+    }
 }
 
 /** Persist a drag-move or resize (occurrence moves become exceptions). */

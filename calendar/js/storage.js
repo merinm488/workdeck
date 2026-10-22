@@ -10,6 +10,7 @@
 class CalendarStorage {
     constructor() {
         this.apiEndpoint = APP_CONFIG.apiEndpoint;
+        this._thumbTimer = null;
     }
 
     /**
@@ -42,6 +43,13 @@ class CalendarStorage {
      * @returns {Promise<object|null>} result.data on success, null on failure
      */
     async put(action, data) {
+        const result = await this.send(action, data);
+        if (result && action !== 'updateSettings') this.scheduleThumbnail();
+        return result;
+    }
+
+    /** Raw PUT without the thumbnail hook. */
+    async send(action, data) {
         const hash = getCalendarUserHash();
         if (!hash) {
             console.error('[STORAGE] No user hash found');
@@ -63,6 +71,15 @@ class CalendarStorage {
             console.error(`[STORAGE] ${action} error:`, error);
             return null;
         }
+    }
+
+    /** Card snapshot: coalesce write bursts, then capture + store. */
+    scheduleThumbnail() {
+        clearTimeout(this._thumbTimer);
+        this._thumbTimer = setTimeout(async () => {
+            const thumbnail = await captureCalendarThumbnail();
+            if (thumbnail) await this.send('updateSettings', { settings: { calendarThumbnail: thumbnail } });
+        }, 1500);
     }
 
     /** Create a calendar; returns { calendar, data } or null. */
