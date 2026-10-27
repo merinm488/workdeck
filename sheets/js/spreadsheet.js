@@ -135,15 +135,43 @@ class SpreadsheetManager {
             console.warn('[SPREADSHEET] Sort preset not loaded - sort unavailable');
         }
 
-        // Hyperlinks (cell mentions)
+        // Data validation (dropdowns, checkboxes) — hyper-link's Insert menu
+        // needs its model, so register before hyper-link
+        if (typeof UniverPresetSheetsDataValidation !== 'undefined' &&
+            typeof UniverPresetSheetsDataValidationEnUS !== 'undefined') {
+            presets.push(UniverPresetSheetsDataValidation.UniverSheetsDataValidationPreset());
+            locales.push(UniverPresetSheetsDataValidationEnUS);
+        } else {
+            console.warn('[SPREADSHEET] Data validation preset not loaded - dropdowns/checkboxes unavailable');
+        }
+
+        // Hyperlinks (cell mentions). The preset locale carries the UI
+        // strings — the core-only global leaves the link dialog showing
+        // raw keys like sheets-hyper-link-ui.form.label
         if (typeof UniverPresetSheetsHyperLink !== 'undefined' &&
-            typeof UniverSheetsHyperLinkEnUS !== 'undefined') {
+            typeof UniverPresetSheetsHyperLinkEnUS !== 'undefined' &&
+            typeof UniverSheetsHyperLinkUiEnUS !== 'undefined') {
             presets.push(UniverPresetSheetsHyperLink.UniverSheetsHyperLinkPreset({
                 urlHandler: {
                     navigateToOtherWebsite: (url) => this.handleLinkClick(url)
                 }
             }));
-            locales.push(UniverSheetsHyperLinkEnUS);
+            locales.push(UniverPresetSheetsHyperLinkEnUS);
+            // mergeLocales replaces per-namespace, so the custom wording
+            // is spread into the full UI subtree rather than merged beside it
+            const hlUi = UniverSheetsHyperLinkUiEnUS['sheets-hyper-link-ui'];
+            locales.push({
+                'sheets-hyper-link-ui': {
+                    ...hlUi,
+                    form: {
+                        ...hlUi.form,
+                        type: 'Insert Type',
+                        ok: 'Done',
+                        labelPlaceholder: '',
+                        linkPlaceholder: ''
+                    }
+                }
+            });
         } else {
             console.warn('[SPREADSHEET] Hyperlink preset not loaded - cell links unavailable');
         }

@@ -1,6 +1,6 @@
-const STATIC_CACHE = 'sheets-static-v8-univer';
-const DYNAMIC_CACHE = 'sheets-dynamic-v8-univer';
-const API_CACHE = 'sheets-api-v8-univer';
+const STATIC_CACHE = 'sheets-static-v9-dv';
+const DYNAMIC_CACHE = 'sheets-dynamic-v9-dv';
+const API_CACHE = 'sheets-api-v9-dv';
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
