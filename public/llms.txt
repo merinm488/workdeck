@@ -1,9 +1,9 @@
 # Workdeck — API reference for AI agents
 
-Workdeck is a personal workspace of small apps: Docs, Sheets, Forms, Slides,
+Workdeck is a personal workdeck of small apps: Docs, Sheets, Forms, Slides,
 Draw, Files, Todo, Calendar and Kanban, all stored in one unified
 account document. This file describes its HTTP API so an agent can read and
-write a user's workspace directly, without driving a browser.
+write a user's workdeck directly, without driving a browser.
 
 ## Base URL
 
@@ -22,7 +22,7 @@ you — a short word or phrase they also sign in with:
 
 The server resolves the key to the account; you never handle a password or
 a hash. Whoever holds the key can read and write everything in the
-workspace, so treat it as a secret.
+workdeck, so treat it as a secret.
 
 Finding the key:
   1. Check for WORKDECK_KEY=<key> in the .env file (or environment) where
