@@ -120,8 +120,28 @@ class SheetsStorage {
             return null;
         }
 
-        const spreadsheet = userData.sheets.find(s => s.id === sheetId);
-        return spreadsheet || null;
+        const record = userData.sheets.find(s => s.id === sheetId);
+        if (!record) return null;
+
+        // The workbook body lives in its own record; legacy sheets carry
+        // it inline.
+        if (record.data) return record;
+
+        try {
+            const hash = this.getUserHash();
+            const response = await fetch(`${this.apiEndpoint}?${new URLSearchParams({ hash, sheet: sheetId })}`, {
+                cache: 'no-store'
+            });
+            if (!response.ok) {
+                console.error('[STORAGE] Sheet body load failed:', response.status);
+                return record;
+            }
+            const result = await response.json();
+            return result.success ? { ...record, data: result.data } : record;
+        } catch (error) {
+            console.error('[STORAGE] Sheet body load error:', error);
+            return record;
+        }
     }
 
     /**

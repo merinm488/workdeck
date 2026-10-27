@@ -54,6 +54,8 @@ import {
   putSharedDoc,
   getSharedDoc,
   deleteSharedDoc,
+  getSheetBody,
+  putSheetBody,
   getBaseUrl,
   applyCorsHeaders,
   accountHash
@@ -275,17 +277,26 @@ function buildResponsesSheetRecord(sheetId, name, columns, responses, components
  * index, question keys the sheet has never seen go to the end. If the
  * spreadsheet was deleted from the Sheets app, the stale link is dropped.
  */
-function syncFormResponsesToSheet(userData, form, sharedResponses, sharedForm) {
+async function syncFormResponsesToSheet(userData, form, sharedResponses, sharedForm) {
   const link = form.linkedSheet;
   if (!link || !link.sheetId) return false;
 
   const sheetRecord = (userData.sheets || []).find(s => s.id === link.sheetId);
-  if (!sheetRecord || !sheetRecord.data || !sheetRecord.data.sheets) {
+  if (!sheetRecord) {
     delete form.linkedSheet;
     return true;
   }
 
-  const worksheet = sheetRecord.data.sheets[sheetRecord.data.sheetOrder?.[0]];
+  // The workbook body lives in its own record; legacy sheets carry it inline.
+  const body = sheetRecord.data !== undefined
+    ? sheetRecord.data
+    : await getSheetBody(sheetRecord.id);
+  if (!body || !body.sheets) {
+    delete form.linkedSheet;
+    return true;
+  }
+
+  const worksheet = body.sheets[body.sheetOrder?.[0]];
   if (!worksheet || !worksheet.cellData) return false;
 
   if (!Array.isArray(link.syncedResponseIds)) {
@@ -323,6 +334,9 @@ function syncFormResponsesToSheet(userData, form, sharedResponses, sharedForm) {
 
   ensureSheetCapacity(worksheet, nextRow + 25, columns.length + 4);
   sheetRecord.updatedAt = new Date().toISOString();
+  if (sheetRecord.data === undefined && !(await putSheetBody(sheetRecord.id, body))) {
+    return false;
+  }
   return true;
 }
 
@@ -716,7 +730,7 @@ export default async function handler(req, res) {
         // fail the read.
         if (form.linkedSheet) {
           try {
-            const changed = syncFormResponsesToSheet(
+            const changed = await syncFormResponsesToSheet(
               userData, form, responses, sharedDoc.form
             );
             if (changed) {
@@ -824,11 +838,17 @@ export default async function handler(req, res) {
         if (!userData.sheets) {
           userData.sheets = [];
         }
-        userData.sheets.push(
-          buildResponsesSheetRecord(
-            sheetId, sheetName, columns, responses, sharedDoc.form.components || []
-          )
+        const sheetRecord = buildResponsesSheetRecord(
+          sheetId, sheetName, columns, responses, sharedDoc.form.components || []
         );
+        if (!(await putSheetBody(sheetId, sheetRecord.data))) {
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to link spreadsheet'
+          });
+        }
+        delete sheetRecord.data;
+        userData.sheets.push(sheetRecord);
 
         form.linkedSheet = {
           sheetId,

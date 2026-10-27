@@ -447,6 +447,29 @@ export async function deleteRawDoc(key) {
 }
 
 // ================================================
+// Spreadsheet bodies (Sheets app workbooks)
+// ================================================
+
+// A workbook grows without bound, so — like Filebox file bytes — it gets its
+// own record and the user document keeps only sheet metadata.
+const sheetBodyKey = sheetId => `sheet_${sheetId}`;
+
+/** Read a sheet's workbook body, or null. */
+export async function getSheetBody(sheetId) {
+  return getRawDoc(sheetBodyKey(sheetId));
+}
+
+/** Store a sheet's workbook body. */
+export async function putSheetBody(sheetId, body) {
+  return putRawDoc(sheetBodyKey(sheetId), body);
+}
+
+/** Delete a sheet's workbook body record. */
+export async function deleteSheetBody(sheetId) {
+  return deleteRawDoc(sheetBodyKey(sheetId));
+}
+
+// ================================================
 // Request helpers
 // ================================================
 

@@ -18,6 +18,9 @@ import {
   putSharedDoc,
   getSharedDoc,
   deleteSharedDoc,
+  getSheetBody,
+  putSheetBody,
+  deleteSheetBody,
   getBaseUrl,
   applyCorsHeaders,
   accountHash
@@ -29,6 +32,16 @@ async function saveSheetsSections(hash, userData) {
     sheets: userData.sheets,
     settings: userData.settings
   });
+}
+
+/** Move legacy inline workbook bodies into their own records. */
+async function migrateSheetBodies(userData) {
+  await Promise.all((userData.sheets || []).map(async sheet => {
+    if (!sheet || sheet.data === undefined) return;
+    if (await putSheetBody(sheet.id, sheet.data)) {
+      delete sheet.data;
+    }
+  }));
 }
 
 // ================================================
@@ -48,7 +61,7 @@ export default async function handler(req, res) {
     // GET - Retrieve user data or shared sheet
     // ============================================================
     if (req.method === 'GET') {
-      const { shared } = req.query;
+      const { shared, sheet: sheetId } = req.query;
       const hash = accountHash(req.query);
 
       if (shared) {
@@ -74,6 +87,31 @@ export default async function handler(req, res) {
           success: false,
           error: 'Hash parameter is required'
         });
+      }
+
+      // A sheet's workbook body — the user doc only carries sheet metadata.
+      if (sheetId) {
+        const userData = await getUserDoc(hash);
+        if (!userData) {
+          return res.status(404).json({
+            success: false,
+            error: 'User not found'
+          });
+        }
+
+        const record = (userData.sheets || []).find(s => s.id === sheetId);
+        if (!record) {
+          return res.status(404).json({
+            success: false,
+            error: 'Sheet not found'
+          });
+        }
+
+        const body = record.data !== undefined
+          ? record.data
+          : await getSheetBody(sheetId);
+
+        return res.status(200).json({ success: true, data: body });
       }
 
       const userData = await getUserDoc(hash);
@@ -221,6 +259,19 @@ export default async function handler(req, res) {
           userData.sheets = [];
         }
 
+        // The workbook body goes to its own record; the user doc keeps
+        // metadata. Legacy inline bodies migrate here too, so the first
+        // save after this change shrinks the account document.
+        await migrateSheetBodies(userData);
+
+        const { data: body, ...sheetMeta } = sheetData || {};
+        if (body !== undefined && !(await putSheetBody(sheetId, body))) {
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to update sheet'
+          });
+        }
+
         const existingIndex = userData.sheets.findIndex(
           s => s.id === sheetId
         );
@@ -228,14 +279,14 @@ export default async function handler(req, res) {
         if (existingIndex >= 0) {
           userData.sheets[existingIndex] = {
             ...userData.sheets[existingIndex],
-            ...sheetData,
+            ...sheetMeta,
             id: sheetId,
             updatedAt: new Date().toISOString()
           };
         } else {
           userData.sheets.push({
             id: sheetId,
-            ...sheetData,
+            ...sheetMeta,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           });
@@ -265,6 +316,12 @@ export default async function handler(req, res) {
           } catch (e) {
             console.error('[API] Failed to delete shared copy:', e);
           }
+        }
+
+        try {
+          await deleteSheetBody(sheetId);
+        } catch (e) {
+          console.error('[API] Failed to delete sheet body:', e);
         }
 
         userData.sheets = userData.sheets.filter(
@@ -327,8 +384,12 @@ export default async function handler(req, res) {
         }
 
         const newShareId = generateId();
+        const record = userData.sheets[sheetIndex];
+        const sharedRecord = record.data !== undefined
+          ? record
+          : { ...record, data: await getSheetBody(sheetId) };
         const shareData = {
-          sheet: userData.sheets[sheetIndex],
+          sheet: sharedRecord,
           sharedAt: new Date().toISOString()
         };
 

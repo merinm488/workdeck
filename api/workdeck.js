@@ -24,6 +24,8 @@ import {
   deleteUserDoc,
   deleteSharedDoc,
   deleteRawDoc,
+  putSheetBody,
+  deleteSheetBody,
   getBaseUrl,
   applyCorsHeaders,
   accountHash
@@ -338,6 +340,11 @@ export default async function handler(req, res) {
           const sheet = createDefaultSheet(id);
           if (data?.name) sheet.name = data.name;
           if (data?.tagId) sheet.tagId = data.tagId;
+          // Workbook body lives in its own record; the user doc keeps metadata.
+          if (!(await putSheetBody(id, sheet.data))) {
+            return res.status(500).json({ success: false, error: 'Failed to create spreadsheet' });
+          }
+          delete sheet.data;
           userData.sheets.push(sheet);
           break;
         }
@@ -458,6 +465,13 @@ export default async function handler(req, res) {
             ...taggedIn(userData.calendars || []),
             ...taggedIn(userData.kanban || [])
           ];
+          for (const sheet of taggedIn(userData.sheets)) {
+            try {
+              await deleteSheetBody(sheet.id);
+            } catch (error) {
+              console.error('[WORKDECK API] Failed to delete sheet body:', error);
+            }
+          }
           for (const file of doomed) {
             if (file.sharedId) {
               try {
@@ -756,6 +770,11 @@ export default async function handler(req, res) {
             const sheet = userData.sheets.find(s => s.id === fileId);
             if (sheet?.sharedId) {
               await deleteSharedDoc(sheet.sharedId);
+            }
+            try {
+              await deleteSheetBody(fileId);
+            } catch (error) {
+              console.error('[WORKDECK API] Failed to delete sheet body:', error);
             }
             userData.sheets = userData.sheets.filter(s => s.id !== fileId);
           } else if (app === 'forms') {
