@@ -67,6 +67,45 @@
         page.replaceChildren(img);
     }
 
+    // Thumbnails live in their own storage record (thumbRef); inline only
+    // on legacy records. Fetches are cached for the session.
+    const thumbCache = new Map();   // record id -> Promise<dataUrl|null>
+
+    function sessionHash() {
+        try { return sessionStorage.getItem('wd_hash'); } catch (e) { return null; }
+    }
+
+    /** dataUrl | Promise<dataUrl|null> | null — sync when inline. */
+    function thumbOf(record) {
+        if (!record) return null;
+        if (typeof record.thumbnail === 'string' && record.thumbnail) {
+            return record.thumbnail;
+        }
+        if (!record.thumbRef) return null;
+        const id = record.id;
+        if (!thumbCache.has(id)) {
+            const hash = sessionHash();
+            if (!hash) return null;
+            thumbCache.set(id,
+                fetch('/api/users?' + new URLSearchParams({ hash: hash, thumbs: id }))
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (j) {
+                        return (j && j.success && j.thumbnails && j.thumbnails[id]) || null;
+                    })
+                    .catch(function () { return null; }));
+        }
+        return thumbCache.get(id);
+    }
+
+    /** setImage with a Promise — skipped when the card has moved on. */
+    function setThumbWhenReady(page, key, thumb) {
+        thumb.then(function (dataUrl) {
+            if (dataUrl && page.isConnected && page.dataset.fileKey === key) {
+                setImage(page, dataUrl);
+            }
+        });
+    }
+
     // ================================================
     // Markdown (small subset, enough for a thumbnail)
     // ================================================
@@ -364,15 +403,24 @@
     }
 
     function renderSheets(page, file) {
-        // Snapshot stored by the editor at save time; the sketch below
-        // only covers files that haven't been re-saved since
-        const thumb = file.raw && typeof file.raw.thumbnail === 'string' && file.raw.thumbnail;
-        if (thumb) {
+        const raw = file.raw || {};
+        const key = revisionKey(file);
+        page.dataset.fileKey = key;
+
+        // Snapshot stored by the editor at save time (own record since the
+        // thumbnail split); the sketch below only covers legacy files with
+        // neither thumb nor body.
+        const thumb = thumbOf(raw);
+        if (thumb && typeof thumb.then !== 'function') {
             setImage(page, thumb);
             return;
         }
+        if (thumb) {
+            setThumbWhenReady(page, key, thumb);
+            return;
+        }
 
-        const info = extractSheetCells(file.raw);
+        const info = extractSheetCells(raw);
         if (!info) return;
 
         const box = page.parentElement;
@@ -602,11 +650,19 @@
     }
 
     function renderFilebox(page, file) {
-        if (file.thumbnail) {
-            setImage(page, file.thumbnail);
+        const raw = file.raw || {};
+        const key = revisionKey(file);
+        page.dataset.fileKey = key;
+
+        const thumb = thumbOf(raw);
+        if (thumb && typeof thumb.then !== 'function') {
+            setImage(page, thumb);
             return;
         }
-        const raw = file.raw || {};
+        if (thumb) {
+            setThumbWhenReady(page, key, thumb);
+            return;
+        }
         const tile = document.createElement('div');
         tile.className = 'wd-preview-filebox-tile';
         const ext = document.createElement('span');

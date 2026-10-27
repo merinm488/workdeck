@@ -38,6 +38,7 @@ import {
   generateId,
   putRawDoc,
   getRawDoc,
+  putThumb,
   applyCorsHeaders,
   accountHash
 } from './_lib/store.js';
@@ -241,6 +242,14 @@ export default async function handler(req, res) {
       const stored = await putRawDoc(record.storageKey, { bytes: data.base64 });
       if (!stored) {
         return res.status(502).json({ success: false, error: 'Failed to store file content' });
+      }
+
+      // The thumbnail moves to its own record too; if that write fails the
+      // thumbnail stays inline (bounded by sanitizeThumbnail) rather than
+      // failing the upload.
+      if (record.thumbnail && await putThumb(record.id, record.thumbnail)) {
+        delete record.thumbnail;
+        record.thumbRef = 1;
       }
 
       userData.files.unshift(record);

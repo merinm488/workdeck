@@ -26,6 +26,8 @@ import {
   deleteRawDoc,
   putSheetBody,
   deleteSheetBody,
+  putThumb,
+  deleteThumb,
   getBaseUrl,
   applyCorsHeaders,
   accountHash
@@ -562,6 +564,7 @@ export default async function handler(req, res) {
               } catch (error) {
                 console.error('[WORKDECK API] Failed to delete file content:', error);
               }
+              await deleteThumb(file.id).catch(() => {});
             }
             if (userData.settings?.lastOpened) {
               delete userData.settings.lastOpened[file.id];
@@ -618,7 +621,18 @@ export default async function handler(req, res) {
           const thumb = data?.thumbnail;
           const valid = typeof thumb === 'string' &&
             thumb.startsWith('data:image/') && thumb.length <= 60000;
-          target.thumbnail = valid ? thumb : null;
+          if (valid) {
+            // Thumbnails live in their own record; the file keeps only flags.
+            if (!(await putThumb(target.id, thumb))) {
+              return res.status(500).json({ success: false, error: 'Failed to store thumbnail' });
+            }
+            target.thumbnail = null;
+            target.thumbRef = 1;
+          } else {
+            await deleteThumb(target.id).catch(() => {});
+            target.thumbnail = null;
+            delete target.thumbRef;
+          }
           target.thumbnailCover = valid ? data?.thumbnailCover === true : false;
           target.thumbVer = valid && data?.thumbVer > 0 ? data.thumbVer : 0;
           break;
@@ -776,6 +790,11 @@ export default async function handler(req, res) {
             } catch (error) {
               console.error('[WORKDECK API] Failed to delete sheet body:', error);
             }
+            try {
+              await deleteThumb(fileId);
+            } catch (error) {
+              console.error('[WORKDECK API] Failed to delete sheet thumbnail:', error);
+            }
             userData.sheets = userData.sheets.filter(s => s.id !== fileId);
           } else if (app === 'forms') {
             const form = userData.forms.find(f => f.id === fileId);
@@ -811,6 +830,7 @@ export default async function handler(req, res) {
               } catch (error) {
                 console.error('[WORKDECK API] Failed to delete file content:', error);
               }
+              await deleteThumb(fileId).catch(() => {});
             }
             userData.files = (userData.files || []).filter(f => f.id !== fileId);
           } else {
@@ -878,8 +898,9 @@ export default async function handler(req, res) {
         return res.status(404).json({ success: false, error: 'User not found' });
       }
 
-      // Filebox bytes live in separate records — remove them BEFORE the doc
-      // goes, or they'd survive as orphans no metadata points at.
+      // Filebox bytes and card thumbnails live in separate records — remove
+      // them BEFORE the doc goes, or they'd survive as orphans nothing
+      // points at.
       for (const file of userData.files || []) {
         if (file && file.storageKey) {
           try {
@@ -888,6 +909,10 @@ export default async function handler(req, res) {
             console.error('[WORKDECK API] Failed to delete file content:', error);
           }
         }
+        await deleteThumb(file.id).catch(() => {});
+      }
+      for (const sheet of userData.sheets || []) {
+        await deleteThumb(sheet.id).catch(() => {});
       }
 
       const deleted = await deleteUserDoc(hash);

@@ -21,10 +21,16 @@ import {
   getSheetBody,
   putSheetBody,
   deleteSheetBody,
+  getThumb,
+  putThumb,
+  deleteThumb,
   getBaseUrl,
   applyCorsHeaders,
   accountHash
 } from './_lib/store.js';
+
+const VALID_THUMB = t =>
+  typeof t === 'string' && t.startsWith('data:image/') && t.length <= 600000;
 
 /** Persist only the sections Sheets owns (sheets) + settings changes. */
 async function saveSheetsSections(hash, userData) {
@@ -34,12 +40,16 @@ async function saveSheetsSections(hash, userData) {
   });
 }
 
-/** Move legacy inline workbook bodies into their own records. */
+/** Move legacy inline workbook bodies and thumbnails into their own records. */
 async function migrateSheetBodies(userData) {
   await Promise.all((userData.sheets || []).map(async sheet => {
-    if (!sheet || sheet.data === undefined) return;
-    if (await putSheetBody(sheet.id, sheet.data)) {
+    if (!sheet) return;
+    if (sheet.data !== undefined && await putSheetBody(sheet.id, sheet.data)) {
       delete sheet.data;
+    }
+    if (sheet.thumbnail && !sheet.thumbRef && await putThumb(sheet.id, sheet.thumbnail)) {
+      delete sheet.thumbnail;
+      sheet.thumbRef = 1;
     }
   }));
 }
@@ -61,7 +71,7 @@ export default async function handler(req, res) {
     // GET - Retrieve user data or shared sheet
     // ============================================================
     if (req.method === 'GET') {
-      const { shared, sheet: sheetId } = req.query;
+      const { shared, sheet: sheetId, thumbs: thumbIds } = req.query;
       const hash = accountHash(req.query);
 
       if (shared) {
@@ -87,6 +97,32 @@ export default async function handler(req, res) {
           success: false,
           error: 'Hash parameter is required'
         });
+      }
+
+      // Batched card thumbnails — one auth check, N records. Only ids the
+      // account owns are served.
+      if (thumbIds) {
+        const userData = await getUserDoc(hash);
+        if (!userData) {
+          return res.status(404).json({
+            success: false,
+            error: 'User not found'
+          });
+        }
+
+        const owned = new Map();
+        for (const r of [...(userData.sheets || []), ...(userData.files || [])]) {
+          if (r && r.id) owned.set(r.id, r);
+        }
+
+        const thumbnails = {};
+        await Promise.all(thumbIds.split(',').slice(0, 100).map(async id => {
+          if (!owned.has(id)) return;
+          const record = owned.get(id);
+          thumbnails[id] = record.thumbnail || await getThumb(id);
+        }));
+
+        return res.status(200).json({ success: true, thumbnails });
       }
 
       // A sheet's workbook body — the user doc only carries sheet metadata.
@@ -264,12 +300,20 @@ export default async function handler(req, res) {
         // save after this change shrinks the account document.
         await migrateSheetBodies(userData);
 
-        const { data: body, ...sheetMeta } = sheetData || {};
+        const { data: body, thumbnail, ...sheetMeta } = sheetData || {};
         if (body !== undefined && !(await putSheetBody(sheetId, body))) {
           return res.status(500).json({
             success: false,
             error: 'Failed to update sheet'
           });
+        }
+
+        // Thumbnails live in their own record. An omitted thumbnail keeps
+        // the previous one (the editor omits it when capture fails).
+        let thumbSaved = true;
+        if (VALID_THUMB(thumbnail)) {
+          thumbSaved = await putThumb(sheetId, thumbnail);
+          sheetMeta.thumbRef = 1;
         }
 
         const existingIndex = userData.sheets.findIndex(
@@ -292,7 +336,7 @@ export default async function handler(req, res) {
           });
         }
 
-        const saved = await saveSheetsSections(hash, userData);
+        const saved = thumbSaved && await saveSheetsSections(hash, userData);
         if (saved) {
           return res.status(200).json({ success: true, data: userData });
         }
@@ -322,6 +366,12 @@ export default async function handler(req, res) {
           await deleteSheetBody(sheetId);
         } catch (e) {
           console.error('[API] Failed to delete sheet body:', e);
+        }
+
+        try {
+          await deleteThumb(sheetId);
+        } catch (e) {
+          console.error('[API] Failed to delete sheet thumbnail:', e);
         }
 
         userData.sheets = userData.sheets.filter(

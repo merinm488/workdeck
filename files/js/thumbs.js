@@ -1186,8 +1186,11 @@
     }
 
     function wantsThumb(file) {
-        if (!file || !file.thumbnail) return true;
-        return file.thumbnailCover || (file.thumbVer || 0) < THUMB_VERSION;
+        if (!file) return true;
+        if (file.thumbnail || file.thumbRef) {
+            return file.thumbnailCover || (file.thumbVer || 0) < THUMB_VERSION;
+        }
+        return true;
     }
 
     /** True while the card should show a loading skeleton (vs the ext tile). */
@@ -1241,6 +1244,7 @@
                 var saved = await fileboxStorage.setFileThumbnail(file.id, card.url, card.cover, card.ver);
                 if (saved) {
                     file.thumbnail = card.url;
+                    file.thumbRef = 1;
                     file.thumbnailCover = card.cover;
                     file.thumbVer = card.ver;
                     if (hooks.onThumb) hooks.onThumb(file, card.url);
@@ -1266,6 +1270,7 @@
             var saved = await fileboxStorage.setFileThumbnail(file.id, card.url, card.cover, card.ver);
             if (saved) {
                 file.thumbnail = card.url;
+                file.thumbRef = 1;
                 file.thumbnailCover = card.cover;
                 file.thumbVer = card.ver;
                 if (hooks.onThumb) hooks.onThumb(file, card.url);

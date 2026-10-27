@@ -470,6 +470,31 @@ export async function deleteSheetBody(sheetId) {
 }
 
 // ================================================
+// Card thumbnails (Filebox files, Sheets, ...)
+// ================================================
+
+// Same pattern as sheet bodies: thumbnails are data URLs that would
+// otherwise dominate the account record. The value is wrapped in an object
+// because a bare JSON string would trip parseDocText's unwrap loop.
+const thumbKey = recordId => `thumb_${recordId}`;
+
+/** Read a record's thumbnail data URL, or null. */
+export async function getThumb(recordId) {
+  const doc = await getRawDoc(thumbKey(recordId));
+  return doc && typeof doc === 'object' ? doc.thumb || null : null;
+}
+
+/** Store a record's thumbnail data URL. */
+export async function putThumb(recordId, dataUrl) {
+  return putRawDoc(thumbKey(recordId), { thumb: dataUrl });
+}
+
+/** Delete a record's thumbnail. */
+export async function deleteThumb(recordId) {
+  return deleteRawDoc(thumbKey(recordId));
+}
+
+// ================================================
 // Request helpers
 // ================================================
 

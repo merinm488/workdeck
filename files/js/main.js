@@ -25,8 +25,31 @@
  */
 
 // ================================================
-// Icons 
+// Icons
 // ================================================
+
+// Thumbnails live in their own record (thumbRef); inline only on legacy
+// records. Fetched per id and cached for the session.
+const thumbFetches = new Map();
+
+/** dataUrl | Promise<dataUrl|null> | null — sync when inline. */
+function resolveThumb(file) {
+    if (!file) return null;
+    if (file.thumbnail) return file.thumbnail;
+    if (!file.thumbRef) return null;
+    const hash = getFileboxUserHash();
+    if (!hash) return null;
+    if (!thumbFetches.has(file.id)) {
+        thumbFetches.set(file.id,
+            fetch('/api/users?' + new URLSearchParams({ hash: hash, thumbs: file.id }))
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (j) {
+                    return (j && j.success && j.thumbnails && j.thumbnails[file.id]) || null;
+                })
+                .catch(function () { return null; }));
+    }
+    return thumbFetches.get(file.id);
+}
 
 /** Clone icon #fb-icon-<name> from index.html. */
 function fbIcon(name) {
@@ -769,11 +792,22 @@ function buildFileCard(file) {
     card.querySelector('.fb-card-title').textContent = file.name;
 
     const preview = card.querySelector('.fb-card-preview');
-    if (file.thumbnail) {
-        const thumb = document.createElement('span');
-        thumb.className = 'fb-card-thumb';
-        thumb.style.backgroundImage = 'url("' + file.thumbnail + '")';
-        preview.replaceChildren(thumb);
+    const thumb = resolveThumb(file);
+    if (thumb && typeof thumb.then !== 'function') {
+        const el = document.createElement('span');
+        el.className = 'fb-card-thumb';
+        el.style.backgroundImage = 'url("' + thumb + '")';
+        preview.replaceChildren(el);
+    } else if (thumb) {
+        thumb.then(function (dataUrl) {
+            if (!dataUrl) return;
+            const live = document.querySelector('#fbGrid [data-id="' + file.id + '"] .fb-card-preview');
+            if (!live) return;
+            const el = document.createElement('span');
+            el.className = 'fb-card-thumb';
+            el.style.backgroundImage = 'url("' + dataUrl + '")';
+            live.replaceChildren(el);
+        });
     } else if (window.fileboxThumbs && fileboxThumbs.isPending(file)) {
         const skel = document.createElement('span');
         skel.className = 'fb-thumb-skel';
@@ -831,10 +865,22 @@ function buildFileRow(file) {
 
     const color = extColor(file.name);
     const iconSpan = row.querySelector('.fb-row-icon');
-    if (file.thumbnail) {
+    const thumb = resolveThumb(file);
+    if (thumb && typeof thumb.then !== 'function') {
         iconSpan.classList.remove('fb-row-ext');
         iconSpan.classList.add('fb-row-thumb');
-        iconSpan.style.backgroundImage = 'url("' + file.thumbnail + '")';
+        iconSpan.style.backgroundImage = 'url("' + thumb + '")';
+    } else if (thumb) {
+        iconSpan.classList.add('fb-row-skel');
+        thumb.then(function (dataUrl) {
+            if (!dataUrl) return;
+            const live = document.querySelector('#fbList [data-id="' + file.id + '"] .fb-row-icon');
+            if (!live) return;
+            live.classList.remove('fb-row-ext', 'fb-row-skel');
+            live.classList.add('fb-row-thumb');
+            live.style.backgroundImage = 'url("' + dataUrl + '")';
+            live.textContent = '';
+        });
     } else if (window.fileboxThumbs && fileboxThumbs.isPending(file)) {
         iconSpan.classList.add('fb-row-skel');
     } else {
@@ -856,21 +902,28 @@ function buildFileRow(file) {
 }
 
 function refreshFilePreview(file) {
-    if (!file || !file.thumbnail) return;
-    const card = document.querySelector('#fbGrid [data-id="' + file.id + '"] .fb-card-preview');
-    if (card) {
-        const thumb = document.createElement('span');
-        thumb.className = 'fb-card-thumb';
-        thumb.style.backgroundImage = 'url("' + file.thumbnail + '")';
-        card.replaceChildren(thumb);
-    }
-    const icon = document.querySelector('#fbList [data-id="' + file.id + '"] .fb-row-icon');
-    if (icon) {
-        icon.classList.remove('fb-row-skel');
-        icon.classList.add('fb-row-thumb');
-        icon.style.backgroundImage = 'url("' + file.thumbnail + '")';
-        icon.textContent = '';
-    }
+    if (!file) return;
+    const thumb = resolveThumb(file);
+    if (!thumb) return;
+    const apply = function (dataUrl) {
+        if (!dataUrl) return;
+        const card = document.querySelector('#fbGrid [data-id="' + file.id + '"] .fb-card-preview');
+        if (card) {
+            const el = document.createElement('span');
+            el.className = 'fb-card-thumb';
+            el.style.backgroundImage = 'url("' + dataUrl + '")';
+            card.replaceChildren(el);
+        }
+        const icon = document.querySelector('#fbList [data-id="' + file.id + '"] .fb-row-icon');
+        if (icon) {
+            icon.classList.remove('fb-row-skel');
+            icon.classList.add('fb-row-thumb');
+            icon.style.backgroundImage = 'url("' + dataUrl + '")';
+            icon.textContent = '';
+        }
+    };
+    if (typeof thumb.then !== 'function') apply(thumb);
+    else thumb.then(apply);
 }
 
 function renderFooter() {
