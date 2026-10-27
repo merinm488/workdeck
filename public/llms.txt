@@ -1,0 +1,234 @@
+# Workdeck — API reference for AI agents
+
+Workdeck is a personal workspace of small apps: Docs, Sheets, Forms, Slides,
+Draw, Files, Todo, Calendar and Kanban, all stored in one unified
+account document. This file describes its HTTP API so an agent can read and
+write a user's workspace directly, without driving a browser.
+
+## Base URL
+
+https://workdeck-m.vercel.app
+
+(The same host this file was fetched from. Local development uses
+http://localhost:4000 with the same paths.)
+
+## Authentication
+
+Every request identifies the account. Send the account KEY the user gives
+you — a short word or phrase they also sign in with:
+
+    GET  /api/todo?key=<key>
+    PUT  /api/todo   { "key": "<key>", "action": ..., "data": ... }
+
+The server resolves the key to the account; you never handle a password or
+a hash. Whoever holds the key can read and write everything in the
+workspace, so treat it as a secret.
+
+Finding the key:
+  1. Check for WORKDECK_KEY=<key> in the .env file (or environment) where
+     YOU (the agent) are running. If it is there, use it — don't ask again.
+  2. If not, ask the user for their Workdeck key (Workdeck -> Settings ->
+     View My Key shows it). Once you have it, save it as
+     WORKDECK_KEY=<key> in the .env file in your working folder so future
+     sessions find it without asking. Pasting it in the chat also works.
+
+Shortcut for long sessions: a login returns the account's `hash`, which you
+may send instead of the key for the rest of the session (the browser
+front-end works this way):
+
+    POST /api/users   { "key": "<key>", "action": "login" }   -> { hash, data }
+
+Don't save the hash to .env — the key is the durable credential.
+
+Changing the key (only when the user asks): this moves the whole account to
+the new key, keeping every app's data. The old key stops working
+immediately:
+
+    POST /api/workdeck  { "key": "<current key>", "action": "changeKey",
+                          "data": { "newKey": "<new key>" } }
+         -> { "hash": "<new hash>", "data": <account document> }
+
+(/api/users takes the same call, and `hash` may be sent instead of `key`.)
+Afterwards save the new key as WORKDECK_KEY in your .env — the old one no
+longer logs in. A new key that already has an account is refused.
+
+Data only: use the key for the operations the user asked for, and never
+create or delete accounts.
+
+## Conventions
+
+- JSON in, JSON out. Nearly everything is:
+      GET  /api/<app>                 -> read the account's data
+      PUT  /api/<app>   { action, data } -> mutate
+- Responses: { "success": true, ... } or { "success": false, "error": "..." }.
+- Successful mutations return `data`: the ENTIRE unified account document as
+  saved. Use it as your fresh read — no second GET needed.
+- Send `key` with every request: query parameter on GET, `key` field in the
+  JSON body on mutations. After a login you may send `hash` instead —
+  see Authentication.
+- DateTimes are local floating strings without timezone: "2026-11-02T08:40".
+  All-day calendar events: "2026-11-02" with allDay: true.
+- IDs are server-generated short strings. Reuse IDs from GET responses.
+- The account document is one JSON blob per app section; each app endpoint
+  only saves the sections it owns. Send each mutation to the endpoint of the
+  app that owns the data.
+- Keep documents under ~1 MB (larger payloads are gzipped automatically, but
+  there is a hard ceiling — Filebox file bytes especially).
+
+## Account document shape (what GET returns)
+
+    {
+      docs:     [ { id, title, content, contentType, tagId, pinned, archived,
+                    sharedId?, createdAt, updatedAt } ],   // Docs
+      tags:     [ { id, name, color } ],
+      sheets:   [ ... ],   // Sheets spreadsheets (Univer data)
+      forms:    [ ... ],   // Forms + linked sheet info
+      slides:   [ ... ],   // Slides decks
+      draws:    [ ... ],   // Draw canvases
+      files:    [ { id, name, mime, size, folderId, tags, storageKey, ... } ],
+      folders:  [ { id, name, parentId, tags, ... } ],
+      todo:     [ { id, name, items: [ { id, title, description?, dueDate?,
+                    priority?, completed?, createdAt } ], createdAt, updatedAt } ],
+      calendars:[ { id, name, color, visible, tagId, createdAt, updatedAt } ],
+      events:   [ { id, calId, title, description?, location?, start, end,
+                    allDay, rrule?, exdates?, overrides?, reminders?, links?,
+                    createdAt, updatedAt } ],
+      kanban:   [ { id, name, columns: [...], rows: [...], cards: [...],
+                    links: [...], createdAt, updatedAt } ],
+      settings: { theme, viewMode, lastOpened, ... }
+    }
+
+## Endpoints
+
+### Todo  —  /api/todo
+    GET  -> { todo: [lists], settings, ... }
+    PUT  { action: "createList",   data: { name?, id? } }
+    PUT  { action: "renameList",   data: { listId, name } }
+    PUT  { action: "updateList",   data: { listId, list: { name, items: [...] } } }
+         (upserts the whole list; items are the full item array)
+    PUT  { action: "deleteList",   data: { listId } }
+    PUT  { action: "updateSettings", data: { settings: {...} } }
+
+### Calendar  —  /api/calendar
+    GET  -> { calendars: [...], events: [...], settings, ... }
+    PUT  { action: "createCalendar", data: { name?, color? } }
+    PUT  { action: "updateCalendar", data: { calId, updates: { name?, color?,
+                                               visible?, tagId? } } }
+    PUT  { action: "deleteCalendar", data: { calId } }
+         (deletes the calendar and all its events)
+    PUT  { action: "createEvent",  data: { event: { calId, title, start, end,
+             description?, location?, allDay?, rrule? } } }
+    PUT  { action: "updateEvent",  data: { eventId, event: {...} } }
+    PUT  { action: "deleteEvent",  data: { eventId } }
+    Recurrence is stored verbatim in `rrule` (RFC 5545 string) — the API never
+    expands recurrences; clients do.
+
+### Kanban  —  /api/kanban
+    GET  -> { kanban: [boards], settings, ... }
+    PUT  { action: "createBoard",  data: { name?, id? } }
+         (new board gets default columns: To Do / In Progress / Done)
+    PUT  { action: "renameBoard",  data: { boardId, name } }
+    PUT  { action: "updateBoard",  data: { boardId, board: {...} } }
+         (upserts the whole board record: columns, rows, cards, links —
+          read the board first, mutate, write back)
+    PUT  { action: "deleteBoard",  data: { boardId } }
+    Card records live in board.cards; their exact shape comes from GET.
+
+### Sheets  —  /api/users
+    GET  -> { sheets: [...], settings, ... }
+    PUT  { action: "updateSheet",  data: { sheetId, sheetData } }
+    PUT  { action: "deleteSheet",  data: { sheetId } }
+    PUT  { action: "shareSheet",   data: { sheetId } }  -> { shareUrl }
+    sheetData is the full spreadsheet document (Univer format) — read first.
+
+### Forms  —  /api/forms
+    GET  -> { forms: [...], settings, ... }
+    PUT  { action: "updateForm",      data: { formId, formData } }
+    PUT  { action: "deleteForm",      data: { formId } }
+    PUT  { action: "shareForm",       data: { formId } }  -> { shareUrl }
+    PUT  { action: "getResponses",    data: { formId } }  -> responses
+    PUT  { action: "deleteResponses", data: { formId } }
+    PUT  { action: "linkSheet",       data: { formId, sheetId? } }
+    PUT  { action: "unlinkSheet",     data: { formId } }
+    Public (no auth): POST { action: "submitResponse", shareId,
+                             data: { response } }
+
+### Slides  —  /api/slides
+    GET  -> { slides: [decks], settings, ... }
+    PUT  { action: "updateDeck",   data: { deckId, deckData } }
+    PUT  { action: "deleteDeck",   data: { deckId } }
+    PUT  { action: "shareDeck",    data: { deckId } }  -> { shareUrl }
+
+### Draw  —  /api/draw
+    GET  -> { draws: [drawings], settings, ... }
+    PUT  { action: "updateDrawing", data: { drawingId, drawingData } }
+    PUT  { action: "deleteDrawing", data: { drawingId } }
+    PUT  { action: "shareDrawing",  data: { drawingId } }  -> { shareUrl }
+
+### Files —  /api/filebox
+    GET            -> whole document (files + folders metadata)
+    GET ?fileId=X  -> the file's raw bytes (binary response)
+    PUT  { action: "uploadFile", data: { name, mime, base64, folderId?, tags? } }
+         base64-encoded content; a few hundred KB max by default.
+
+### Workdeck launchpad  —  /api/workdeck
+    GET  -> whole document (everything above)
+    PUT  { action: "createDoc",      data: { title?, content?, contentType?,
+                                             tagId? } }
+    PUT  { action: "createSheet",    data: { name?, tagId? } }   (stub)
+    PUT  { action: "createForm",     data: { name?, tagId? } }   (stub)
+    PUT  { action: "createDeck",     data: { name?, tagId? } }   (stub)
+    PUT  { action: "createTodo",     data: { name?, tagId? } }   (stub list)
+    PUT  { action: "createKanban",   data: { name?, tagId? } }   (stub board)
+    PUT  { action: "createDrawing",  data: { name?, tagId? } }   (stub)
+    PUT  { action: "createCalendar", data: { name?, tagId? } }   (stub)
+    PUT  { action: "createTag",      data: { name, color? } }
+    PUT  { action: "recordOpen",     data: { fileId, app } }   (recency)
+    PUT  { action: "renameFile",     data: { fileId, name, app? } }
+    PUT  { action: "deleteFile",     data: { fileId, app } }
+    PUT  { action: "createFolder",   data: { name, parentId? } }
+    PUT  { action: "updateSettings", data: { settings: {...} } }
+
+### Docs  —  /api/docs   (fetch-style: GET/PUT/DELETE; POST is login/create-account)
+    GET              -> { docs: [...], tags: [...], settings, ... }
+    GET ?shared=X    -> public shared doc
+    PUT  { action: "createDoc",    data: { title?, content?, contentType?,
+                                            tagId? } }
+    PUT  { action: "updateDoc",    data: { docId, updates: {...} } }
+    PUT  { action: "deleteDoc",    data: { docId } }
+    PUT  { action: "shareDoc",     data: { docId } }     -> { shareUrl }
+    PUT  { action: "togglePin",    data: { docId } }
+    PUT  { action: "toggleArchive",data: { docId } }
+    PUT  { action: "createTag",    data: { name, color? } }
+    PUT  { action: "updateTag",    data: { tagId, updates: {...} } }
+    PUT  { action: "deleteTag",    data: { tagId } }
+    contentType: "plain-text" or "markdown".
+
+## Examples
+
+Add three tasks to a new todo list:
+
+    curl -X PUT https://workdeck-m.vercel.app/api/todo \
+      -H "Content-Type: application/json" \
+      -d '{"key":"<key>","action":"createList","data":{"name":"Errands","items":[]}}'
+
+Then, using the list `id` from the response:
+
+    curl -X PUT https://workdeck-m.vercel.app/api/todo \
+      -H "Content-Type: application/json" \
+      -d '{"key":"<key>","action":"updateList","data":{"listId":"<id>","list":{"name":"Errands","items":[{"id":"i1","title":"Buy milk","completed":false}]}}}'
+
+Create a calendar event:
+
+    curl -X PUT https://workdeck-m.vercel.app/api/calendar \
+      -H "Content-Type: application/json" \
+      -d '{"key":"<key>","action":"createEvent","data":{"event":{"calId":"<calId>","title":"Dentist","start":"2026-11-04T14:30","end":"2026-11-04T15:00"}}}'
+
+## Notes for agents
+
+- Prefer create-then-update (createList with empty items, then updateList)
+  when adding many tasks in one list.
+- When a user asks "add X to my Workdeck", pick the app they mean; when
+  unsure, ask the user.
+- Failed writes return success:false with a readable error — surface it.
+- Human-facing documentation: /docs

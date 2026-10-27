@@ -114,6 +114,7 @@ async function adaptDocsHandler(req, res, method) {
 }
 
 // ---------- API routes ----------
+app.get('/llm.txt', (req, res) => res.redirect(301, '/llms.txt'));
 app.all('/api/workdeck', (req, res) => workdeckHandler(req, res));
 app.all('/api/docs', (req, res) => adaptDocsHandler(req, res, req.method.toUpperCase()));
 app.all('/api/users', (req, res) => usersHandler(req, res));

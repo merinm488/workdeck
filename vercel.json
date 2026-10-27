@@ -51,6 +51,11 @@
   ],
   "redirects": [
     {
+      "source": "/llm.txt",
+      "destination": "/llms.txt",
+      "permanent": true
+    },
+    {
       "source": "/filebox/:path*",
       "destination": "/files/:path*"
     },

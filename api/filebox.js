@@ -38,7 +38,8 @@ import {
   generateId,
   putRawDoc,
   getRawDoc,
-  applyCorsHeaders
+  applyCorsHeaders,
+  accountHash
 } from './_lib/store.js';
 
 // Hard cap on decoded file size. Default is sized for textdb.dev (bytes
@@ -141,7 +142,8 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, limits: { maxFileSize: MAX_FILE_SIZE } });
       }
 
-      const { hash, fileId, dl } = req.query;
+      const { fileId, dl } = req.query;
+      const hash = accountHash(req.query);
 
       // --- Whole user document (app bootstrap / poll) ---
       if (!fileId) {
@@ -190,7 +192,8 @@ export default async function handler(req, res) {
     // PUT - uploadFile (the only action)
     // ============================================================
     if (req.method === 'PUT') {
-      const { hash, action, data } = req.body || {};
+      const { action, data } = req.body || {};
+      const hash = accountHash(req.body);
 
       if (!hash) {
         return res.status(400).json({ success: false, error: 'Hash is required' });

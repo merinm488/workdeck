@@ -59,7 +59,8 @@ import {
   getSharedDoc,
   deleteSharedDoc,
   getBaseUrl,
-  applyCorsHeaders
+  applyCorsHeaders,
+  accountHash
 } from './_lib/store.js';
 
 async function saveSlidesSections(hash, userData) {
@@ -86,7 +87,8 @@ export default async function handler(req, res) {
     // GET - user data, or a shared deck snapshot
     // ============================================================
     if (req.method === 'GET') {
-      const { hash, shared } = req.query;
+      const { shared } = req.query;
+      const hash = accountHash(req.query);
 
       // --- Shared deck (public: viewers have no hash) ---
 
@@ -148,7 +150,8 @@ export default async function handler(req, res) {
     // PUT - owner operations on the unified document
     // ============================================================
     if (req.method === 'PUT') {
-      const { hash, action, data } = req.body || {};
+      const { action, data } = req.body || {};
+      const hash = accountHash(req.body);
 
       if(!hash){
         return res.status(400).json({success: false, error: 'Hash is required'});
@@ -274,7 +277,7 @@ export default async function handler(req, res) {
     // DELETE - delete user account
     // ============================================================
     if (req.method === 'DELETE') {
-      const { hash } = req.query;
+      const hash = accountHash(req.query);
 
       if (!hash) {
         return res.status(400).json({

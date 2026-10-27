@@ -20,7 +20,8 @@ import {
   getSharedDoc,
   deleteSharedDoc,
   getBaseUrl,
-  applyCorsHeaders
+  applyCorsHeaders,
+  accountHash
 } from './_lib/store.js';
 
 /**
@@ -43,7 +44,7 @@ async function saveDocsSections(hash, userData) {
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const hash = searchParams.get('hash');
+    const hash = accountHash({ key: searchParams.get('key'), hash: searchParams.get('hash') });
     const shared = searchParams.get('shared');
 
     if (shared) {
@@ -131,7 +132,8 @@ export async function PUT(request) {
   try {
     const baseUrl = getBaseUrl(request);
     const body = await request.json();
-    const { hash, action, data } = body;
+    const { action, data } = body;
+    const hash = accountHash(body);
 
     if (!hash || !action) {
       return Response.json({ error: 'Hash and action are required' }, { status: 400 });
@@ -340,7 +342,7 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const hash = searchParams.get('hash');
+    const hash = accountHash({ key: searchParams.get('key'), hash: searchParams.get('hash') });
 
     if (!hash) {
       return Response.json({ error: 'Hash is required' }, { status: 400 });

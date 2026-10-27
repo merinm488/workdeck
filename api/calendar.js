@@ -20,7 +20,8 @@ import {
   saveOwnedSections,
   createUserDoc,
   deleteUserDoc,
-  applyCorsHeaders
+  applyCorsHeaders,
+  accountHash
 } from './_lib/store.js';
 
 const DEFAULT_CALENDAR_NAME = 'Untitled Calendar';
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
     // GET - user data (session check / initial load)
     // ============================================================
     if (req.method === 'GET') {
-      const { hash } = req.query;
+      const hash = accountHash(req.query);
 
       if (!hash) {
         return res.status(400).json({ success: false, error: 'Hash is required' });
@@ -108,7 +109,8 @@ export default async function handler(req, res) {
     // PUT - owner operations on the unified document
     // ============================================================
     if (req.method === 'PUT') {
-      const { hash, action, data } = req.body || {};
+      const { action, data } = req.body || {};
+      const hash = accountHash(req.body);
 
       if (!hash || !action) {
         return res.status(400).json({ success: false, error: 'Hash and action are required' });
@@ -293,7 +295,7 @@ export default async function handler(req, res) {
     // DELETE - delete account (clears the unified document)
     // ============================================================
     if (req.method === 'DELETE') {
-      const { hash } = req.query;
+      const hash = accountHash(req.query);
 
       if (!hash) {
         return res.status(400).json({ success: false, error: 'Hash is required' });
