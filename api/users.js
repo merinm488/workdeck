@@ -13,12 +13,14 @@ import {
   getUserDoc,
   saveOwnedSections,
   createUserDoc,
+  changeUserKey,
   deleteUserDoc,
   putSharedDoc,
   getSharedDoc,
   deleteSharedDoc,
   getBaseUrl,
-  applyCorsHeaders
+  applyCorsHeaders,
+  accountHash
 } from './_lib/store.js';
 
 /** Persist only the sections Sheets owns (sheets) + settings changes. */
@@ -46,7 +48,8 @@ export default async function handler(req, res) {
     // GET - Retrieve user data or shared sheet
     // ============================================================
     if (req.method === 'GET') {
-      const { hash, shared } = req.query;
+      const { shared } = req.query;
+      const hash = accountHash(req.query);
 
       if (shared) {
         console.log(`[API] GET fetching shared sheet: ${shared}`);
@@ -89,6 +92,43 @@ export default async function handler(req, res) {
     // ============================================================
     if (req.method === 'POST') {
       const { key, action } = req.body;
+
+      // CHANGE KEY — current key or hash identifies the account;
+      // data.newKey becomes the login key.
+      if (action === 'changeKey') {
+        const currentHash = accountHash(req.body);
+        if (!currentHash) {
+          return res.status(400).json({
+            success: false,
+            error: 'Key or hash is required'
+          });
+        }
+
+        const newKey = req.body?.data?.newKey;
+        if (!newKey || typeof newKey !== 'string' || !newKey.trim()) {
+          return res.status(400).json({
+            success: false,
+            error: 'New key is required'
+          });
+        }
+
+        const result = await changeUserKey(currentHash, newKey.trim());
+        if (!result.ok) {
+          const failure = {
+            SAME_KEY: [400, 'New key must be different from the current key'],
+            NOT_FOUND: [404, 'User not found'],
+            KEY_TAKEN: [409, 'That key is already in use by another account'],
+            SAVE_FAILED: [500, 'Failed to change key']
+          }[result.code] || [500, 'Failed to change key'];
+          return res.status(failure[0]).json({ success: false, error: failure[1] });
+        }
+        return res.status(200).json({
+          success: true,
+          hash: result.hash,
+          data: result.doc,
+          message: 'Key changed successfully'
+        });
+      }
 
       if (!key || typeof key !== 'string') {
         return res.status(400).json({
@@ -155,7 +195,8 @@ export default async function handler(req, res) {
     // PUT - Update user data
     // ============================================================
     if (req.method === 'PUT') {
-      const { hash, action, data } = req.body;
+      const { action, data } = req.body;
+      const hash = accountHash(req.body);
 
       if (!hash) {
         return res.status(400).json({
@@ -327,7 +368,7 @@ export default async function handler(req, res) {
     // DELETE - Delete user account
     // ============================================================
     if (req.method === 'DELETE') {
-      const { hash } = req.query;
+      const hash = accountHash(req.query);
 
       if (!hash) {
         return res.status(400).json({

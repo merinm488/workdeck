@@ -71,6 +71,12 @@ export function generateHash(input) {
   return crypto.createHash('sha256').update(normalized + PEPPER_SECRET).digest('hex');
 }
 
+/** Account hash from a raw key (agents) or an explicit hash (browser). */
+export function accountHash(params) {
+  const { key, hash } = params || {};
+  return key ? generateHash(key) : hash;
+}
+
 /**
  * Generate unique ID.
  */
@@ -306,6 +312,28 @@ export async function createUserDoc(hash, defaults = {}) {
 
   const saved = await overwriteDoc(hash, doc);
   return saved ? { ok: true, doc } : { ok: false, code: 'SAVE_FAILED' };
+}
+
+/**
+ * Move the account document from `oldHash` to the hash of `newKey`.
+ * The copy to the new address happens first — if it fails, the account
+ * is untouched under the old key. Fails with KEY_TAKEN when the new
+ * key already has an account of its own.
+ */
+export async function changeUserKey(oldHash, newKey) {
+  const newHash = generateHash(newKey);
+  if (newHash === oldHash) return { ok: false, code: 'SAME_KEY' };
+
+  const doc = await getUserDoc(oldHash);
+  if (!doc) return { ok: false, code: 'NOT_FOUND' };
+
+  if (await getUserDoc(newHash)) return { ok: false, code: 'KEY_TAKEN' };
+
+  const saved = await overwriteDoc(newHash, doc);
+  if (!saved) return { ok: false, code: 'SAVE_FAILED' };
+
+  await deleteUserDoc(oldHash);
+  return { ok: true, hash: newHash, doc };
 }
 
 /** Delete the account document. */

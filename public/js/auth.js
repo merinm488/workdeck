@@ -225,6 +225,45 @@ class WdAuthManager {
         }
     }
 
+    /**
+     * Move the account to a new login key. On success the session
+     * (hash + key) is re-stored under every app's storage keys.
+     */
+    async changeKey(newKey) {
+        if (!this.userHash) {
+            return { success: false, error: 'No user logged in' };
+        }
+        const normalizedKey = String(newKey || '').trim();
+        if (!normalizedKey) {
+            return { success: false, error: 'Key cannot be empty' };
+        }
+        if (normalizedKey === this.userKey) {
+            return { success: false, error: 'New key must be different from the current key' };
+        }
+
+        try {
+            const response = await fetch(WD_AUTH_CONFIG.apiEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    hash: this.userHash,
+                    action: 'changeKey',
+                    data: { newKey: normalizedKey }
+                })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                this.storeSession(normalizedKey, data.hash, data.data);
+                return { success: true };
+            }
+            return { success: false, error: data.error || 'Failed to change key' };
+        } catch (error) {
+            console.error('[AUTH] Change key error:', error);
+            return { success: false, error: 'Failed to change key. Please try again.' };
+        }
+    }
+
     getUserHash() {
         return this.userHash;
     }

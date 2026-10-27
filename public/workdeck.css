@@ -1701,8 +1701,28 @@ html[data-theme="dark"] .wd-theme-option-icon {
     margin-bottom: 18px;
 }
 
+.wd-key-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.wd-key-actions > button {
+    flex: 1;
+}
+
 .wd-key-close {
     width: 100%;
+}
+
+/* Change key modal */
+.wd-change-key-label {
+    margin-top: 14px;
+}
+
+.wd-change-key-error {
+    font-size: 13px;
+    color: var(--danger);
+    margin: 12px 0;
 }
 
 /* ---------- Offscreen helpers ---------- */

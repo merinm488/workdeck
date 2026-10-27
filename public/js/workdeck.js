@@ -1801,12 +1801,63 @@ function makeDropTarget(row, tagId) {
 
 function showKeyModal() {
     $('keyText').textContent = wdAuth.getUserKey() || 'Not available';
+    $('keyLlmUrl').textContent = location.origin + '/llms.txt';
     $('keyModal').classList.add('active');
     closeDropdown($('settingsDropdown'));
 }
 
 function hideKeyModal() {
     $('keyModal').classList.remove('active');
+}
+
+function showChangeKeyModal() {
+    $('newKeyInput').value = '';
+    $('confirmKeyInput').value = '';
+    $('changeKeyError').classList.add('hidden');
+    $('keyModal').classList.remove('active');
+    $('changeKeyModal').classList.add('active');
+    $('newKeyInput').focus();
+}
+
+function hideChangeKeyModal() {
+    $('changeKeyModal').classList.remove('active');
+}
+
+async function confirmChangeKey() {
+    const newKey = $('newKeyInput').value.trim();
+    const confirmKey = $('confirmKeyInput').value.trim();
+    const errorEl = $('changeKeyError');
+
+    errorEl.classList.add('hidden');
+    if (!newKey) {
+        errorEl.textContent = 'New key cannot be empty';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+    if (newKey !== confirmKey) {
+        errorEl.textContent = 'Keys do not match';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    $('confirmChangeKey').disabled = true;
+    try {
+        const result = await wdAuth.changeKey(newKey);
+        if (result.success) {
+            state.userHash = wdAuth.getUserHash();
+            hideChangeKeyModal();
+            showKeyModal();
+            showNotification('Key changed. Sign in with the new key from now on.', 'success');
+        } else {
+            errorEl.textContent = result.error || 'Failed to change key';
+            errorEl.classList.remove('hidden');
+        }
+    } catch (error) {
+        errorEl.textContent = 'Failed to change key. Please try again.';
+        errorEl.classList.remove('hidden');
+    } finally {
+        $('confirmChangeKey').disabled = false;
+    }
 }
 
 function showDeleteAccountModal() {
@@ -2152,6 +2203,7 @@ function setupEventListeners() {
     });
 
     $('viewKeyBtn').addEventListener('click', showKeyModal);
+
     $('logoutBtn').addEventListener('click', function () {
         wdAuth.logout();
         state.userHash = null;
@@ -2177,6 +2229,20 @@ function setupEventListeners() {
     // ----- Key modal -----
     $('keyModalClose').addEventListener('click', hideKeyModal);
     $('keyModalCloseBtn').addEventListener('click', hideKeyModal);
+    $('changeKeyOpenBtn').addEventListener('click', showChangeKeyModal);
+
+    // ----- Change key modal -----
+    $('changeKeyModalClose').addEventListener('click', hideChangeKeyModal);
+    $('cancelChangeKey').addEventListener('click', hideChangeKeyModal);
+    $('confirmChangeKey').addEventListener('click', confirmChangeKey);
+    $('newKeyInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') confirmChangeKey();
+        if (e.key === 'Escape') hideChangeKeyModal();
+    });
+    $('confirmKeyInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') confirmChangeKey();
+        if (e.key === 'Escape') hideChangeKeyModal();
+    });
     $('keyCopyBtn').addEventListener('click', async function () {
         const key = wdAuth.getUserKey();
         if (!key) return;

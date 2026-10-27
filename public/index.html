@@ -444,7 +444,32 @@
                     </button>
                 </div>
                 <p class="wd-key-feedback" id="keyCopyFeedback">Copied!</p>
-                <button class="wd-secondary-btn wd-key-close" id="keyModalCloseBtn">Close</button>
+                <p class="wd-key-hint">Give an AI agent this key along with <code id="keyLlmUrl"></code> and it can manage your workspace.</p>
+                <div class="wd-key-actions">
+                    <button class="wd-secondary-btn" id="changeKeyOpenBtn">Change My Key</button>
+                    <button class="wd-secondary-btn wd-key-close" id="keyModalCloseBtn">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change key modal -->
+    <div id="changeKeyModal" class="wd-modal">
+        <div class="wd-modal-content">
+            <div class="wd-modal-header">
+                <h3 class="wd-modal-title">Change My Key</h3>
+                <button class="wd-modal-close" id="changeKeyModalClose">&times;</button>
+            </div>
+            <div class="wd-modal-body">
+                <label for="newKeyInput" class="wd-label">New Key</label>
+                <input type="text" id="newKeyInput" class="wd-input" placeholder="Enter new key..." maxlength="200" autocomplete="off">
+                <label for="confirmKeyInput" class="wd-label wd-change-key-label">Repeat New Key</label>
+                <input type="text" id="confirmKeyInput" class="wd-input" placeholder="Repeat new key..." maxlength="200" autocomplete="off">
+                <p id="changeKeyError" class="wd-change-key-error hidden"></p>
+                <div class="wd-modal-actions">
+                    <button id="cancelChangeKey" class="wd-secondary-btn">Cancel</button>
+                    <button id="confirmChangeKey" class="wd-primary-btn">Change Key</button>
+                </div>
             </div>
         </div>
     </div>
