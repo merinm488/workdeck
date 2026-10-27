@@ -41,6 +41,17 @@ const DEFAULT_DRAWING_NAME = 'Untitled Drawing';
 const DEFAULT_FOLDER_NAME = 'Untitled';
 const DEFAULT_TODO_LIST_NAME = 'Untitled List';
 
+/** Move inline file thumbnails into their own records (no-op once done). */
+async function migrateFileThumbs(userData) {
+  await Promise.all((userData.files || []).map(async file => {
+    if (!file || !file.thumbnail || file.thumbRef) return;
+    if (await putThumb(file.id, file.thumbnail)) {
+      delete file.thumbnail;
+      file.thumbRef = 1;
+    }
+  }));
+}
+
 /**
  * Filebox tags are multi-valued
  */
@@ -859,6 +870,8 @@ export default async function handler(req, res) {
         default:
           return res.status(400).json({ success: false, error: 'Invalid action' });
       }
+
+      await migrateFileThumbs(userData);
 
       const saved = await saveOwnedSections(hash, {
         docs: userData.docs,
