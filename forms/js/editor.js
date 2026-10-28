@@ -283,15 +283,9 @@ class FormsEditorApp {
         // wide screens the panel is a static third pane and the class
         // is harmless.
         this.builderInstance.on('selection.changed', (event) => {
-            this.setPropertiesDrawer(!!event?.selection);
+            document.getElementById('builderTabPanel')?.classList
+                .toggle('properties-open', !!event?.selection);
         });
-
-        // Narrow layouts hide the panel until opened (see the builder
-        // responsiveness CSS). Start with it open — form-js shows
-        // form-level properties when no field is selected.
-        if (window.matchMedia('(max-width: 1100px)').matches) {
-            this.setPropertiesDrawer(true);
-        }
 
         // Tap-to-add (see docstring above). Delegated on #builder — the
         // container form-js renders INTO, never replaces — so the handler
@@ -300,7 +294,7 @@ class FormsEditorApp {
         // addFormField goes through the command stack, so undo/redo and the
         // 'changed' event fire exactly like a drag-drop add does, keeping
         // dirty tracking and auto-save working. On phones the palette is a
-        // drawer (see setupDrawerControls), so a tap also closes it.
+        // drawer (see setupPaletteDrawer), so a tap also closes it.
         element.addEventListener('click', (e) => {
             if (!this.builderInstance) return;
             const paletteBtn = e.target.closest('.fjs-palette .fjs-palette-field');
@@ -309,7 +303,7 @@ class FormsEditorApp {
             this.addPaletteField(paletteBtn.dataset.fieldType);
         });
 
-        this.setupDrawerControls();
+        this.setupPaletteDrawer();
 
         // Keep the caret in properties-panel inputs when form-js's canvas
         // re-render steals focus mid-typing (see setupFocusPreservation).
@@ -540,11 +534,10 @@ class FormsEditorApp {
     }
 
     /**
-     * Drawer controls for narrow layouts: "+" opens the palette, the
-     * sliders FAB opens properties, the backdrop closes both. On desktop
-     * all three are display:none (CSS) and the panes are static.
+     * Phone-only palette drawer: the FAB opens it, the backdrop closes it.
+     * On desktop both controls are display:none (CSS) and drag just works.
      */
-    setupDrawerControls() {
+    setupPaletteDrawer() {
         const builderPanel = document.getElementById('builderTabPanel');
         const addBtn = document.getElementById('builderAddBtn');
         const backdrop = document.getElementById('builderBackdrop');
@@ -557,16 +550,6 @@ class FormsEditorApp {
             this.closePaletteDrawer();
             this.closePropertiesDrawer();
         });
-        document.getElementById('builderPropertiesBtn')?.addEventListener('click', () => {
-            this.setPropertiesDrawer(true);
-        });
-    }
-
-    /** Open/close the properties drawer + keep the FAB's aria-expanded honest. */
-    setPropertiesDrawer(open) {
-        document.getElementById('builderTabPanel')?.classList
-            .toggle('properties-open', open);
-        document.getElementById('builderPropertiesBtn')?.setAttribute('aria-expanded', String(open));
     }
 
     closePaletteDrawer() {
@@ -575,7 +558,7 @@ class FormsEditorApp {
 
     /** Slide the properties drawer back out (mobile/narrow layouts). */
     closePropertiesDrawer() {
-        this.setPropertiesDrawer(false);
+        document.getElementById('builderTabPanel')?.classList.remove('properties-open');
     }
 
     /**
