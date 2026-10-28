@@ -790,15 +790,6 @@ html[data-theme="dark"] .wd-theme-option-icon {
     padding: 6px 0 16px;
 }
 
-.wd-filters {
-    display: flex;
-    gap: 6px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    padding: 4px;
-    border-radius: 999px;
-}
-
 .wd-filter {
     padding: 7px 16px;
     border-radius: 999px;
@@ -1911,7 +1902,37 @@ body.wd-sidebar-open .wd-sidebar {
 
 .wd-side-brand {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
     padding: 14px 14px 12px;
+}
+
+/* App pill + All files pill share a line under the brand: chooser left,
+   All files right. Own line at every width, so nothing jumps around. */
+.wd-side-filters {
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+.wd-side-filters #filterChooser {
+    min-width: 0;
+}
+
+.wd-side-filters .wd-filter-chooser-btn {
+    min-width: 0;
+}
+
+.wd-side-filters #filterChooserLabel {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .wd-sidebar-scroll {

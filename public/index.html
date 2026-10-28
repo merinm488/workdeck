@@ -108,14 +108,32 @@
                     <path d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
-            <a href="/" class="wd-logo wd-side-brand">
-                <div class="wd-logo-icon">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 01-1-1h4a1 1 0 001 1v4a1 1 0 001 1h3a1 1 0 001-1V10" />
-                    </svg>
+            <div class="wd-side-brand">
+                <a href="/" class="wd-logo">
+                    <div class="wd-logo-icon">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 01-1-1h4a1 1 0 001 1v4a1 1 0 001 1h3a1 1 0 001-1V10" />
+                        </svg>
+                    </div>
+                    <span class="wd-logo-text">Workdeck</span>
+                </a>
+                <!-- App chooser + All files pill (moved from the filter bar) -->
+                <div class="wd-side-filters">
+                    <div class="wd-filter-chooser" id="filterChooser">
+                        <button id="filterChooserBtn" class="wd-filter wd-filter-chooser-btn" aria-haspopup="menu" aria-expanded="false">
+                            <span class="wd-filter-chooser-icon hidden" id="filterChooserIcon"></span>
+                            <span id="filterChooserLabel">Apps</span>
+                            <svg class="wd-new-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div id="filterDropdown" class="wd-dropdown">
+                            <!-- Items rendered by JS from WD_APPS -->
+                        </div>
+                    </div>
+                    <button class="wd-filter active" data-filter="all">All files</button>
                 </div>
-                <span class="wd-logo-text">Workdeck</span>
-            </a>
+            </div>
             <nav class="wd-sidebar-scroll">
                 <!-- All files -->
                 <div id="allFilesBtn" class="wd-side-row" role="button" tabindex="0" title="All files">
@@ -299,23 +317,8 @@
                 </div>
             </header>
 
-            <!-- Filter bar: All files / app chooser + view toggle -->
+            <!-- Filter bar: view toggle -->
             <div class="wd-filter-bar">
-                <div class="wd-filters">
-                    <button class="wd-filter active" data-filter="all">All files</button>
-                    <div class="wd-filter-chooser" id="filterChooser">
-                        <button id="filterChooserBtn" class="wd-filter wd-filter-chooser-btn" aria-haspopup="menu" aria-expanded="false">
-                            <span class="wd-filter-chooser-icon hidden" id="filterChooserIcon"></span>
-                            <span id="filterChooserLabel">Apps</span>
-                            <svg class="wd-new-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </button>
-                        <div id="filterDropdown" class="wd-dropdown">
-                            <!-- Items rendered by JS from WD_APPS -->
-                        </div>
-                    </div>
-                </div>
                 <div class="wd-view-toggle" id="viewToggle" role="group" aria-label="Switch between grid and list view">
                     <button class="wd-view-btn active" data-view="grid" aria-label="Grid view" title="Grid view">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
