@@ -2307,6 +2307,19 @@ body.home-page {
         flex-wrap: wrap;
     }
 
+    /* The nav wraps here, so the settings group can end up mid-row —
+       anchor its menu to the nav as a full-width sheet (left/right 16px,
+       just below both rows) instead of to the button, or it clips. */
+    .top-nav-settings {
+        position: static;
+    }
+
+    .settings-dropdown {
+        left: 16px;
+        right: 16px;
+        min-width: 0;
+    }
+
     .home-search {
         display: none;
         order: 10;
