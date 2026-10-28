@@ -206,7 +206,6 @@ const WD_APPS = [
         route: '/files/',
         editorParam: 'id',
         create: null,
-        chooserOpensApp: true,
         contentSearch: false
     }
 ];
@@ -2151,12 +2150,6 @@ function setupEventListeners() {
         const item = e.target.closest('.wd-dropdown-item[data-app]');
         if (!item) return;
         e.stopPropagation();
-        const app = getApp(item.dataset.app);
-        if (app.chooserOpensApp) {
-            closeFilterDropdown();
-            openInNewTab(app.route);
-            return;
-        }
         state.filter = item.dataset.app;
         closeFilterDropdown();
         render();
