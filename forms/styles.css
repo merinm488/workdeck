@@ -517,16 +517,24 @@ body {
    Builder responsiveness
    The 3-pane row (270px palette + canvas + 300px properties) needs
    ~1100px.
-   - Below 1100px: hide the properties panel; the canvas still shows
-     every field and edits still land on save.
+   - Below 1100px: the properties panel becomes an overlay drawer on
+     the right. It starts open and is reopened via the sliders FAB or
+     by selecting a field (markup + toggles live in editor.js /
+     editor.html); deselecting the field or tapping the backdrop
+     closes it.
    - Below 700px: the palette becomes an off-canvas drawer opened by
-     the floating "+" button (markup + toggle live in editor.js /
-     editor.html). Adding a field via tap-to-add closes the drawer.
+     the floating "+" button. Adding a field via tap-to-add closes
+     the drawer.
    ============================================================ */
 
+/* Properties FAB exists only for narrow layouts (styled at ≤1100px) */
+.builder-properties-btn {
+    display: none;
+}
+
 /* Between 701–1100px the canvas alone can't fit the properties panel
-   beside it, so it becomes an overlay drawer on the right, opened by
-   selecting a field (see editor.js). */
+   beside it, so it becomes an overlay drawer on the right (see
+   editor.js). */
 @media (max-width: 1100px) {
     #builder .fjs-editor-properties-container {
         position: absolute;
@@ -544,7 +552,36 @@ body {
         transform: translateX(0);
     }
 
-    /* Dimmed backdrop; tap it (or select another field) to close */
+    /* Properties FAB: opens the drawer without a field selection.
+       Hidden while the drawer is open — it sits underneath it. */
+    .builder-properties-btn {
+        position: absolute;
+        right: 18px;
+        bottom: 18px;
+        z-index: 50;
+        width: 48px;
+        height: 48px;
+        border: none;
+        border-radius: 50%;
+        background: var(--accent-color);
+        color: #ffffff;
+        cursor: pointer;
+        box-shadow: 0 4px 14px var(--shadow-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .builder-properties-btn:active {
+        transform: scale(0.96);
+    }
+
+    #builderTabPanel.properties-open .builder-properties-btn {
+        visibility: hidden;
+    }
+
+    /* Dimmed backdrop; tap it (or select another field) to close.
+       Phones only — display:none at 701px+ further down. */
     #builderTabPanel.properties-open .builder-backdrop {
         opacity: 1;
         pointer-events: auto;
@@ -620,9 +657,16 @@ body {
     #builderTabPanel.palette-open .builder-add-btn {
         display: none;
     }
+
+    /* Stack the properties FAB above the "+" */
+    .builder-properties-btn {
+        right: 20px;
+        bottom: 82px;
+    }
 }
 
-/* Wide screens never see the FAB or the backdrop — phones only */
+/* Wide screens never see the palette FAB or the backdrop — phones only
+   (the properties FAB shows down to 701px, see the 1100px block) */
 @media (min-width: 701px) {
     .builder-add-btn,
     .builder-backdrop {
