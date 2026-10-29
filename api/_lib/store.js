@@ -94,7 +94,9 @@ function isDefaultTextdbContent(text) {
 
 /**
  * Parse a stored document, handling textdb.dev's double-encoded JSON quirk
- * and the gzip wrapper postTextdbDoc writes for large payloads.
+ * and the gzip wrapper postTextdbDoc writes for large payloads. A null
+ * write comes back as textdb's {"_json":null} envelope — normalize to null
+ * so deleted records read as deleted.
  */
 function parseDocText(text) {
   let parsed = JSON.parse(text);
@@ -103,6 +105,10 @@ function parseDocText(text) {
   }
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed[COMPRESSED_FLAG]) {
     parsed = JSON.parse(zlib.gunzipSync(Buffer.from(parsed.data, 'base64')).toString('utf8'));
+  }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) &&
+      Object.keys(parsed).length === 1 && parsed._json === null) {
+    return null;
   }
   return parsed;
 }
@@ -353,6 +359,35 @@ export async function deleteUserDoc(hash) {
 }
 
 // ================================================
+// Record addressing (production)
+// ================================================
+
+// textdb.dev has no authentication — knowing a record's address IS write
+// access, and record ids surface in URLs (deep links, share links). So raw
+// and shared records live at pepper-derived addresses no client can compute;
+// only this module resolves logical key -> address. Records still stored at
+// the bare logical key migrate lazily on first read.
+function deriveRecordKey(key) {
+  return 'wd1_' + crypto.createHash('sha256')
+    .update(`wdraw1:${key}:${PEPPER_SECRET}`)
+    .digest('hex');
+}
+
+async function getTextdbRecord(key) {
+  const derived = deriveRecordKey(key);
+  const doc = await getTextdbDoc(derived);
+  if (doc !== null) return doc;
+
+  const legacy = await getTextdbDoc(key);
+  if (legacy === null) return null;
+
+  if (await postTextdbDoc(derived, legacy)) {
+    await postTextdbDoc(key, null);
+  }
+  return legacy;
+}
+
+// ================================================
 // Shared (public) documents
 // ================================================
 
@@ -361,7 +396,7 @@ export async function putSharedDoc(shareId, value) {
     if (IS_DEVELOPMENT) {
       return writeLocalDoc(getSharedFilePath(shareId), value);
     }
-    return await postTextdbDoc(`shared_${shareId}`, value);
+    return await postTextdbDoc(deriveRecordKey(`shared_${shareId}`), value);
   } catch (error) {
     console.error('[STORE] Error saving shared doc:', error);
     return false;
@@ -372,7 +407,7 @@ export async function getSharedDoc(shareId) {
   try {
     const doc = IS_DEVELOPMENT
       ? readLocalDoc(getSharedFilePath(shareId))
-      : await getTextdbDoc(`shared_${shareId}`);
+      : await getTextdbRecord(`shared_${shareId}`);
     if (!doc || typeof doc !== 'object') return null;
     return doc;
   } catch (error) {
@@ -388,7 +423,12 @@ export async function deleteSharedDoc(shareId) {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       return true;
     }
-    return await postTextdbDoc(`shared_${shareId}`, null);
+    // textdb.dev has no delete; writing null empties the document.
+    // Both addresses: the record may not have migrated yet.
+    const key = `shared_${shareId}`;
+    const derived = await postTextdbDoc(deriveRecordKey(key), null);
+    const legacy = await postTextdbDoc(key, null);
+    return derived && legacy;
   } catch (error) {
     console.error('[STORE] Error deleting shared doc:', error);
     return false;
@@ -409,7 +449,7 @@ export async function putRawDoc(key, value) {
     if (IS_DEVELOPMENT) {
       return writeLocalDoc(getRawFilePath(key), value);
     }
-    return await postTextdbDoc(key, value);
+    return await postTextdbDoc(deriveRecordKey(key), value);
   } catch (error) {
     console.error('[STORE] Error saving raw doc:', error);
     return false;
@@ -421,7 +461,7 @@ export async function getRawDoc(key) {
   try {
     const doc = IS_DEVELOPMENT
       ? readLocalDoc(getRawFilePath(key))
-      : await getTextdbDoc(key);
+      : await getTextdbRecord(key);
     if (doc === null || doc === undefined) return null;
     return doc;
   } catch (error) {
@@ -439,7 +479,10 @@ export async function deleteRawDoc(key) {
       return true;
     }
     // textdb.dev has no delete; writing null empties the document.
-    return await postTextdbDoc(key, null);
+    // Both addresses: the record may not have migrated yet.
+    const derived = await postTextdbDoc(deriveRecordKey(key), null);
+    const legacy = await postTextdbDoc(key, null);
+    return derived && legacy;
   } catch (error) {
     console.error('[STORE] Error deleting raw doc:', error);
     return false;

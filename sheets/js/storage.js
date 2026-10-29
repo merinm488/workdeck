@@ -290,55 +290,6 @@ class SheetsStorage {
     }
 
     /**
-     * Get shared spreadsheet from textdb.dev
-     * @param {string} shareId - Share ID
-     * @returns {Promise<object|null>} Shared spreadsheet data
-     */
-    async getSharedSpreadsheet(shareId) {
-        try {
-            const response = await fetch(`https://textdb.dev/api/data/shared_${shareId}`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                return null;
-            }
-
-            const text = await response.text();
-
-            // Check for empty or invalid content
-            if (!text || text.trim() === '' || text.includes('hello world from textdb') || text.length < 10) {
-                return null;
-            }
-
-            let parsed;
-            try {
-                parsed = JSON.parse(text);
-                if (typeof parsed === 'string') {
-                    parsed = JSON.parse(parsed);
-                }
-            } catch (parseError) {
-                console.error('[STORAGE] JSON parse error:', parseError);
-                return null;
-            }
-
-            // Validate structure
-            if (!parsed || typeof parsed !== 'object' || !parsed.spreadsheet) {
-                return null;
-            }
-
-            return parsed;
-
-        } catch (error) {
-            console.error('[STORAGE] Get shared spreadsheet error:', error);
-            return null;
-        }
-    }
-
-    /**
      * Generate unique ID for sharing
      * @returns {string} Unique ID
      */

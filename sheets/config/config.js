@@ -24,16 +24,6 @@ const APP_CONFIG = {
 
     // Storage configuration
     storage: {
-        // TextDB configuration for production
-        // Collection ID is handled server-side in api/storage.js
-        // Client-side code only needs the API endpoint
-        textDB: {
-            baseUrl: 'https://textdb.dev/api/data',
-            // These are placeholder values - actual values are set server-side
-            collectionId: 'handled-server-side',
-            apiKey: 'handled-server-side',
-        },
-
         // Local storage keys
         keys: {
             spreadsheetData: 'sheets_spreadsheet_data',
@@ -89,12 +79,6 @@ const APP_CONFIG = {
         storageKey: 'sheets_theme',
     },
 
-    // API endpoints
-    api: {
-        // TODO: Add API endpoints if needed
-        textDB: 'https://textdb.dev/api/data',
-    },
-
     // Auto-save configuration
     autoSave: {
         enabled: true,
@@ -113,17 +97,6 @@ const APP_CONFIG = {
 // ================================================
 // Utility Functions
 // ================================================
-
-/**
- * Get environment-specific storage configuration
- * TODO: Implement environment detection logic
- */
-function getStorageConfig() {
-    // TODO: Return appropriate storage config based on environment
-    return APP_CONFIG.isProduction
-        ? APP_CONFIG.storage.textDB
-        : { useLocalStorage: true };
-}
 
 /**
  * Get spreadsheet initialization options

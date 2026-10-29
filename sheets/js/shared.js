@@ -29,7 +29,7 @@ class SharedSpreadsheet {
                 return;
             }
 
-            // Fetch shared spreadsheet from textdb.dev
+            // Fetch shared spreadsheet via the server API
             await this.fetchSharedSpreadsheet();
 
         } catch (error) {

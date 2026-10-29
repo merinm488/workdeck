@@ -876,13 +876,6 @@ class SpreadsheetManager {
         // Update cached metadata immediately after save
         if (success) {
             this.currentSpreadsheetMetadata = spreadsheetData;
-
-            // If spreadsheet is shared, update the shared copy asynchronously (non-blocking)
-            if (spreadsheetData.sharedId) {
-                this.updateSharedCopy(spreadsheetData).catch(e => {
-                    console.error('[SPREADSHEET] Failed to update shared copy:', e);
-                });
-            }
         }
 
         return success;
@@ -1706,40 +1699,6 @@ class SpreadsheetManager {
         } catch (error) {
             console.error('[SPREADSHEET] Error saving metadata:', error);
             return false;
-        }
-    }
-
-    /**
-     * Update shared copy asynchronously (non-blocking)
-     * @param {object} spreadsheetData - Complete spreadsheet data to push
-     */
-    async updateSharedCopy(spreadsheetData) {
-        if (!spreadsheetData.sharedId) {
-            console.warn('[SPREADSHEET] No sharedId found, skipping shared copy update');
-            return;
-        }
-
-        try {
-            const shareData = {
-                spreadsheet: spreadsheetData,
-                sharedAt: new Date().toISOString()
-            };
-
-            const response = await fetch(`https://textdb.dev/api/data/shared_${spreadsheetData.sharedId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(shareData)
-            });
-
-            if (!response.ok) {
-                console.error('[SPREADSHEET] Failed to update shared copy, status:', response.status);
-            }
-        } catch (e) {
-            console.error('[SPREADSHEET] Error updating shared copy:', e);
-            throw e;
         }
     }
 }

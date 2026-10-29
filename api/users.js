@@ -54,6 +54,15 @@ async function migrateSheetBodies(userData) {
   }));
 }
 
+/** Shared-copy snapshot: sheet metadata minus sharedId, with the workbook embedded. */
+async function buildSharedSheetRecord(record, body) {
+  const { sharedId, ...sheet } = record;
+  if (sheet.data === undefined) {
+    sheet.data = body !== undefined ? body : await getSheetBody(record.id);
+  }
+  return sheet;
+}
+
 // ================================================
 // API Handler
 // ================================================
@@ -320,20 +329,37 @@ export default async function handler(req, res) {
           s => s.id === sheetId
         );
 
+        let sheetRecord;
         if (existingIndex >= 0) {
-          userData.sheets[existingIndex] = {
+          sheetRecord = {
             ...userData.sheets[existingIndex],
             ...sheetMeta,
             id: sheetId,
             updatedAt: new Date().toISOString()
           };
+          userData.sheets[existingIndex] = sheetRecord;
         } else {
-          userData.sheets.push({
+          sheetRecord = {
             id: sheetId,
             ...sheetMeta,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
-          });
+          };
+          userData.sheets.push(sheetRecord);
+        }
+
+        // Keep any existing share link in step with the edit (docs-style
+        // mirror). A failed re-sync must not fail the save.
+        if (sheetRecord.sharedId) {
+          try {
+            const synced = await putSharedDoc(sheetRecord.sharedId, {
+              sheet: await buildSharedSheetRecord(sheetRecord, body),
+              sharedAt: new Date().toISOString()
+            });
+            if (!synced) console.error('[API] Failed to update shared copy');
+          } catch (e) {
+            console.error('[API] Failed to update shared copy:', e);
+          }
         }
 
         const saved = thumbSaved && await saveSheetsSections(hash, userData);
@@ -434,12 +460,8 @@ export default async function handler(req, res) {
         }
 
         const newShareId = generateId();
-        const record = userData.sheets[sheetIndex];
-        const sharedRecord = record.data !== undefined
-          ? record
-          : { ...record, data: await getSheetBody(sheetId) };
         const shareData = {
-          sheet: sharedRecord,
+          sheet: await buildSharedSheetRecord(userData.sheets[sheetIndex]),
           sharedAt: new Date().toISOString()
         };
 

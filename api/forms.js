@@ -431,11 +431,12 @@ export default async function handler(req, res) {
         }
 
         // Initialize the responses array and append this submission.
+        // Server fields spread last so a submitter can't spoof them.
         sharedDoc.responses = sharedDoc.responses || [];
         sharedDoc.responses.push({
+          ...data.response,
           id: generateId(),
-          submittedAt: new Date().toISOString(),
-          ...data.response
+          submittedAt: new Date().toISOString()
         });
 
         const stored = await putSharedDoc(shareId, sharedDoc);
