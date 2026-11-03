@@ -967,7 +967,7 @@ export default async function handler(req, res) {
           if (existing && existing.hash === hash) {
             await deleteSitePointer(pub.slug);
           }
-          delete userData.settings.publish;
+          userData.settings.publish = null;
           break;
         }
 

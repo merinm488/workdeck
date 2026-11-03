@@ -1889,41 +1889,127 @@ async function confirmDeleteAccount() {
 
 const SITE_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
 
+// Publishable kinds for the modal's content chips. kind doubles as the
+// chip color class; unit is the singular label; icon is a WD_APPS icon key.
+const PUBLISH_KINDS = [
+    { kind: 'docs', unit: 'doc', icon: 'docs' },
+    { kind: 'sheets', unit: 'sheet', icon: 'sheets' },
+    { kind: 'decks', unit: 'deck', icon: 'slides' },
+    { kind: 'forms', unit: 'form', icon: 'forms' }
+];
+
+let unpublishArmedTimer = null;
+
+/** Swap a button's label / spinner / disabled state. */
+function setBtnBusy(btn, busy, text) {
+    const label = btn.querySelector('.wd-btn-text');
+    const spinner = btn.querySelector('.wd-btn-spinner');
+    btn.disabled = busy;
+    if (spinner) spinner.classList.toggle('hidden', !busy);
+    if (label && text) label.textContent = text;
+}
+
+/** Publishable item counts from the in-memory account state. */
+function publishCounts() {
+    const totals = {
+        docs: state.docs.filter(function (d) { return !d.archived; }).length,
+        sheets: state.sheets.length,
+        decks: state.slides.length,
+        forms: state.forms.length
+    };
+    return PUBLISH_KINDS
+        .map(function (k) { return { kind: k.kind, unit: k.unit, icon: k.icon, n: totals[k.kind] }; })
+        .filter(function (c) { return c.n > 0; });
+}
+
+function renderPublishChips() {
+    const host = $('publishChips');
+    host.replaceChildren();
+    publishCounts().forEach(function (c) {
+        const chip = document.createElement('span');
+        chip.className = 'wd-publish-chip ' + c.kind;
+        chip.append(wdIcon(c.icon));
+        const count = document.createElement('span');
+        count.className = 'wd-publish-chip-count';
+        count.textContent = String(c.n);
+        const name = document.createElement('span');
+        name.className = 'wd-publish-chip-name';
+        name.textContent = c.n === 1 ? c.unit : c.kind;
+        chip.append(count, name);
+        host.append(chip);
+    });
+    if (!host.childElementCount) {
+        const empty = document.createElement('span');
+        empty.className = 'wd-publish-chip';
+        empty.textContent = 'Nothing publishable yet';
+        host.append(empty);
+    }
+}
+
 function showPublishModal() {
     const pub = state.settings && state.settings.publish;
     $('publishSlugPrefix').textContent = location.origin + '/';
     $('publishTitleInput').value = (pub && pub.title) || '';
     $('publishSlugInput').value = (pub && pub.slug) || '';
     $('publishError').classList.add('hidden');
+    renderPublishChips();
 
-    const status = $('publishStatus');
-    status.replaceChildren();
+    const live = $('publishLiveCard');
     if (pub && pub.slug) {
-        status.append('Public at ');
-        const link = document.createElement('a');
-        link.href = `${location.origin}/${pub.slug}`;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        link.textContent = `/${pub.slug}`;
-        status.append(link);
-        if (pub.publishedAt) {
-            status.append(' · since ' + new Date(pub.publishedAt).toLocaleDateString());
-        }
-        status.classList.remove('hidden');
-        $('confirmPublish').textContent = 'Update';
-        $('unpublishActions').classList.remove('hidden');
+        const url = `${location.origin}/${pub.slug}`;
+        $('publishLiveUrl').textContent = url;
+        $('publishOpenLink').href = url;
+        $('publishSince').textContent = pub.publishedAt
+            ? 'Public since ' + new Date(pub.publishedAt).toLocaleDateString()
+            : '';
+        live.classList.remove('hidden');
+        $('publishDanger').classList.remove('hidden');
+        setBtnBusy($('confirmPublish'), false, 'Update');
     } else {
-        status.classList.add('hidden');
-        $('confirmPublish').textContent = 'Publish';
-        $('unpublishActions').classList.add('hidden');
+        live.classList.add('hidden');
+        $('publishDanger').classList.add('hidden');
+        setBtnBusy($('confirmPublish'), false, 'Publish');
     }
 
+    disarmUnpublish();
     $('publishModal').classList.add('active');
     closeDropdown($('settingsDropdown'));
 }
 
 function hidePublishModal() {
     $('publishModal').classList.remove('active');
+    disarmUnpublish();
+}
+
+function copyPublishLink() {
+    const pub = state.settings && state.settings.publish;
+    if (!pub || !pub.slug) return;
+    const url = `${location.origin}/${pub.slug}`;
+    const btn = $('publishCopyBtn');
+    const done = function (ok) {
+        if (!ok) {
+            showNotification('Could not copy link', 'error');
+            return;
+        }
+        btn.classList.add('copied');
+        setTimeout(function () { btn.classList.remove('copied'); }, 1600);
+    };
+    const fallbackCopy = function () {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.classList.add('wd-clipboard-helper');
+        document.body.appendChild(ta);
+        ta.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+        document.body.removeChild(ta);
+        done(ok);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () { done(true); }, fallbackCopy);
+    } else {
+        fallbackCopy();
+    }
 }
 
 async function confirmPublish() {
@@ -1938,7 +2024,7 @@ async function confirmPublish() {
         return;
     }
 
-    $('confirmPublish').disabled = true;
+    setBtnBusy($('confirmPublish'), true, 'Publishing…');
     try {
         // Direct fetch (not api()) so the shareFailures list in the
         // response envelope is reachable.
@@ -1966,12 +2052,32 @@ async function confirmPublish() {
         errorEl.textContent = 'Failed to publish. Please try again.';
         errorEl.classList.remove('hidden');
     } finally {
-        $('confirmPublish').disabled = false;
+        const published = state.settings && state.settings.publish && state.settings.publish.slug;
+        setBtnBusy($('confirmPublish'), false, published ? 'Update' : 'Publish');
     }
 }
 
+/** Two-step confirm: arm, then confirm within 4s. */
+function disarmUnpublish() {
+    clearTimeout(unpublishArmedTimer);
+    const btn = $('confirmUnpublish');
+    if (!btn) return;
+    btn.classList.remove('armed');
+    const label = btn.querySelector('.wd-btn-text');
+    if (label) label.textContent = 'Unpublish';
+}
+
 async function confirmUnpublish() {
-    $('confirmUnpublish').disabled = true;
+    const btn = $('confirmUnpublish');
+    if (!btn.classList.contains('armed')) {
+        btn.classList.add('armed');
+        const label = btn.querySelector('.wd-btn-text');
+        if (label) label.textContent = 'Click again to confirm';
+        unpublishArmedTimer = setTimeout(disarmUnpublish, 4000);
+        return;
+    }
+    disarmUnpublish();
+    setBtnBusy(btn, true, 'Unpublishing…');
     try {
         await api('unpublishSite', {});
         hidePublishModal();
@@ -1979,7 +2085,7 @@ async function confirmUnpublish() {
     } catch (error) {
         showNotification(error.message || 'Failed to unpublish', 'error');
     } finally {
-        $('confirmUnpublish').disabled = false;
+        setBtnBusy(btn, false, 'Unpublish');
     }
 }
 
@@ -2361,9 +2467,15 @@ function setupEventListeners() {
     $('cancelPublish').addEventListener('click', hidePublishModal);
     $('confirmPublish').addEventListener('click', confirmPublish);
     $('confirmUnpublish').addEventListener('click', confirmUnpublish);
+    $('publishCopyBtn').addEventListener('click', copyPublishLink);
     $('publishSlugInput').addEventListener('keydown', function (e) {
         if (e.key === 'Enter') confirmPublish();
         if (e.key === 'Escape') hidePublishModal();
+    });
+    ['publishTitleInput', 'publishSlugInput'].forEach(function (id) {
+        $(id).addEventListener('input', function () {
+            $('publishError').classList.add('hidden');
+        });
     });
 
     // ----- Login theme toggle -----
