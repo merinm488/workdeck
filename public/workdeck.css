@@ -1716,6 +1716,67 @@ html[data-theme="dark"] .wd-theme-option-icon {
     margin: 12px 0;
 }
 
+/* Publish site modal */
+.wd-publish-status {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.wd-publish-status a {
+    color: var(--accent);
+}
+
+.wd-publish-optional {
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+.wd-publish-slug-label {
+    margin-top: 14px;
+}
+
+.wd-publish-slug-row {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    overflow: hidden;
+}
+
+.wd-publish-slug-row:focus-within {
+    border-color: var(--accent);
+}
+
+.wd-publish-slug-prefix {
+    padding: 0 4px 0 12px;
+    font-size: 14px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wd-publish-slug-row .wd-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    min-width: 0;
+}
+
+.wd-publish-slug-row .wd-input:focus {
+    outline: none;
+}
+
+.wd-publish-hint {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin: 14px 0;
+    line-height: 1.5;
+}
+
 /* ---------- Offscreen helpers ---------- */
 /* Hidden sandboxed iframe that previews.js renders documents in */
 .wd-sandbox-frame {

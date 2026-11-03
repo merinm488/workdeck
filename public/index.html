@@ -293,6 +293,14 @@
                                     </svg>
                                     <span class="wd-item-text">View My Key</span>
                                 </button>
+                                <button class="wd-dropdown-item" id="publishBtn">
+                                    <svg class="wd-item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                    </svg>
+                                    <span class="wd-item-text">Publish Site</span>
+                                </button>
                                 <div class="wd-dropdown-divider"></div>
                                 <button class="wd-dropdown-item wd-item-danger" id="deleteAccountBtn">
                                     <svg class="wd-item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -472,6 +480,37 @@
                 <div class="wd-modal-actions">
                     <button id="cancelChangeKey" class="wd-secondary-btn">Cancel</button>
                     <button id="confirmChangeKey" class="wd-primary-btn">Change Key</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Publish site modal — makes the account publicly readable at
+         /<slug> (server-side slug resolution; the account hash is
+         never exposed). -->
+    <div id="publishModal" class="wd-modal">
+        <div class="wd-modal-content">
+            <div class="wd-modal-header">
+                <h3 class="wd-modal-title">Publish Site</h3>
+                <button class="wd-modal-close" id="publishModalClose">&times;</button>
+            </div>
+            <div class="wd-modal-body">
+                <p id="publishStatus" class="wd-publish-status hidden"></p>
+                <label for="publishTitleInput" class="wd-label">Site Title <span class="wd-publish-optional">(optional)</span></label>
+                <input type="text" id="publishTitleInput" class="wd-input" placeholder="Workdeck Site" maxlength="120">
+                <label for="publishSlugInput" class="wd-label wd-publish-slug-label">Public Address</label>
+                <div class="wd-publish-slug-row">
+                    <span class="wd-publish-slug-prefix" id="publishSlugPrefix"></span>
+                    <input type="text" id="publishSlugInput" class="wd-input" placeholder="my-site" maxlength="40" autocomplete="off" spellcheck="false">
+                </div>
+                <p class="wd-publish-hint">Docs, sheets, decks and forms become publicly readable at this address. Form responses, files and account settings stay private. Archived docs are excluded.</p>
+                <p id="publishError" class="wd-change-key-error hidden"></p>
+                <div class="wd-modal-actions">
+                    <button id="cancelPublish" class="wd-secondary-btn">Cancel</button>
+                    <button id="confirmPublish" class="wd-primary-btn">Publish</button>
+                </div>
+                <div class="wd-modal-actions hidden" id="unpublishActions">
+                    <button id="confirmUnpublish" class="wd-danger-btn">Unpublish</button>
                 </div>
             </div>
         </div>

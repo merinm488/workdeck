@@ -28,6 +28,12 @@ import {
   deleteSheetBody,
   putThumb,
   deleteThumb,
+  getSitePointer,
+  putSitePointer,
+  deleteSitePointer,
+  isValidSiteSlug,
+  isReservedSiteSlug,
+  putSharedDoc,
   getBaseUrl,
   applyCorsHeaders,
   accountHash
@@ -211,6 +217,31 @@ function withSettingsDefaults(userData) {
   return userData;
 }
 
+/**
+ * Publish helpers. Decks and forms appear on a public site through their
+ * EXISTING per-file share viewers (iframes of /slides/shared.html and
+ * /forms/shared.html), so publishing snapshots any that have no share yet.
+ * Existing snapshots are never touched — forms' accumulated responses
+ * would be wiped. Docs and sheets need no snapshot: the site API reads
+ * them live from the account document.
+ */
+async function ensureDeckShare(deck) {
+  if (deck.sharedId) return deck.sharedId;
+  const shareId = generateId();
+  const { sharedId: _drop, ...snapshot } = deck;
+  const stored = await putSharedDoc(shareId, { deck: snapshot, sharedAt: new Date().toISOString() });
+  return stored ? shareId : null;
+}
+
+async function ensureFormShare(form) {
+  if (form.sharedId) return form.sharedId;
+  const shareId = generateId();
+  // linkedSheet stays private (see the linked-spreadsheet notes in forms.js)
+  const { sharedId: _dropShare, linkedSheet: _dropLink, ...snapshot } = form;
+  const stored = await putSharedDoc(shareId, { form: snapshot, responses: [], sharedAt: new Date().toISOString() });
+  return stored ? shareId : null;
+}
+
 // ================================================
 // Handler
 // ================================================
@@ -271,6 +302,17 @@ export default async function handler(req, res) {
           }[result.code] || [500, 'Failed to change key'];
           return res.status(failure[0]).json({ success: false, error: failure[1] });
         }
+        // A published site keeps working across key changes: repoint it at
+        // the account's new hash.
+        const pub = result.doc?.settings?.publish;
+        if (pub && pub.slug) {
+          await putSitePointer(pub.slug, {
+            hash: result.hash,
+            slug: pub.slug,
+            title: pub.title || null,
+            publishedAt: pub.publishedAt || new Date().toISOString()
+          });
+        }
         return res.status(200).json({
           success: true,
           hash: result.hash,
@@ -328,6 +370,8 @@ export default async function handler(req, res) {
       if (!userData) {
         return res.status(404).json({ success: false, error: 'User not found' });
       }
+
+      let publishResult = null;
 
       switch (action) {
         // ---- Create a doc (same shape Docs creates) ----
@@ -858,6 +902,75 @@ export default async function handler(req, res) {
           break;
         }
 
+        // ---- Publish the account as a public read-only site ----
+        // The public address is /<slug>; the server resolves the slug
+        // to this account through a pepper-HMAC'd pointer record, so the
+        // account hash never appears in any public page or request.
+        case 'publishSite': {
+          const slug = String(data?.slug || '').trim().toLowerCase();
+          if (!isValidSiteSlug(slug)) {
+            return res.status(400).json({ success: false, error: 'Slug must be 3-40 lowercase letters, digits or hyphens' });
+          }
+          if (isReservedSiteSlug(slug)) {
+            return res.status(400).json({ success: false, error: 'That address is reserved' });
+          }
+          const existing = await getSitePointer(slug);
+          if (existing && existing.hash !== hash) {
+            return res.status(409).json({ success: false, error: 'That address is already taken' });
+          }
+
+          // Snapshot decks/forms that have no share yet (re-publish after
+          // adding new ones — the site embeds them via their share viewers).
+          const shareFailures = [];
+          for (const deck of userData.slides) {
+            if (!deck.sharedId) {
+              const shareId = await ensureDeckShare(deck);
+              if (shareId) deck.sharedId = shareId;
+              else shareFailures.push(deck.name || deck.id);
+            }
+          }
+          for (const form of userData.forms) {
+            if (!form.sharedId) {
+              const shareId = await ensureFormShare(form);
+              if (shareId) form.sharedId = shareId;
+              else shareFailures.push(form.name || form.id);
+            }
+          }
+
+          const title = String(data?.title || '').trim().slice(0, 120) || null;
+          const pointer = {
+            hash,
+            slug,
+            title: title || userData.settings?.publish?.title || null,
+            publishedAt: (existing && existing.publishedAt) || new Date().toISOString()
+          };
+          if (!(await putSitePointer(slug, pointer))) {
+            return res.status(500).json({ success: false, error: 'Failed to publish site' });
+          }
+          userData.settings = userData.settings || {};
+          userData.settings.publish = {
+            slug: pointer.slug,
+            title: pointer.title,
+            publishedAt: pointer.publishedAt
+          };
+          publishResult = { siteUrl: `${getBaseUrl(req)}/${slug}`, shareFailures };
+          break;
+        }
+
+        case 'unpublishSite': {
+          const pub = userData.settings?.publish;
+          if (!pub || !pub.slug) {
+            return res.status(400).json({ success: false, error: 'Site is not published' });
+          }
+          // Only remove the pointer when it still points at this account.
+          const existing = await getSitePointer(pub.slug);
+          if (existing && existing.hash === hash) {
+            await deleteSitePointer(pub.slug);
+          }
+          delete userData.settings.publish;
+          break;
+        }
+
         // ---- Theme / viewMode / misc settings ----
         case 'updateSettings': {
           if (!data?.settings || typeof data.settings !== 'object') {
@@ -893,7 +1006,11 @@ export default async function handler(req, res) {
         return res.status(500).json({ success: false, error: 'Failed to save data' });
       }
 
-      return res.status(200).json({ success: true, data: withSettingsDefaults(userData) });
+      return res.status(200).json({
+        success: true,
+        data: withSettingsDefaults(userData),
+        ...(publishResult ? { publish: publishResult } : {})
+      });
     }
 
     // ============================================================
@@ -926,6 +1043,11 @@ export default async function handler(req, res) {
       }
       for (const sheet of userData.sheets || []) {
         await deleteThumb(sheet.id).catch(() => {});
+      }
+
+      // Taking the account down takes its public site with it.
+      if (userData.settings?.publish?.slug) {
+        await deleteSitePointer(userData.settings.publish.slug);
       }
 
       const deleted = await deleteUserDoc(hash);

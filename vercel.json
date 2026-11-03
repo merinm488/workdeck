@@ -47,6 +47,10 @@
     {
       "source": "/f/:id([a-z0-9_]{14,})",
       "destination": "/f.html?id=:id"
+    },
+    {
+      "source": "/:slug([a-z0-9-]{3,40})",
+      "destination": "/blog.html?site=:slug"
     }
   ],
   "redirects": [

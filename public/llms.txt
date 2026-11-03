@@ -204,6 +204,22 @@ create or delete accounts.
     PUT  { action: "deleteTag",    data: { tagId } }
     contentType: "plain-text" or "markdown".
 
+### Public sites  —  /api/blog   (NO AUTH — read-only)
+An account can publish itself as a public, read-only site
+(Workdeck -> Settings -> Publish Site; humans view it at /<slug>).
+The slug resolves server-side; the account key/hash is never involved
+or exposed. There are no write methods — everything but GET answers 405.
+
+    GET ?slug=<slug>            -> { site: { slug, title, publishedAt },
+                                     docs, tags, sheets, forms, slides }
+    GET ?slug=<slug>&sheet=<id> -> { sheetId, data }   (Univer workbook)
+
+Projection rules: docs exclude archived ones; sheets are metadata only
+(fetch bodies per-sheet); forms carry questions + sharedId but never
+responses or linked-sheet state; decks carry full slide data + sharedId.
+Excluded entirely: settings, todo, calendars, events, kanban, draws,
+Filebox files/folders.
+
 ## Examples
 
 Add three tasks to a new todo list:

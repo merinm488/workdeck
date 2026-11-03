@@ -490,6 +490,46 @@ export async function deleteRawDoc(key) {
 }
 
 // ================================================
+// Published sites (public read-only blog pointers)
+// ================================================
+
+// A published site resolves slug -> account hash through a pointer record.
+// Its storage key is HMAC'd with the pepper so the public slug never
+// yields a fetchable textdb address — only this server can find it.
+const sitePointerKey = slug =>
+  `pub_${crypto.createHmac('sha256', PEPPER_SECRET).update(`wd-site:${slug}`).digest('hex')}`;
+
+/** 3-40 chars: lowercase letters, digits, hyphens; no leading/trailing hyphen. */
+export function isValidSiteSlug(slug) {
+  return typeof slug === 'string' && /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/.test(slug);
+}
+
+const RESERVED_SITE_SLUGS = new Set([
+  'api', 'blog', 'calendar', 'css', 'docs', 'draw', 'files', 'forms',
+  'index', 'js', 'kanban', 'sheets', 'slides', 'todo', 'workdeck'
+]);
+
+export function isReservedSiteSlug(slug) {
+  return RESERVED_SITE_SLUGS.has(slug);
+}
+
+/** Read the pointer for `slug`, or null when the address is unpublished. */
+export async function getSitePointer(slug) {
+  const doc = await getRawDoc(sitePointerKey(slug));
+  return doc && typeof doc === 'object' && doc.hash ? doc : null;
+}
+
+/** Write the pointer for `slug`. */
+export async function putSitePointer(slug, value) {
+  return putRawDoc(sitePointerKey(slug), value);
+}
+
+/** Remove the pointer for `slug`. */
+export async function deleteSitePointer(slug) {
+  return deleteRawDoc(sitePointerKey(slug));
+}
+
+// ================================================
 // Spreadsheet bodies (Sheets app workbooks)
 // ================================================
 

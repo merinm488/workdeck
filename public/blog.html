@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+
+    <title>Workdeck Site</title>
+    <meta name="description" content="A site published with Workdeck.">
+    <meta name="theme-color" content="#4F46E5">
+
+    <!-- App Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Suite theme variables + shared buttons, then the blog's own layout -->
+    <link rel="stylesheet" href="/workdeck.css">
+    <link rel="stylesheet" href="/blog.css">
+
+    <!-- Markdown rendering (same package as the landing page previews) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+
+    <!-- form-js viewer: read-only rendering of published forms -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@bpmn-io/form-js@1.25.0/dist/assets/form-js.css">
+    <script src="https://cdn.jsdelivr.net/npm/@bpmn-io/form-js@1.25.0/dist/form-viewer.umd.js"></script>
+</head>
+<body>
+    <!-- ===== LOADING / ERROR ===== -->
+    <div id="blogLoading" class="blog-loading">
+        <div class="blog-spinner"></div>
+        <p>Loading site…</p>
+    </div>
+
+    <div id="blogError" class="blog-error hidden">
+        <h1 id="blogErrorTitle">Site not found</h1>
+        <p id="blogErrorText">This address is not published.</p>
+        <button id="blogRetryBtn" class="blog-btn">Retry</button>
+    </div>
+
+    <!-- ===== SITE ===== -->
+    <div id="blogApp" class="blog-app hidden">
+        <header class="blog-header">
+            <div class="blog-header-inner">
+                <div class="blog-brand-row">
+                    <a class="blog-brand" href="/" title="Made with Workdeck">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 01-1-1h4a1 1 0 001 1v4a1 1 0 001 1h3a1 1 0 001-1V10" /></svg>
+                        <span>Workdeck</span>
+                    </a>
+                    <button id="blogThemeToggle" class="blog-theme-toggle" aria-label="Toggle theme">
+                        <svg class="blog-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                        <svg class="blog-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    </button>
+                </div>
+                <h1 id="siteTitle" class="blog-site-title">Workdeck Site</h1>
+                <p id="siteMeta" class="blog-site-meta"></p>
+            </div>
+        </header>
+
+        <nav id="blogTabs" class="blog-tabs" aria-label="Sections"></nav>
+
+        <main id="blogMain" class="blog-main"></main>
+
+        <footer class="blog-footer">
+            <a href="/">Powered by Workdeck</a>
+        </footer>
+    </div>
+
+    <!-- ===== TEMPLATES (cloned by blog.js) ===== -->
+
+    <!-- Section tab -->
+    <template id="blogTabTemplate">
+        <button class="blog-tab">
+            <span class="blog-tab-label"></span>
+            <span class="blog-tab-count"></span>
+        </button>
+    </template>
+
+    <!-- List row for any item (post / sheet / deck / form) -->
+    <template id="blogRowTemplate">
+        <button class="blog-row">
+            <span class="blog-row-icon"></span>
+            <span class="blog-row-main">
+                <span class="blog-row-title"></span>
+                <span class="blog-row-meta"></span>
+            </span>
+            <span class="blog-row-date"></span>
+        </button>
+    </template>
+
+    <!-- Tag chip (docs rows + article meta) -->
+    <template id="blogChipTemplate">
+        <span class="blog-chip"><span class="blog-chip-dot"></span><span class="blog-chip-name"></span></span>
+    </template>
+
+    <!-- Row icons, one per section (blog.js: iconSvg) -->
+    <template id="blog-icon-doc">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+    </template>
+    <template id="blog-icon-sheet">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18M3 14h18m-9-4v8m-7-6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2z" /></svg>
+    </template>
+    <template id="blog-icon-deck">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"></rect><line x1="12" y1="17" x2="12" y2="21"></line><line x1="8" y1="21" x2="16" y2="21"></line></svg>
+    </template>
+    <template id="blog-icon-form">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"></path><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="13" y2="16"></line></svg>
+    </template>
+
+    <!-- Article (doc reading view) -->
+    <template id="blogArticleTemplate">
+        <article class="blog-article">
+            <button class="blog-back">← All posts</button>
+            <h2 class="blog-article-title"></h2>
+            <div class="blog-article-meta"></div>
+            <div class="blog-article-body"></div>
+        </article>
+    </template>
+
+    <!-- Sheet (read-only workbook tables) -->
+    <template id="blogSheetTemplate">
+        <section class="blog-sheet">
+            <button class="blog-back">← All sheets</button>
+            <h2 class="blog-item-title"></h2>
+            <p class="blog-loading-note hidden">Loading…</p>
+            <div class="blog-sheet-body"></div>
+        </section>
+    </template>
+
+    <!-- One worksheet table -->
+    <template id="blogWorksheetTemplate">
+        <div class="blog-worksheet">
+            <h3 class="blog-worksheet-name"></h3>
+            <div class="blog-table-wrap"><table class="blog-table"></table></div>
+        </div>
+    </template>
+
+    <!-- Deck (slides embed) -->
+    <template id="blogSlideTemplate">
+        <section class="blog-slide">
+            <button class="blog-back">← All decks</button>
+            <h2 class="blog-item-title"></h2>
+            <div class="blog-slide-frame">
+                <iframe title="Slide deck" allowfullscreen></iframe>
+            </div>
+            <p class="blog-note hidden">This deck was added after the last publish. The owner needs to republish to share it here.</p>
+        </section>
+    </template>
+
+    <!-- Form (read-only preview + link to the fill-out page) -->
+    <template id="blogFormTemplate">
+        <section class="blog-form">
+            <button class="blog-back">← All forms</button>
+            <h2 class="blog-item-title"></h2>
+            <div class="blog-form-frame"></div>
+            <a class="blog-btn blog-form-open hidden" target="_blank" rel="noopener">Fill out this form ↗</a>
+            <p class="blog-note hidden">This form was added after the last publish. The owner needs to republish to accept responses here.</p>
+        </section>
+    </template>
+
+    <!-- Empty site -->
+    <template id="blogEmptyTemplate">
+        <div class="blog-empty">
+            <h2>Nothing published yet</h2>
+            <p>This site has no public content.</p>
+        </div>
+    </template>
+
+    <script src="/js/themes.js"></script>
+    <script src="/js/blog.js"></script>
+</body>
+</html>

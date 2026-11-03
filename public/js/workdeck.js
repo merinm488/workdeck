@@ -1884,6 +1884,106 @@ async function confirmDeleteAccount() {
 }
 
 // ================================================
+// Publish site
+// ================================================
+
+const SITE_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
+
+function showPublishModal() {
+    const pub = state.settings && state.settings.publish;
+    $('publishSlugPrefix').textContent = location.origin + '/';
+    $('publishTitleInput').value = (pub && pub.title) || '';
+    $('publishSlugInput').value = (pub && pub.slug) || '';
+    $('publishError').classList.add('hidden');
+
+    const status = $('publishStatus');
+    status.replaceChildren();
+    if (pub && pub.slug) {
+        status.append('Public at ');
+        const link = document.createElement('a');
+        link.href = `${location.origin}/${pub.slug}`;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = `/${pub.slug}`;
+        status.append(link);
+        if (pub.publishedAt) {
+            status.append(' · since ' + new Date(pub.publishedAt).toLocaleDateString());
+        }
+        status.classList.remove('hidden');
+        $('confirmPublish').textContent = 'Update';
+        $('unpublishActions').classList.remove('hidden');
+    } else {
+        status.classList.add('hidden');
+        $('confirmPublish').textContent = 'Publish';
+        $('unpublishActions').classList.add('hidden');
+    }
+
+    $('publishModal').classList.add('active');
+    closeDropdown($('settingsDropdown'));
+}
+
+function hidePublishModal() {
+    $('publishModal').classList.remove('active');
+}
+
+async function confirmPublish() {
+    const slug = $('publishSlugInput').value.trim().toLowerCase();
+    const title = $('publishTitleInput').value.trim();
+    const errorEl = $('publishError');
+
+    errorEl.classList.add('hidden');
+    if (!SITE_SLUG_RE.test(slug)) {
+        errorEl.textContent = 'Use 3-40 lowercase letters, digits or hyphens (no leading/trailing hyphen)';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    $('confirmPublish').disabled = true;
+    try {
+        // Direct fetch (not api()) so the shareFailures list in the
+        // response envelope is reachable.
+        const response = await fetch(WD_APP.apiEndpoint, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hash: state.userHash, action: 'publishSite', data: { slug, title } })
+        });
+        const result = await response.json();
+        if (result.success) {
+            state.settings = result.data.settings;
+            hidePublishModal();
+            const failed = (result.publish && result.publish.shareFailures.length) || 0;
+            showNotification(
+                failed
+                    ? `Published at /${slug} — ${failed} item${failed === 1 ? '' : 's'} will appear after the next publish`
+                    : `Published at /${slug}`,
+                'success'
+            );
+        } else {
+            errorEl.textContent = result.error || 'Failed to publish';
+            errorEl.classList.remove('hidden');
+        }
+    } catch (error) {
+        errorEl.textContent = 'Failed to publish. Please try again.';
+        errorEl.classList.remove('hidden');
+    } finally {
+        $('confirmPublish').disabled = false;
+    }
+}
+
+async function confirmUnpublish() {
+    $('confirmUnpublish').disabled = true;
+    try {
+        await api('unpublishSite', {});
+        hidePublishModal();
+        showNotification('Site unpublished', 'success');
+    } catch (error) {
+        showNotification(error.message || 'Failed to unpublish', 'error');
+    } finally {
+        $('confirmUnpublish').disabled = false;
+    }
+}
+
+// ================================================
 // Loading / notifications
 // ================================================
 
@@ -2254,6 +2354,17 @@ function setupEventListeners() {
     $('deleteAccountModalClose').addEventListener('click', hideDeleteAccountModal);
     $('cancelDeleteAccount').addEventListener('click', hideDeleteAccountModal);
     $('confirmDeleteAccount').addEventListener('click', confirmDeleteAccount);
+
+    // ----- Publish site modal -----
+    $('publishBtn').addEventListener('click', showPublishModal);
+    $('publishModalClose').addEventListener('click', hidePublishModal);
+    $('cancelPublish').addEventListener('click', hidePublishModal);
+    $('confirmPublish').addEventListener('click', confirmPublish);
+    $('confirmUnpublish').addEventListener('click', confirmUnpublish);
+    $('publishSlugInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') confirmPublish();
+        if (e.key === 'Escape') hidePublishModal();
+    });
 
     // ----- Login theme toggle -----
     $('loginThemeToggle').addEventListener('click', function () {
