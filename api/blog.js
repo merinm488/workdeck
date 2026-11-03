@@ -63,6 +63,7 @@ function publicForm(form) {
     name: form.name || 'Untitled Form',
     display: form.display || 'form',
     components: Array.isArray(form.components) ? form.components : [],
+    tagId: form.tagId || null,
     sharedId: form.sharedId || null,
     createdAt: form.createdAt,
     updatedAt: form.updatedAt
