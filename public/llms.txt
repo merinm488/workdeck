@@ -147,7 +147,9 @@ create or delete accounts.
     PUT  { action: "updateBlogSettings",data: { title? } }
     PUT  { action: "publishPost",       data: { id, slug } } -> { blog: { postUrl, path } }
          (makes one post public at /<slug> — the slug is chosen per publish,
-          unique across all accounts; unpublish/delete frees it again.
+          unique across all accounts. Unpublishing keeps the slug reserved:
+          the old link 404s and can't be re-registered; republishing the
+          same link revives it, deleting the post frees it.
           Posts published before per-post links keep /<address>/<post>)
     PUT  { action: "unpublishPost",     data: { id } }
     PUT  { action: "updateSettings",    data: { settings: {...} } }

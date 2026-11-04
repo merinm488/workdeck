@@ -822,8 +822,8 @@ export default async function handler(req, res) {
           } else if (isPost) {
             target.title = cleanName;
             // Same slug rule as Blog's updatePost: only never-published
-            // posts re-derive their slug, so live URLs stay stable.
-            if (!target.publishedAt) {
+            // posts re-derive their slug (a reserved link stays put).
+            if (!target.publishedAt && !target.path) {
               target.slug = uniquePostSlug(userData.posts || [], slugifyTitle(cleanName), target.id);
             }
           } else {

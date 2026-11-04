@@ -154,15 +154,17 @@ const BlogEditor = {
         slugInput.disabled = published;
         $('pubSlugRow').classList.toggle('locked', published);
         slugInput.value = this.post.slug || '';
+        const hint = $('pubSlugHint');
         if (published) {
             const blog = blogConfig();
             $('pubSlugPrefix').textContent = this.post.path
                 ? location.origin + '/'
                 : location.origin + '/' + (blog.address ? blog.address.slug + '/' : '');
-            $('pubSlugHint').textContent = 'This link is live — unpublish the post to change it.';
+            hint.textContent = 'This link is live — unpublish the post to change it.';
+            hint.classList.remove('hidden');
         } else {
             $('pubSlugPrefix').textContent = location.origin + '/';
-            $('pubSlugHint').textContent = 'Choose this post\'s public link — letters, digits, hyphens; unique across Workdeck.';
+            hint.classList.add('hidden');
         }
     },
 
@@ -294,8 +296,8 @@ const BlogEditor = {
             return;
         }
         this.post.updatedAt = new Date().toISOString();
-        // The server re-derives the slug suggestion from the title while
-        // the post is unpublished — mirror it so the modal pre-fills fresh.
+        // The server derives the slug suggestion from the title for
+        // never-published posts — mirror it so the modal pre-fills fresh.
         const savedPost = result.data && result.data.posts
             ? result.data.posts.find(p => p && p.id === this.post.id)
             : null;

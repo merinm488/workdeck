@@ -19,8 +19,10 @@
  * global pointer registry — every published post occupies its own root
  * path across all accounts — and stored as a pepper-HMAC'd pointer
  * record (getSitePointer) pointing at this account's hash; the public
- * reader resolves it through /api/site. Unpublishing or deleting the
- * post frees the slug again. Posts published before per-post links keep
+ * reader resolves it through /api/site. Unpublishing keeps the slug
+ * reserved for the post (the old link 404s and can't be re-registered
+ * by another account); republishing the same link revives it, deleting
+ * the post frees it. Posts published before per-post links keep
  * living under the blog's claimed address (settings.blog.address) and
  * its single pointer. There is exactly one blog per account.
  *
@@ -194,7 +196,10 @@ export default async function handler(req, res) {
 
         if (data.title !== undefined) {
           target.title = String(data.title).trim() || DEFAULT_TITLE;
-          if (!target.publishedAt) {
+          // Only never-published posts re-slug (their slug is a modal
+          // suggestion); published or unpublished-but-reserved posts
+          // keep their link.
+          if (!target.publishedAt && !target.path) {
             target.slug = uniquePostSlug(userData.posts, slugifyTitle(target.title), target.id);
           }
         }
@@ -277,6 +282,14 @@ export default async function handler(req, res) {
           return res.status(409).json({ success: false, error: 'That address is already taken' });
         }
 
+        // Republishing at a new link frees the old one.
+        if (target.path && target.slug && target.slug !== slug) {
+          const old = await getSitePointer(target.slug);
+          if (old && old.hash === hash && old.postId === target.id) {
+            await deleteSitePointer(target.slug);
+          }
+        }
+
         const now = new Date().toISOString();
         if (!(await putSitePointer(slug, { hash, slug, postId: target.id, title: target.title || null, publishedAt: now }))) {
           return res.status(500).json({ success: false, error: 'Failed to publish post' });
@@ -297,18 +310,13 @@ export default async function handler(req, res) {
         });
       }
 
-      // UNPUBLISH POST — take one post offline. Frees its public slug
-      // (per-post pointers only; the legacy address pointer stays).
+      // UNPUBLISH POST — take one post offline. The slug stays reserved
+      // for this post: the old link keeps 404ing but can't be claimed by
+      // another account. Republishing the same link brings it back.
       if (action === 'unpublishPost') {
         const target = userData.posts.find(p => p && p.id === data?.id);
         if (!target) {
           return res.status(404).json({ success: false, error: 'Post not found' });
-        }
-        if (target.publishedAt && target.slug) {
-          const pointer = await getSitePointer(target.slug);
-          if (pointer && pointer.hash === hash && pointer.postId === target.id) {
-            await deleteSitePointer(target.slug);
-          }
         }
         target.publishedAt = null;
 
