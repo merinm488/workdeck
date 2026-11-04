@@ -293,14 +293,6 @@
                                     </svg>
                                     <span class="wd-item-text">View My Key</span>
                                 </button>
-                                <button class="wd-dropdown-item" id="publishBtn">
-                                    <svg class="wd-item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <line x1="2" y1="12" x2="22" y2="12"></line>
-                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                                    </svg>
-                                    <span class="wd-item-text">Publish Site</span>
-                                </button>
                                 <div class="wd-dropdown-divider"></div>
                                 <button class="wd-dropdown-item wd-item-danger" id="deleteAccountBtn">
                                     <svg class="wd-item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -485,71 +477,6 @@
         </div>
     </div>
 
-    <!-- Publish site modal — makes the account publicly readable at
-         /<slug> (server-side slug resolution; the account hash is
-         never exposed). -->
-    <div id="publishModal" class="wd-modal">
-        <div class="wd-modal-content wd-publish-modal">
-            <div class="wd-modal-header">
-                <h3 class="wd-modal-title">Publish Site</h3>
-                <button class="wd-modal-close" id="publishModalClose">&times;</button>
-            </div>
-            <div class="wd-modal-body">
-                <!-- Live status (shown while the site is published) -->
-                <div id="publishLiveCard" class="wd-publish-live hidden">
-                    <div class="wd-publish-live-head">
-                        <span class="wd-publish-live-dot"></span>
-                        <span class="wd-publish-live-label">Live</span>
-                        <span class="wd-publish-live-since" id="publishSince"></span>
-                    </div>
-                    <div class="wd-publish-live-row">
-                        <span class="wd-publish-live-url" id="publishLiveUrl"></span>
-                        <button class="wd-publish-live-btn" id="publishCopyBtn" title="Copy link" aria-label="Copy link">
-                            <svg class="wd-publish-copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                            <svg class="wd-publish-copied-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        </button>
-                        <a class="wd-publish-live-btn" id="publishOpenLink" target="_blank" rel="noopener" title="Open site" aria-label="Open site">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                        </a>
-                    </div>
-                </div>
-
-                <label for="publishTitleInput" class="wd-label">Site Title <span class="wd-publish-optional">optional</span></label>
-                <input type="text" id="publishTitleInput" class="wd-input" placeholder="My Site" maxlength="120">
-                <label for="publishSlugInput" class="wd-label wd-publish-slug-label">Public Address</label>
-                <div class="wd-publish-slug-row">
-                    <span class="wd-publish-slug-prefix" id="publishSlugPrefix"></span>
-                    <input type="text" id="publishSlugInput" class="wd-input" placeholder="my-site" maxlength="40" autocomplete="off" spellcheck="false">
-                </div>
-
-                <div class="wd-publish-contents">
-                    <span class="wd-publish-contents-label">Will include</span>
-                    <div class="wd-publish-chips" id="publishChips"></div>
-                </div>
-
-                <p id="publishError" class="wd-change-key-error hidden"></p>
-
-                <div class="wd-modal-actions">
-                    <button id="cancelPublish" class="wd-secondary-btn">Cancel</button>
-                    <button id="confirmPublish" class="wd-primary-btn">
-                        <span class="wd-btn-text">Publish</span>
-                        <span class="wd-btn-spinner hidden"></span>
-                    </button>
-                </div>
-
-                <div id="publishDanger" class="wd-publish-danger hidden">
-                    <div class="wd-publish-danger-row">
-                        <p>Take the site offline at this address.</p>
-                        <button id="confirmUnpublish" class="wd-danger-btn wd-publish-unpublish">
-                            <span class="wd-btn-text">Unpublish</span>
-                            <span class="wd-btn-spinner hidden"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Delete account modal -->
     <div id="deleteAccountModal" class="wd-modal">
         <div class="wd-modal-content">
@@ -657,6 +584,9 @@
     </template>
     <template id="wd-icon-kanban">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+    </template>
+    <template id="wd-icon-blog">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
     </template>
     <template id="wd-icon-check">
         <svg class="wd-move-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>

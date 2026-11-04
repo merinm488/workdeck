@@ -28,16 +28,14 @@ import {
   deleteSheetBody,
   putThumb,
   deleteThumb,
-  getSitePointer,
   putSitePointer,
   deleteSitePointer,
-  isValidSiteSlug,
-  isReservedSiteSlug,
-  putSharedDoc,
+  getSitePointer,
   getBaseUrl,
   applyCorsHeaders,
   accountHash
 } from './_lib/store.js';
+import { createPostRecord, slugifyTitle, uniquePostSlug } from './_lib/posts.js';
 
 const DEFAULT_SHEET_NAME = 'Untitled Sheet';
 const DEFAULT_DOC_TITLE = 'Untitled';
@@ -217,31 +215,6 @@ function withSettingsDefaults(userData) {
   return userData;
 }
 
-/**
- * Publish helpers. Decks and forms appear on a public site through their
- * EXISTING per-file share viewers (iframes of /slides/shared.html and
- * /forms/shared.html), so publishing snapshots any that have no share yet.
- * Existing snapshots are never touched — forms' accumulated responses
- * would be wiped. Docs and sheets need no snapshot: the site API reads
- * them live from the account document.
- */
-async function ensureDeckShare(deck) {
-  if (deck.sharedId) return deck.sharedId;
-  const shareId = generateId();
-  const { sharedId: _drop, ...snapshot } = deck;
-  const stored = await putSharedDoc(shareId, { deck: snapshot, sharedAt: new Date().toISOString() });
-  return stored ? shareId : null;
-}
-
-async function ensureFormShare(form) {
-  if (form.sharedId) return form.sharedId;
-  const shareId = generateId();
-  // linkedSheet stays private (see the linked-spreadsheet notes in forms.js)
-  const { sharedId: _dropShare, linkedSheet: _dropLink, ...snapshot } = form;
-  const stored = await putSharedDoc(shareId, { form: snapshot, responses: [], sharedAt: new Date().toISOString() });
-  return stored ? shareId : null;
-}
-
 // ================================================
 // Handler
 // ================================================
@@ -302,15 +275,28 @@ export default async function handler(req, res) {
           }[result.code] || [500, 'Failed to change key'];
           return res.status(failure[0]).json({ success: false, error: failure[1] });
         }
-        // A published site keeps working across key changes: repoint it at
-        // the account's new hash.
-        const pub = result.doc?.settings?.publish;
+        // A published blog keeps working across key changes: repoint its
+        // pointers at the account's new hash.
+        const blog = result.doc?.settings?.blog;
+        const pub = blog?.address || blog?.publish;   // publish = pre-per-post docs
         if (pub && pub.slug) {
           await putSitePointer(pub.slug, {
             hash: result.hash,
             slug: pub.slug,
-            title: pub.title || null,
+            title: blog?.title || pub.title || null,
             publishedAt: pub.publishedAt || new Date().toISOString()
+          });
+        }
+        for (const post of result.doc?.posts || []) {
+          if (!post || !post.publishedAt || !post.path) continue;   // per-post links only
+          const pointer = await getSitePointer(post.slug);
+          if (pointer && pointer.hash !== result.hash) continue;   // not ours to touch
+          await putSitePointer(post.slug, {
+            hash: result.hash,
+            slug: post.slug,
+            postId: post.id,
+            title: post.title || null,
+            publishedAt: post.publishedAt
           });
         }
         return res.status(200).json({
@@ -371,9 +357,16 @@ export default async function handler(req, res) {
         return res.status(404).json({ success: false, error: 'User not found' });
       }
 
-      let publishResult = null;
-
       switch (action) {
+        // ---- Create a blog post draft (same shape Blog creates) ----
+        case 'createPost': {
+          const id = data?.id || generateId();
+          userData.posts = userData.posts || [];
+          const post = createPostRecord(id, { ...data, posts: userData.posts });
+          userData.posts.unshift(post);
+          break;
+        }
+
         // ---- Create a doc (same shape Docs creates) ----
         case 'createDoc': {
           const now = new Date().toISOString();
@@ -520,7 +513,8 @@ export default async function handler(req, res) {
             ...taggedIn(userData.draws),
             ...taggedIn(userData.todo || []),
             ...taggedIn(userData.calendars || []),
-            ...taggedIn(userData.kanban || [])
+            ...taggedIn(userData.kanban || []),
+            ...taggedIn(userData.posts || [])
           ];
           for (const sheet of taggedIn(userData.sheets)) {
             try {
@@ -554,6 +548,7 @@ export default async function handler(req, res) {
           }
           userData.calendars = (userData.calendars || []).filter(f => !f || f.tagId !== tagId);
           userData.kanban = (userData.kanban || []).filter(f => !f || f.tagId !== tagId);
+          userData.posts = (userData.posts || []).filter(f => !f || f.tagId !== tagId);
           (userData.files || []).forEach(f => {
             if (Array.isArray(f.tags)) f.tags = f.tags.filter(id => id !== tagId);
           });
@@ -770,6 +765,8 @@ export default async function handler(req, res) {
                      (userData.calendars || []).some(c => c.id === fileId))
                   : app === 'kanban'
                   ? (userData.kanban || []).find(b => b.id === fileId)
+                  : app === 'blog'
+                  ? (userData.posts || []).find(p => p.id === fileId)
                   : userData.docs.find(n => n.id === fileId)
             );
           }
@@ -798,7 +795,8 @@ export default async function handler(req, res) {
           const isTodo = app === "todo";
           const isCalendar = app === "calendar";
           const isKanban = app === "kanban";
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : isKanban ? (userData.kanban || []) : userData.docs;
+          const isPost = app === "blog";
+          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : isKanban ? (userData.kanban || []) : isPost ? (userData.posts || []) : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -821,6 +819,13 @@ export default async function handler(req, res) {
             target.name = cleanName;
           } else if (isKanban) {
             target.name = cleanName;
+          } else if (isPost) {
+            target.title = cleanName;
+            // Same slug rule as Blog's updatePost: only never-published
+            // posts re-derive their slug, so live URLs stay stable.
+            if (!target.publishedAt) {
+              target.slug = uniquePostSlug(userData.posts || [], slugifyTitle(cleanName), target.id);
+            }
           } else {
             target.title = cleanName;
           }
@@ -873,6 +878,17 @@ export default async function handler(req, res) {
             userData.todo = (userData.todo || []).filter(l => l.id !== fileId);
           } else if (app === 'kanban') {
             userData.kanban = (userData.kanban || []).filter(b => b.id !== fileId);
+          } else if (app === 'blog') {
+            // Deleting a post frees its public slug (per-post pointers only;
+            // legacy address pointers have no postId and stay untouched).
+            const post = (userData.posts || []).find(p => p && p.id === fileId);
+            if (post && post.slug) {
+              const pointer = await getSitePointer(post.slug);
+              if (pointer && pointer.hash === hash && pointer.postId === post.id) {
+                await deleteSitePointer(post.slug);
+              }
+            }
+            userData.posts = (userData.posts || []).filter(p => p.id !== fileId);
           } else if (app === 'calendar') {
             // A calendar takes its events with it.
             userData.calendars = (userData.calendars || []).filter(c => c.id !== fileId);
@@ -902,75 +918,6 @@ export default async function handler(req, res) {
           break;
         }
 
-        // ---- Publish the account as a public read-only site ----
-        // The public address is /<slug>; the server resolves the slug
-        // to this account through a pepper-HMAC'd pointer record, so the
-        // account hash never appears in any public page or request.
-        case 'publishSite': {
-          const slug = String(data?.slug || '').trim().toLowerCase();
-          if (!isValidSiteSlug(slug)) {
-            return res.status(400).json({ success: false, error: 'Slug must be 3-40 lowercase letters, digits or hyphens' });
-          }
-          if (isReservedSiteSlug(slug)) {
-            return res.status(400).json({ success: false, error: 'That address is reserved' });
-          }
-          const existing = await getSitePointer(slug);
-          if (existing && existing.hash !== hash) {
-            return res.status(409).json({ success: false, error: 'That address is already taken' });
-          }
-
-          // Snapshot decks/forms that have no share yet (re-publish after
-          // adding new ones — the site embeds them via their share viewers).
-          const shareFailures = [];
-          for (const deck of userData.slides) {
-            if (!deck.sharedId) {
-              const shareId = await ensureDeckShare(deck);
-              if (shareId) deck.sharedId = shareId;
-              else shareFailures.push(deck.name || deck.id);
-            }
-          }
-          for (const form of userData.forms) {
-            if (!form.sharedId) {
-              const shareId = await ensureFormShare(form);
-              if (shareId) form.sharedId = shareId;
-              else shareFailures.push(form.name || form.id);
-            }
-          }
-
-          const title = String(data?.title || '').trim().slice(0, 120) || null;
-          const pointer = {
-            hash,
-            slug,
-            title: title || userData.settings?.publish?.title || null,
-            publishedAt: (existing && existing.publishedAt) || new Date().toISOString()
-          };
-          if (!(await putSitePointer(slug, pointer))) {
-            return res.status(500).json({ success: false, error: 'Failed to publish site' });
-          }
-          userData.settings = userData.settings || {};
-          userData.settings.publish = {
-            slug: pointer.slug,
-            title: pointer.title,
-            publishedAt: pointer.publishedAt
-          };
-          publishResult = { siteUrl: `${getBaseUrl(req)}/${slug}`, shareFailures };
-          break;
-        }
-
-        case 'unpublishSite': {
-          const pub = userData.settings?.publish;
-          if (!pub || !pub.slug) {
-            return res.status(400).json({ success: false, error: 'Site is not published' });
-          }
-          // Only remove the pointer when it still points at this account.
-          const existing = await getSitePointer(pub.slug);
-          if (existing && existing.hash === hash) {
-            await deleteSitePointer(pub.slug);
-          }
-          userData.settings.publish = null;
-          break;
-        }
-
         // ---- Theme / viewMode / misc settings ----
         case 'updateSettings': {
           if (!data?.settings || typeof data.settings !== 'object') {
@@ -997,6 +944,7 @@ export default async function handler(req, res) {
         folders: userData.folders,
         todo: userData.todo,
         kanban: userData.kanban,
+        posts: userData.posts,
         calendars: userData.calendars,
         events: userData.events,
         settings: userData.settings
@@ -1008,8 +956,7 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         success: true,
-        data: withSettingsDefaults(userData),
-        ...(publishResult ? { publish: publishResult } : {})
+        data: withSettingsDefaults(userData)
       });
     }
 
@@ -1045,9 +992,18 @@ export default async function handler(req, res) {
         await deleteThumb(sheet.id).catch(() => {});
       }
 
-      // Taking the account down takes its public site with it.
-      if (userData.settings?.publish?.slug) {
-        await deleteSitePointer(userData.settings.publish.slug);
+      // Taking the account down takes its published posts with it.
+      const blog = userData.settings?.blog;
+      const addressSlug = blog?.address?.slug || blog?.publish?.slug;   // publish = pre-per-post docs
+      if (addressSlug) {
+        await deleteSitePointer(addressSlug);
+      }
+      for (const post of userData.posts || []) {
+        if (!post || !post.slug) continue;
+        const pointer = await getSitePointer(post.slug);
+        if (pointer && pointer.hash === hash && pointer.postId === post.id) {
+          await deleteSitePointer(post.slug);
+        }
       }
 
       const deleted = await deleteUserDoc(hash);

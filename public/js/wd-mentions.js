@@ -66,6 +66,7 @@
         (userData.slides || []).forEach(function (s) { add('slides', s); });
         (userData.draws || []).forEach(function (d) { add('draw', d); });
         (userData.todo || []).forEach(function (t) { add('todo', t); });
+        (userData.posts || []).forEach(function (p) { add('blog', p); });
         (userData.files || []).forEach(function (f) { add('filebox', f); });
         (userData.folders || []).forEach(function (f) { add('filebox', f, 'folder'); });
         return list;

@@ -24,7 +24,11 @@
  *   /api/draw      -> api/draw.js         (Draw API)
  *   /api/filebox   -> api/filebox.js      (Filebox bytes API)
  *   /api/todo      -> api/todo.js
- *   /api/blog      -> api/blog.js        (Public site API, GET-only)         (Todo API)
+ *   /api/blog      -> api/blog.js         (Blog app API)
+ *   /api/site      -> api/site.js         (Public blog API, GET-only)
+ *   /blog/<id>     -> blog/index.html     (Blog app)
+ *   /<slug>        -> public/blog.html    (published blog)
+ *   /<slug>/<post> -> public/blog.html    (published blog article)
  *
  * Storage: local JSON files under db/users/ (NODE_ENV=development).
  * Run with:  npm run dev   (port 4000)
@@ -66,6 +70,7 @@ const { default: todoHandler } = await import('../api/todo.js');
 const { default: calendarHandler } = await import('../api/calendar.js');
 const { default: kanbanHandler } = await import('../api/kanban.js');
 const { default: blogHandler } = await import('../api/blog.js');
+const { default: siteHandler } = await import('../api/site.js');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -128,6 +133,7 @@ app.all('/api/todo', (req, res) => todoHandler(req, res));
 app.all('/api/calendar', (req, res) => calendarHandler(req, res));
 app.all('/api/kanban', (req, res) => kanbanHandler(req, res));
 app.all('/api/blog', (req, res) => blogHandler(req, res));
+app.all('/api/site', (req, res) => siteHandler(req, res));
 
 // ---------- Pretty file URLs ----------
 // Underscore allowed: legacy client-created sheets have ids like mv7xyz_ab12cde
@@ -141,9 +147,10 @@ const WD_PRETTY_PAGES = {
   todo: '/todo/index.html',
   calendar: '/calendar/index.html',
   kanban: '/kanban/index.html',
-  files: '/files/index.html'
+  files: '/files/index.html',
+  blog: '/blog/index.html'
 };
-const WD_PRETTY_PARAMS = { docs: 'doc', todo: 'list', calendar: 'cal', kanban: 'board' };
+const WD_PRETTY_PARAMS = { docs: 'doc', todo: 'list', calendar: 'cal', kanban: 'board', blog: 'post' };
 
 Object.keys(WD_PRETTY_PAGES).forEach((prettyApp) => {
   app.get('/' + prettyApp + '/:id', (req, res, next) => {
@@ -164,11 +171,21 @@ app.get('/f/:id', (req, res, next) => {
   next();
 });
 
-// Published site /<slug> -> public/blog.html (public read-only view;
-// the slug resolves server-side in api/blog.js).
+// Published blog /<slug> -> public/blog.html (public read-only view;
+// the slug resolves server-side in api/site.js). Articles: /<slug>/<post>.
+// 'blog' itself is a reserved slug — skip it so /blog serves the app.
 app.get('/:slug', (req, res, next) => {
+  if (req.params.slug === 'blog') return next();
   if (!/^[a-z0-9-]{3,40}$/.test(req.params.slug)) return next();
   req.url = '/blog.html?site=' + encodeURIComponent(req.params.slug);
+  next();
+});
+
+app.get('/:slug/:post', (req, res, next) => {
+  if (!/^[a-z0-9-]{3,40}$/.test(req.params.slug)) return next();
+  if (!/^[a-z0-9-]{1,80}$/.test(req.params.post)) return next();
+  req.url = '/blog.html?site=' + encodeURIComponent(req.params.slug)
+    + '&post=' + encodeURIComponent(req.params.post);
   next();
 });
 
@@ -216,6 +233,9 @@ app.use('/calendar', express.static(path.join(ROOT_DIR, 'calendar'), { index: 'i
 // Kanban (plain static)
 app.use('/kanban', express.static(path.join(ROOT_DIR, 'kanban'), { index: 'index.html' }));
 
+// Blog (plain static)
+app.use('/blog', express.static(path.join(ROOT_DIR, 'blog'), { index: 'index.html' }));
+
 // Root redirect to the Workdeck landing page
 app.get('/', (req, res) => {
   res.sendFile(path.join(ROOT_DIR, 'public', 'index.html'));
@@ -234,8 +254,9 @@ app.listen(PORT, () => {
   console.log(`✅ Todo:       http://localhost:${PORT}/todo/`);
   console.log(`📅 Calendar:   http://localhost:${PORT}/calendar/`);
   console.log(`🗂️  Kanban:     http://localhost:${PORT}/kanban/`);
-  console.log(`🌐 Sites:      http://localhost:${PORT}/<slug>`);
-  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw, /api/filebox, /api/todo, /api/calendar, /api/kanban, /api/blog`);
+  console.log(`✍️  Blog:       http://localhost:${PORT}/blog/`);
+  console.log(`🌐 Blogs:      http://localhost:${PORT}/<slug>`);
+  console.log(`🔌 APIs:       /api/workdeck, /api/docs, /api/users, /api/forms, /api/slides, /api/draw, /api/filebox, /api/todo, /api/calendar, /api/kanban, /api/blog, /api/site`);
   console.log(`📁 Local DB:   ${path.join(ROOT_DIR, 'db')}`);
   console.log('\nPress Ctrl+C to stop\n');
 });

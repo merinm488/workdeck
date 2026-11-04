@@ -18,7 +18,7 @@
 (function () {
     'use strict';
 
-    const VIRTUAL_WIDTH = { docs: 720, forms: 420, todo: 420, kanban: 640 };
+    const VIRTUAL_WIDTH = { docs: 720, forms: 420, todo: 420, kanban: 640, blog: 720 };
     const MAX_SHEET_COLS = 9;
     const MAX_SHEET_ROWS = 8;
     const MAX_KANBAN_COLS = 4;
@@ -796,6 +796,24 @@
     }
 
     // ================================================
+    // Blog preview (derived excerpt on a virtual page — never renders the
+    // post HTML, so a card can't load external images)
+    // ================================================
+
+    function renderBlog(page, file) {
+        const raw = file.raw || {};
+        const excerpt = String(raw.excerpt || '').trim();
+        if (!excerpt) return;
+
+        const doc = document.createElement('div');
+        doc.className = 'wd-preview-doc wd-preview-plain';
+        doc.textContent = excerpt;
+        page.replaceChildren(doc);
+
+        registerScaledPage(page.firstChild, VIRTUAL_WIDTH.blog);
+    }
+
+    // ================================================
     // Resize: keep DOM previews scaled to their card
     // ================================================
 
@@ -826,6 +844,7 @@
             case 'draw': renderFabric(page, file); break;
             case 'todo': renderTodo(page, file); break;
             case 'kanban': renderKanban(page, file); break;
+            case 'blog': renderBlog(page, file); break;
             case 'calendar': renderCalendar(page, file); break;
             case 'filebox': renderFilebox(page, file); break;
         }

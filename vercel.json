@@ -41,6 +41,10 @@
       "destination": "/kanban/index.html?board=:id"
     },
     {
+      "source": "/blog/:id([a-z0-9_]{14,})",
+      "destination": "/blog/index.html?post=:id"
+    },
+    {
       "source": "/files/:id([a-z0-9_]{14,})",
       "destination": "/files/index.html?id=:id"
     },
@@ -51,6 +55,10 @@
     {
       "source": "/:slug([a-z0-9-]{3,40})",
       "destination": "/blog.html?site=:slug"
+    },
+    {
+      "source": "/:slug([a-z0-9-]{3,40})/:post([a-z0-9-]{1,80})",
+      "destination": "/blog.html?site=:slug&post=:post"
     }
   ],
   "redirects": [

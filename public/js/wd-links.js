@@ -7,7 +7,7 @@
  * has a canonical, pasteable address:
  *
  *   /docs/<id>   /sheets/<id>   /forms/<id>   /slides/<id>   /draw/<id>
- *   /todo/<id>   /kanban/<id>   /calendar/<id>
+ *   /todo/<id>   /kanban/<id>   /calendar/<id>   /blog/<id>
  *   /files/<id>                  (files AND folders — the app tells them apart)
  *   /f/<id>                      universal resolver -> canonical address
  *
@@ -23,7 +23,7 @@
 
     /** Internal link hrefs -> { app, id, query }. Used to detect mentions. */
     var INTERNAL_LINK_RE = new RegExp(
-        '^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|filebox|files)/(' + ID_SOURCE + ')(\\?[^#]*)?(#.*)?$'
+        '^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|filebox|files)/(' + ID_SOURCE + ')(\\?[^#]*)?(#.*)?$'
     );
 
     /**
@@ -63,6 +63,10 @@
         calendar: {
             id: 'calendar', name: 'Calendar', label: 'Calendar',
             page: '/calendar/index.html', param: 'cal', prefix: '/calendar/'
+        },
+        blog: {
+            id: 'blog', name: 'Blog', label: 'Post',
+            page: '/blog/index.html', param: 'post', prefix: '/blog/'
         },
         filebox: {
             id: 'filebox', name: 'Files', label: 'File',
@@ -115,6 +119,10 @@
             ['line', { x1: 16, y1: 2, x2: 16, y2: 6 }],
             ['line', { x1: 8, y1: 2, x2: 8, y2: 6 }],
             ['line', { x1: 3, y1: 10, x2: 21, y2: 10 }]
+        ],
+        blog: [
+            ['path', { d: 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z' }],
+            ['path', { d: 'm15 5 4 4' }]
         ],
         filebox: [
             ['path', { d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' }]
@@ -194,7 +202,7 @@
         // Pretty path: /<app>/<id> (the URL segment 'files' maps back to the
         // app's internal id 'filebox')
         var pretty = new RegExp(
-            '^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|filebox|files)/(' + ID_SOURCE + ')/?$'
+            '^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|filebox|files)/(' + ID_SOURCE + ')/?$'
         ).exec(pathname);
         if (pretty) {
             return {
@@ -211,7 +219,7 @@
         }
 
         // Legacy query form — infer the app from the path prefix.
-        var prefix = new RegExp('^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|filebox|files)(/|$)').exec(pathname);
+        var prefix = new RegExp('^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|filebox|files)(/|$)').exec(pathname);
         if (prefix) {
             var app = prefix[1] === 'files' ? 'filebox' : prefix[1];
             if (app === 'docs' && params.get('doc') && isValidId(params.get('doc'))) {
@@ -225,6 +233,9 @@
             }
             if (app === 'calendar' && params.get('cal') && isValidId(params.get('cal'))) {
                 return { app: 'calendar', id: params.get('cal'), query: query };
+            }
+            if (app === 'blog' && params.get('post') && isValidId(params.get('post'))) {
+                return { app: 'blog', id: params.get('post'), query: query };
             }
             if (app === 'filebox' && params.get('folder') && isValidId(params.get('folder'))) {
                 return { app: 'filebox', id: params.get('folder'), kind: 'folder', query: query };
@@ -315,6 +326,13 @@
                     kind: 'file', record: calendars[q], url: url('calendar', id) };
             }
         }
+        var posts = userData.posts || [];
+        for (var s = 0; s < posts.length; s++) {
+            if (posts[s] && posts[s].id === id) {
+                return { app: 'blog', id: id, name: posts[s].title || 'Untitled',
+                    kind: 'file', record: posts[s], url: url('blog', id) };
+            }
+        }
         var files = userData.files || [];
         for (var n = 0; n < files.length; n++) {
             if (files[n] && files[n].id === id) {
@@ -336,7 +354,7 @@
     function sessionHash() {
         var KEYS = ['wd_hash', 'docs_hash', 'sheets_user_hash', 'forms_user_hash',
             'slides_user_hash', 'draw_user_hash', 'filebox_user_hash', 'todo_user_hash',
-            'kanban_user_hash', 'calendar_user_hash'];
+            'kanban_user_hash', 'calendar_user_hash', 'blog_user_hash'];
         for (var i = 0; i < KEYS.length; i++) {
             var v = sessionStorage.getItem(KEYS[i]) || localStorage.getItem(KEYS[i]);
             if (v) return v;

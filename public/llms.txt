@@ -1,7 +1,7 @@
 # Workdeck — API reference for AI agents
 
 Workdeck is a personal workdeck of small apps: Docs, Sheets, Forms, Slides,
-Draw, Files, Todo, Calendar and Kanban, all stored in one unified
+Draw, Files, Todo, Calendar, Kanban and Blog, all stored in one unified
 account document. This file describes its HTTP API so an agent can read and
 write a user's workdeck directly, without driving a browser.
 
@@ -95,7 +95,10 @@ create or delete accounts.
                     createdAt, updatedAt } ],
       kanban:   [ { id, name, columns: [...], rows: [...], cards: [...],
                     links: [...], createdAt, updatedAt } ],
-      settings: { theme, viewMode, lastOpened, ... }
+      posts:    [ { id, title, slug, path, html, excerpt, tagId,
+                    publishedAt, createdAt, updatedAt } ],   // Blog
+      settings: { theme, viewMode, lastOpened, blog: { title, description,
+                    address: { slug, publishedAt } | null }, ... }
     }
 
 ## Endpoints
@@ -133,6 +136,21 @@ create or delete accounts.
           read the board first, mutate, write back)
     PUT  { action: "deleteBoard",  data: { boardId } }
     Card records live in board.cards; their exact shape comes from GET.
+
+### Blog  —  /api/blog
+    GET  -> { posts: [posts], settings, ... }
+    PUT  { action: "createPost",        data: { title?, tagId?, id? } }
+    PUT  { action: "updatePost",        data: { id, title?, html?, tagId? } }
+         (html is Quill HTML, scrubbed server-side; unpublished posts keep
+          a title-derived slug suggestion in `slug`)
+    PUT  { action: "deletePost",        data: { id } }
+    PUT  { action: "updateBlogSettings",data: { title? } }
+    PUT  { action: "publishPost",       data: { id, slug } } -> { blog: { postUrl, path } }
+         (makes one post public at /<slug> — the slug is chosen per publish,
+          unique across all accounts; unpublish/delete frees it again.
+          Posts published before per-post links keep /<address>/<post>)
+    PUT  { action: "unpublishPost",     data: { id } }
+    PUT  { action: "updateSettings",    data: { settings: {...} } }
 
 ### Sheets  —  /api/users
     GET  -> { sheets: [...], settings, ... }
@@ -180,6 +198,7 @@ create or delete accounts.
     PUT  { action: "createDeck",     data: { name?, tagId? } }   (stub)
     PUT  { action: "createTodo",     data: { name?, tagId? } }   (stub list)
     PUT  { action: "createKanban",   data: { name?, tagId? } }   (stub board)
+    PUT  { action: "createPost",     data: { title?, tagId? } }  (stub post)
     PUT  { action: "createDrawing",  data: { name?, tagId? } }   (stub)
     PUT  { action: "createCalendar", data: { name?, tagId? } }   (stub)
     PUT  { action: "createTag",      data: { name, color? } }
@@ -204,21 +223,24 @@ create or delete accounts.
     PUT  { action: "deleteTag",    data: { tagId } }
     contentType: "plain-text" or "markdown".
 
-### Public sites  —  /api/blog   (NO AUTH — read-only)
-An account can publish itself as a public, read-only site
-(Workdeck -> Settings -> Publish Site; humans view it at /<slug>).
-The slug resolves server-side; the account key/hash is never involved
-or exposed. There are no write methods — everything but GET answers 405.
+### Published posts  —  /api/site   (NO AUTH — read-only)
+Posts published from the Blog app are readable at /<post-slug> (the slug
+chosen at publish, unique across accounts). Posts published before
+per-post links keep the blog-home shape: /<address> lists them and
+/<address>/<post-slug> reads one. The slug resolves server-side to the
+owning account; the account key/hash is never involved or exposed. There
+are no write methods — everything but GET answers 405.
 
-    GET ?slug=<slug>            -> { site: { slug, title, publishedAt },
-                                     docs, tags, sheets, forms, slides }
-    GET ?slug=<slug>&sheet=<id> -> { sheetId, data }   (Univer workbook)
+    GET ?slug=<post-slug>        -> { site: { slug, publishedAt },
+                                      blog: { title, description },
+                                      post: { ..., html } }
+    GET ?slug=<address>          -> { ..., posts: [ { id, title, slug,
+                                      excerpt, publishedAt } ] }   (legacy)
+    GET ?slug=<address>&post=<slug> -> { ..., post: { ..., html } } (legacy)
 
-Projection rules: docs exclude archived ones; sheets are metadata only
-(fetch bodies per-sheet); forms carry questions + sharedId but never
-responses or linked-sheet state; decks carry full slide data + sharedId.
-Excluded entirely: settings, todo, calendars, events, kanban, draws,
-Filebox files/folders.
+Projection rules: only posts with publishedAt set appear, newest first
+in lists, without html (fetch one article at a time). Everything else in
+the account — drafts, docs, files, settings — never leaves the server.
 
 ## Examples
 

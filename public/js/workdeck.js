@@ -187,6 +187,22 @@ const WD_APPS = [
         contentSearch: false
     },
     {
+        id: 'blog',
+        name: 'Blog',
+        label: 'Post',
+        accent: 'blog',
+        icon: 'blog',
+        route: '/blog/',
+        editorParam: 'post',
+        create: {
+            action: 'createPost',
+            payload: {},
+            // The API unshifts, so the newest post is first.
+            pickNewest: function (data) { return data.posts && data.posts[0]; }
+        },
+        contentSearch: true                 // search matches the excerpt
+    },
+    {
         id: 'calendar',
         name: 'Calendar',
         label: 'Calendar',
@@ -259,6 +275,7 @@ const state = {
     folders: [],         // Filebox folders
     todo: [],            // Todo task lists
     kanban: [],          // Kanban boards
+    posts: [],           // Blog posts
     calendars: [],       // Calendar app calendars
     events: [],          // Calendar app events
     settings: {},
@@ -303,6 +320,16 @@ function formatRelativeDate(iso) {
     if (days === 1) return 'Yesterday';
     if (days < 7) return days + 'd ago';
     return date.toLocaleDateString();
+}
+
+/**
+ * Card recency as epoch millis. lastOpened values are ISO strings from
+ * recordOpen, but the Blog app stores Date.now() numbers — accept both.
+ */
+function recencyMs(value) {
+    if (typeof value === 'number') return value;
+    const ts = Date.parse(value || '');
+    return Number.isNaN(ts) ? 0 : ts;
 }
 
 /**
@@ -411,6 +438,20 @@ function getAllFiles() {
         };
     });
 
+    const postFiles = (state.posts || []).map(function (p) {
+        return {
+            id: p.id,
+            app: 'blog',
+            name: p.title || 'Untitled',
+            updatedAt: p.updatedAt,
+            lastOpened: lastOpened[p.id] || null,
+            tagId: getTag(p.tagId) ? p.tagId : null,
+            // The derived excerpt is the searchable content.
+            content: p.excerpt || '',
+            raw: p
+        };
+    });
+
     // One card for the whole Calendar app — not one per calendar. Every
     // calendar or event edit refreshes its timestamp so the card bubbles
     // back up in the recency sort.
@@ -472,11 +513,9 @@ function getAllFiles() {
         });
 
     return docs.concat(sheetFiles).concat(formFiles).concat(slideFiles).concat(drawFiles)
-        .concat(todoFiles).concat(kanbanFiles).concat(calendarFiles).concat(fileboxFiles).concat(folderCards)
+        .concat(todoFiles).concat(kanbanFiles).concat(postFiles).concat(calendarFiles).concat(fileboxFiles).concat(folderCards)
         .sort(function (a, b) {
-            const aTime = a.lastOpened || a.updatedAt || '';
-            const bTime = b.lastOpened || b.updatedAt || '';
-            return bTime.localeCompare(aTime);
+            return recencyMs(b.lastOpened || b.updatedAt) - recencyMs(a.lastOpened || a.updatedAt);
         });
 }
 
@@ -555,6 +594,7 @@ function applyUserData(data) {
     state.folders = data.folders || [];
     state.todo = data.todo || [];
     state.kanban = data.kanban || [];
+    state.posts = data.posts || [];
     state.calendars = data.calendars || [];
     state.events = data.events || [];
     state.settings = data.settings || {};
@@ -1397,6 +1437,8 @@ async function confirmDelete() {
         state.files = state.files.filter(function (f) { return f.id !== file.id; });
     } else if (file.app === 'kanban') {
         state.kanban = state.kanban.filter(function (b) { return b.id !== file.id; });
+    } else if (file.app === 'blog') {
+        state.posts = state.posts.filter(function (p) { return p.id !== file.id; });
     } else {
         state.docs = state.docs.filter(function (n) { return n.id !== file.id; });
     }
@@ -1884,212 +1926,6 @@ async function confirmDeleteAccount() {
 }
 
 // ================================================
-// Publish site
-// ================================================
-
-const SITE_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
-
-// Publishable kinds for the modal's content chips. kind doubles as the
-// chip color class; unit is the singular label; icon is a WD_APPS icon key.
-const PUBLISH_KINDS = [
-    { kind: 'docs', unit: 'doc', icon: 'docs' },
-    { kind: 'sheets', unit: 'sheet', icon: 'sheets' },
-    { kind: 'decks', unit: 'deck', icon: 'slides' },
-    { kind: 'forms', unit: 'form', icon: 'forms' }
-];
-
-let unpublishArmedTimer = null;
-
-/** Swap a button's label / spinner / disabled state. */
-function setBtnBusy(btn, busy, text) {
-    const label = btn.querySelector('.wd-btn-text');
-    const spinner = btn.querySelector('.wd-btn-spinner');
-    btn.disabled = busy;
-    if (spinner) spinner.classList.toggle('hidden', !busy);
-    if (label && text) label.textContent = text;
-}
-
-/** Publishable item counts from the in-memory account state. */
-function publishCounts() {
-    const totals = {
-        docs: state.docs.filter(function (d) { return !d.archived; }).length,
-        sheets: state.sheets.length,
-        decks: state.slides.length,
-        forms: state.forms.length
-    };
-    return PUBLISH_KINDS
-        .map(function (k) { return { kind: k.kind, unit: k.unit, icon: k.icon, n: totals[k.kind] }; })
-        .filter(function (c) { return c.n > 0; });
-}
-
-function renderPublishChips() {
-    const host = $('publishChips');
-    host.replaceChildren();
-    publishCounts().forEach(function (c) {
-        const chip = document.createElement('span');
-        chip.className = 'wd-publish-chip ' + c.kind;
-        chip.append(wdIcon(c.icon));
-        const count = document.createElement('span');
-        count.className = 'wd-publish-chip-count';
-        count.textContent = String(c.n);
-        const name = document.createElement('span');
-        name.className = 'wd-publish-chip-name';
-        name.textContent = c.n === 1 ? c.unit : c.kind;
-        chip.append(count, name);
-        host.append(chip);
-    });
-    if (!host.childElementCount) {
-        const empty = document.createElement('span');
-        empty.className = 'wd-publish-chip';
-        empty.textContent = 'Nothing publishable yet';
-        host.append(empty);
-    }
-}
-
-function showPublishModal() {
-    const pub = state.settings && state.settings.publish;
-    $('publishSlugPrefix').textContent = location.origin + '/';
-    $('publishTitleInput').value = (pub && pub.title) || '';
-    $('publishSlugInput').value = (pub && pub.slug) || '';
-    $('publishError').classList.add('hidden');
-    renderPublishChips();
-
-    const live = $('publishLiveCard');
-    if (pub && pub.slug) {
-        const url = `${location.origin}/${pub.slug}`;
-        $('publishLiveUrl').textContent = url;
-        $('publishOpenLink').href = url;
-        $('publishSince').textContent = pub.publishedAt
-            ? 'Public since ' + new Date(pub.publishedAt).toLocaleDateString()
-            : '';
-        live.classList.remove('hidden');
-        $('publishDanger').classList.remove('hidden');
-        setBtnBusy($('confirmPublish'), false, 'Update');
-    } else {
-        live.classList.add('hidden');
-        $('publishDanger').classList.add('hidden');
-        setBtnBusy($('confirmPublish'), false, 'Publish');
-    }
-
-    disarmUnpublish();
-    $('publishModal').classList.add('active');
-    closeDropdown($('settingsDropdown'));
-}
-
-function hidePublishModal() {
-    $('publishModal').classList.remove('active');
-    disarmUnpublish();
-}
-
-function copyPublishLink() {
-    const pub = state.settings && state.settings.publish;
-    if (!pub || !pub.slug) return;
-    const url = `${location.origin}/${pub.slug}`;
-    const btn = $('publishCopyBtn');
-    const done = function (ok) {
-        if (!ok) {
-            showNotification('Could not copy link', 'error');
-            return;
-        }
-        btn.classList.add('copied');
-        setTimeout(function () { btn.classList.remove('copied'); }, 1600);
-    };
-    const fallbackCopy = function () {
-        const ta = document.createElement('textarea');
-        ta.value = url;
-        ta.classList.add('wd-clipboard-helper');
-        document.body.appendChild(ta);
-        ta.select();
-        let ok = false;
-        try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
-        document.body.removeChild(ta);
-        done(ok);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(function () { done(true); }, fallbackCopy);
-    } else {
-        fallbackCopy();
-    }
-}
-
-async function confirmPublish() {
-    const slug = $('publishSlugInput').value.trim().toLowerCase();
-    const title = $('publishTitleInput').value.trim();
-    const errorEl = $('publishError');
-
-    errorEl.classList.add('hidden');
-    if (!SITE_SLUG_RE.test(slug)) {
-        errorEl.textContent = 'Use 3-40 lowercase letters, digits or hyphens (no leading/trailing hyphen)';
-        errorEl.classList.remove('hidden');
-        return;
-    }
-
-    setBtnBusy($('confirmPublish'), true, 'Publishing…');
-    try {
-        // Direct fetch (not api()) so the shareFailures list in the
-        // response envelope is reachable.
-        const response = await fetch(WD_APP.apiEndpoint, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ hash: state.userHash, action: 'publishSite', data: { slug, title } })
-        });
-        const result = await response.json();
-        if (result.success) {
-            state.settings = result.data.settings;
-            hidePublishModal();
-            const failed = (result.publish && result.publish.shareFailures.length) || 0;
-            showNotification(
-                failed
-                    ? `Published at /${slug} — ${failed} item${failed === 1 ? '' : 's'} will appear after the next publish`
-                    : `Published at /${slug}`,
-                'success'
-            );
-        } else {
-            errorEl.textContent = result.error || 'Failed to publish';
-            errorEl.classList.remove('hidden');
-        }
-    } catch (error) {
-        errorEl.textContent = 'Failed to publish. Please try again.';
-        errorEl.classList.remove('hidden');
-    } finally {
-        const published = state.settings && state.settings.publish && state.settings.publish.slug;
-        setBtnBusy($('confirmPublish'), false, published ? 'Update' : 'Publish');
-    }
-}
-
-/** Two-step confirm: arm, then confirm within 4s. */
-function disarmUnpublish() {
-    clearTimeout(unpublishArmedTimer);
-    const btn = $('confirmUnpublish');
-    if (!btn) return;
-    btn.classList.remove('armed');
-    const label = btn.querySelector('.wd-btn-text');
-    if (label) label.textContent = 'Unpublish';
-}
-
-async function confirmUnpublish() {
-    const btn = $('confirmUnpublish');
-    if (!btn.classList.contains('armed')) {
-        btn.classList.add('armed');
-        const label = btn.querySelector('.wd-btn-text');
-        if (label) label.textContent = 'Click again to confirm';
-        unpublishArmedTimer = setTimeout(disarmUnpublish, 4000);
-        return;
-    }
-    disarmUnpublish();
-    setBtnBusy(btn, true, 'Unpublishing…');
-    try {
-        await api('unpublishSite', {});
-        hidePublishModal();
-        showNotification('Site unpublished', 'success');
-    } catch (error) {
-        showNotification(error.message || 'Failed to unpublish', 'error');
-    } finally {
-        setBtnBusy(btn, false, 'Unpublish');
-    }
-}
-
-// ================================================
 // Loading / notifications
 // ================================================
 
@@ -2460,23 +2296,6 @@ function setupEventListeners() {
     $('deleteAccountModalClose').addEventListener('click', hideDeleteAccountModal);
     $('cancelDeleteAccount').addEventListener('click', hideDeleteAccountModal);
     $('confirmDeleteAccount').addEventListener('click', confirmDeleteAccount);
-
-    // ----- Publish site modal -----
-    $('publishBtn').addEventListener('click', showPublishModal);
-    $('publishModalClose').addEventListener('click', hidePublishModal);
-    $('cancelPublish').addEventListener('click', hidePublishModal);
-    $('confirmPublish').addEventListener('click', confirmPublish);
-    $('confirmUnpublish').addEventListener('click', confirmUnpublish);
-    $('publishCopyBtn').addEventListener('click', copyPublishLink);
-    $('publishSlugInput').addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') confirmPublish();
-        if (e.key === 'Escape') hidePublishModal();
-    });
-    ['publishTitleInput', 'publishSlugInput'].forEach(function (id) {
-        $(id).addEventListener('input', function () {
-            $('publishError').classList.add('hidden');
-        });
-    });
 
     // ----- Login theme toggle -----
     $('loginThemeToggle').addEventListener('click', function () {

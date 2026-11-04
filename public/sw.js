@@ -15,7 +15,7 @@
  *                                 first would pin stale files after a deploy
  */
 
-const VERSION = 'workdeck-v4';
+const VERSION = 'workdeck-v5';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 

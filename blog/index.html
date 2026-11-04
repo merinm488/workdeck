@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#0d9488">
+    <title>Blog — Workdeck</title>
+
+    <!-- App Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Quill rich-text editor (post bodies are its HTML output) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
+
+    <link rel="stylesheet" href="/blog/styles.css">
+</head>
+<body>
+    <!-- ===== TOP BAR ===== -->
+    <header class="blog-topbar">
+        <a class="blog-home-link" href="/" title="Back to Workdeck" aria-label="Back to Workdeck">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </a>
+        <div class="blog-brand">
+            <span class="blog-app-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+            </span>
+            <h1 id="pageTitle">Blog</h1>
+        </div>
+        <div class="blog-search-wrap" id="postsSearchWrap">
+            <svg class="blog-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="postsSearch" class="blog-search" placeholder="Search posts…" autocomplete="off">
+        </div>
+        <div class="blog-topbar-actions">
+            <button id="newPostBtn" class="blog-btn blog-btn-primary">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Post
+            </button>
+            <div class="blog-menu-wrap">
+                <button id="settingsBtn" class="blog-icon-btn" title="Settings" aria-haspopup="true" aria-expanded="false">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
+                <div id="settingsMenu" class="blog-menu blog-settings hidden">
+                    <!-- Per-post publish: only when a post is open in the editor -->
+                    <button type="button" id="publishPostMenuItem" class="blog-menu-item hidden">
+                        <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                        <span class="blog-menu-text">Publish post</span>
+                    </button>
+                    <div id="pubPostLive" class="blog-pub-menu-url hidden">
+                        <span class="blog-pub-live-dot"></span>
+                        <span id="pubPostMenuUrl"></span>
+                    </div>
+                    <button type="button" id="copyPostLinkItem" class="blog-menu-item hidden">
+                        <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        <span class="blog-menu-text">Copy public link</span>
+                    </button>
+                    <a id="openPostLinkItem" class="blog-menu-item hidden" target="_blank" rel="noopener">
+                        <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        <span class="blog-menu-text">Open public page</span>
+                    </a>
+                    <button type="button" id="unpublishPostMenuItem" class="blog-menu-item blog-menu-danger hidden">
+                        <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                        <span class="blog-menu-text">Unpublish post</span>
+                    </button>
+                    <div class="blog-menu-divider hidden" id="publishMenuDivider"></div>
+
+                    <div class="blog-theme-wrap">
+                        <button type="button" id="themeMenuBtn" class="blog-menu-item" aria-haspopup="true" aria-expanded="false">
+                            <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                            <span class="blog-menu-text" id="themeText">Theme</span>
+                            <svg class="blog-menu-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                        <div id="themeMenu" class="blog-submenu hidden">
+                            <button type="button" class="blog-menu-item theme-option" data-theme="light">
+                                <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                                <span>Light</span>
+                                <svg class="blog-menu-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+                            </button>
+                            <button type="button" class="blog-menu-item theme-option" data-theme="dark">
+                                <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                                <span>Dark</span>
+                                <svg class="blog-menu-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+                            </button>
+                            <button type="button" class="blog-menu-item theme-option" data-theme="system">
+                                <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                <span>System</span>
+                                <svg class="blog-menu-check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="button" id="viewKeyBtn" class="blog-menu-item">
+                        <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                        <span>View My Key</span>
+                    </button>
+                    <div class="blog-menu-divider"></div>
+                    <button type="button" id="deleteAccountBtn" class="blog-menu-item blog-menu-danger">
+                        <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        <span>Delete Account</span>
+                    </button>
+                    <button type="button" id="logoutBtn" class="blog-menu-item">
+                        <svg class="blog-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===== POSTS HOME ===== -->
+    <main id="postsView" class="blog-page">
+        <div id="postsList" class="blog-posts"></div>
+
+        <div id="postsEmpty" class="blog-empty hidden">
+            <div class="blog-empty-icon" aria-hidden="true">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+            </div>
+            <h2>No posts yet</h2>
+            <p>Write your first post, publish it, and share the link.</p>
+            <button id="emptyNewPostBtn" class="blog-btn blog-btn-primary">New Post</button>
+        </div>
+
+        <div id="postsEmptySearch" class="blog-empty hidden">
+            <h2>No matches</h2>
+            <p>No posts match your search.</p>
+        </div>
+    </main>
+
+    <!-- ===== POST EDITOR ===== -->
+    <main id="editorView" class="blog-page hidden">
+        <div class="blog-editor-top">
+            <button id="backToPosts" class="blog-back">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Posts
+            </button>
+            <span id="saveIndicator" class="blog-save-indicator" data-state="saved">Saved</span>
+            <div class="blog-editor-actions">
+                <button id="deletePostBtn" class="blog-btn blog-btn-danger-outline">Delete</button>
+            </div>
+        </div>
+        <input type="text" id="postTitleInput" class="blog-title-input" placeholder="Post title" maxlength="200" autocomplete="off">
+        <div class="blog-editor-shell">
+            <div id="editorMount"></div>
+        </div>
+    </main>
+
+    <!-- ===== LOADING ===== -->
+    <div id="loadingOverlay" class="blog-loading-overlay">
+        <div class="blog-spinner"></div>
+    </div>
+
+    <!-- ===== PUBLISH POST MODAL (per post; the author picks the post's public link) ===== -->
+    <div id="publishPostModal" class="blog-modal-overlay hidden">
+        <div class="blog-modal blog-pub-modal" role="dialog" aria-modal="true" aria-labelledby="publishPostTitle">
+            <div class="blog-modal-header">
+                <h3 id="publishPostTitle">Publish post</h3>
+                <button class="blog-modal-close" id="publishPostModalClose">&times;</button>
+            </div>
+            <div class="blog-modal-body">
+                <p id="pubPostName" class="blog-modal-text"></p>
+
+                <label for="pubSlugInput" class="blog-label blog-label-spaced" id="pubSlugLabel">Public link</label>
+                <div class="blog-pub-slug-row" id="pubSlugRow">
+                    <span class="blog-pub-slug-prefix" id="pubSlugPrefix"></span>
+                    <input type="text" id="pubSlugInput" class="blog-input" placeholder="my-post" maxlength="40" autocomplete="off" spellcheck="false">
+                </div>
+                <p id="pubSlugHint" class="blog-pub-hint">Choose this post's public link — letters, digits, hyphens.</p>
+
+                <div id="pubLiveCard" class="blog-pub-live hidden">
+                    <div class="blog-pub-live-head">
+                        <span class="blog-pub-live-dot"></span>
+                        <span class="blog-pub-live-label">Live</span>
+                        <span class="blog-pub-live-since" id="pubLiveSince"></span>
+                    </div>
+                    <div class="blog-pub-live-row">
+                        <span class="blog-pub-live-url" id="pubLiveUrl"></span>
+                        <button class="blog-pub-live-btn" id="pubCopyBtn" title="Copy link" aria-label="Copy link">
+                            <svg class="blog-pub-copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            <svg class="blog-pub-copied-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </button>
+                        <a class="blog-pub-live-btn" id="pubOpenLink" target="_blank" rel="noopener" title="Open post" aria-label="Open post">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        </a>
+                    </div>
+                </div>
+
+                <p id="pubError" class="blog-modal-error hidden"></p>
+
+                <div class="blog-modal-actions">
+                    <button id="confirmPublishPost" class="blog-btn blog-btn-primary">Publish post</button>
+                    <button id="confirmUnpublishPost" class="blog-btn blog-btn-danger hidden">Unpublish</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== DELETE POST MODAL ===== -->
+    <div id="deletePostModal" class="blog-modal-overlay hidden">
+        <div class="blog-modal" role="dialog" aria-modal="true" aria-labelledby="deletePostTitle">
+            <div class="blog-modal-header">
+                <h3 id="deletePostTitle">Delete Post</h3>
+                <button class="blog-modal-close" id="deletePostModalClose">&times;</button>
+            </div>
+            <div class="blog-modal-body">
+                <p class="blog-modal-text">Delete "<span id="deletePostName" class="blog-strong"></span>"? This cannot be undone.</p>
+                <div class="blog-modal-actions">
+                    <button id="cancelDeletePost" class="blog-btn blog-btn-ghost">Cancel</button>
+                    <button id="confirmDeletePost" class="blog-btn blog-btn-danger">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== INSERT IMAGE MODAL (external URLs only) ===== -->
+    <div id="imageModal" class="blog-modal-overlay hidden">
+        <div class="blog-modal" role="dialog" aria-modal="true" aria-labelledby="imageModalTitle">
+            <div class="blog-modal-header">
+                <h3 id="imageModalTitle">Insert Image</h3>
+                <button class="blog-modal-close" id="imageModalClose">&times;</button>
+            </div>
+            <div class="blog-modal-body">
+                <label for="imageUrlInput" class="blog-label">Image URL</label>
+                <input type="url" id="imageUrlInput" class="blog-input" placeholder="https://example.com/photo.jpg" autocomplete="off" spellcheck="false">
+                <p class="blog-pub-hint">Images are embedded by link — upload files to a public host first.</p>
+                <p id="imageError" class="blog-modal-error hidden"></p>
+                <div class="blog-modal-actions">
+                    <button id="cancelImage" class="blog-btn blog-btn-ghost">Cancel</button>
+                    <button id="confirmImage" class="blog-btn blog-btn-primary">Insert</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== VIEW KEY MODAL ===== -->
+    <div id="keyModal" class="blog-modal-overlay hidden">
+        <div class="blog-modal" role="dialog" aria-modal="true" aria-labelledby="keyModalTitle">
+            <div class="blog-modal-header">
+                <h3 id="keyModalTitle">Your Access Key</h3>
+                <button class="blog-modal-close" id="keyModalClose">&times;</button>
+            </div>
+            <div class="blog-modal-body">
+                <div class="blog-key-row">
+                    <code id="keyText" class="blog-key-text">-</code>
+                    <button class="blog-pub-live-btn" id="keyCopyBtn" title="Copy key" aria-label="Copy key">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                </div>
+                <p id="keyCopyFeedback" class="blog-details-note" hidden>Copied!</p>
+                <p class="blog-pub-hint">Your key unlocks this account across all Workdeck apps. Keep it private.</p>
+                <div class="blog-modal-actions">
+                    <button id="keyModalCloseBtn" class="blog-btn blog-btn-ghost">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== DELETE ACCOUNT MODAL ===== -->
+    <div id="deleteAccountModal" class="blog-modal-overlay hidden">
+        <div class="blog-modal" role="dialog" aria-modal="true" aria-labelledby="deleteAccountTitle">
+            <div class="blog-modal-header">
+                <h3 id="deleteAccountTitle">Delete Account</h3>
+                <button class="blog-modal-close" id="deleteAccountModalClose">&times;</button>
+            </div>
+            <div class="blog-modal-body">
+                <p class="blog-modal-text">Delete your account? Every app's data goes with it and your published posts are taken offline. This cannot be undone.</p>
+                <div class="blog-modal-actions">
+                    <button id="cancelDeleteAccount" class="blog-btn blog-btn-ghost">Cancel</button>
+                    <button id="confirmDeleteAccount" class="blog-btn blog-btn-danger">Delete Account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TOAST ===== -->
+    <div id="toast" class="blog-toast" hidden></div>
+
+    <!-- ===== TEMPLATES ===== -->
+    <template id="blogPostRowTemplate">
+        <article class="blog-post-row">
+            <div class="blog-post-row-main">
+                <div class="blog-post-row-head">
+                    <h3 class="blog-post-row-title"></h3>
+                    <span class="blog-post-row-public" hidden>Public</span>
+                </div>
+                <p class="blog-post-row-excerpt"></p>
+                <span class="blog-post-row-date"></span>
+            </div>
+            <span class="blog-post-row-chevron" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </span>
+        </article>
+    </template>
+
+    <!-- Config + modules (plain script tags, order matters) -->
+    <script src="/blog/config/config.js"></script>
+    <script src="/blog/js/auth.js"></script>
+    <script src="/blog/js/storage.js"></script>
+    <script src="/blog/js/themes.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+    <script src="/blog/js/app.js"></script>
+    <script src="/blog/js/editor.js"></script>
+</body>
+</html>

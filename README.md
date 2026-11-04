@@ -43,6 +43,13 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
   with a mirrored progress bar, comments, undo/redo, search/sort toolbar,
   column WIP limits, multi-select, and the suite's light/dark theme
   bridged onto the widget via its CSS variables.
+- ✍️ **Blog** — a publishable blog: write posts in a rich-text editor
+  (Quill), keep them as drafts or publish them one by one. Each post
+  publishes at a public link you pick in the publish modal (/<slug>,
+  unique across all accounts). Only published posts go out — drafts stay
+  private — and the public pages are served GET-only through the same
+  slug-pointer scheme the suite uses everywhere (the account key/hash
+  never leaves the server).
 - 📱 **Mobile-friendly** — touch devices open files in the same tab.
 
 ## 🏗️ Architecture
@@ -68,7 +75,9 @@ workdeck/
 │   ├── filebox.js          # Files API (file bytes: upload + download)
 │   ├── todo.js             # Todo API (task list records)
 │   ├── calendar.js         # Calendar API (calendars + event records)
-│   └── kanban.js           # Kanban API (board records)
+│   ├── kanban.js           # Kanban API (board records)
+│   ├── blog.js             # Blog API (post records + publish/unpublish)
+│   └── site.js             # Public blog API (GET-only, slug -> account)
 ├── docs/                   # Docs build output (from docs-src, base /docs/)
 ├── docs-src/               # Docs source (React+Vite, with:
 │                           #   base '/docs/', ?doc= deep link, shared sessions)
@@ -110,6 +119,16 @@ workdeck/
 │   ├── styles.css          # self-contained, sky accents
 │   ├── config/config.js
 │   └── js/                 # auth/storage/themes/editor (+ rrule.js, ical.js via CDN)
+├── kanban/                 # Kanban app (vanilla + SortableJS board surface)
+│   ├── index.html          # boards home + board view (/kanban/<id>, ?board=<id>)
+│   ├── styles.css          # self-contained, fuchsia accents
+│   ├── config/config.js
+│   └── js/                 # auth/storage/themes/app/board
+├── blog/                   # Blog app (vanilla + Quill rich-text editor)
+│   ├── index.html          # posts home + post editor (/blog/<id>, ?post=<id>)
+│   ├── styles.css          # self-contained, teal accents
+│   ├── config/config.js
+│   └── js/                 # auth/storage/themes/app/editor
 ├── server/dev-server.js    # one Express server mirroring the prod layout
 ├── vercel.json             # routing for production
 ├── .env                    # PEPPER_SECRET, FILES_MAX_FILE_SIZE for local dev
@@ -134,10 +153,15 @@ document per hash in production):
   "todo": [ ... ],
   "calendars": [ ... ],
   "events": [ ... ],
+  "kanban": [ ... ],
+  "posts": [ { "id": "...", "title": "...", "slug": "...", "path": null, "html": "...",
+               "excerpt": "...", "publishedAt": null } ],
   "settings": {
     "theme": "dark",
     "viewMode": "grid",
-    "lastOpened": { "<fileId>": "<iso-date>" }
+    "lastOpened": { "<fileId>": "<iso-date>" },
+    "blog": { "title": "Blog", "description": "",
+              "address": { "slug": "my-blog", "publishedAt": "<iso-date>" } | null }
   }
 }
 ```
@@ -145,8 +169,9 @@ document per hash in production):
 All the APIs share `api/_lib/store.js` and save **section-merged**: Docs
 only writes docs/tags, Sheets only writes sheets, Forms only writes
 forms, Slides only writes slides, Draw only writes draws, Todo only
-writes todo, Calendar only writes calendars/events, Workdeck writes
-docs/tags/sheets/forms/slides/draws/settings etc — so no app can wipe another's
+writes todo, Calendar only writes calendars/events, Blog only writes
+posts/settings, Workdeck writes
+docs/tags/sheets/forms/slides/draws/posts/settings etc — so no app can wipe another's
 data.
 
 ### Hard links & mentions (interlinking)
