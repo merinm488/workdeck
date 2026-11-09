@@ -189,7 +189,7 @@ const WD_APPS = [
     {
         id: 'blog',
         name: 'Blog',
-        label: 'Post',
+        label: 'Blog',
         accent: 'blog',
         icon: 'blog',
         route: '/blog/',
