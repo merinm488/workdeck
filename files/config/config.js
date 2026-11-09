@@ -35,7 +35,8 @@ const APP_CONFIG = {
     themes: {
         default: 'light',
         available: ['light', 'dark'],   // 'system' is a preference, not a theme
-        storageKey: 'filebox_theme'
+        storageKey: 'workdeck_theme',   // suite-wide key — one theme for all apps
+        legacyKey: 'filebox_theme'      // pre-unification key, read-only fallback
     },
 
     // Client-side fallback only — the server's value (FILES_MAX_FILE_SIZE

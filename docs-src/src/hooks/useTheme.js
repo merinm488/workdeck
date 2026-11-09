@@ -13,8 +13,8 @@ export function useTheme() {
   const [systemTheme, setSystemTheme] = useState('dark');
 
   useEffect(() => {
-    // Get saved theme preference (legacy key fallback for existing users)
-    const savedTheme = localStorage.getItem('docs_theme') || localStorage.getItem('docs_theme') || 'dark';
+    // Shared suite-wide key; 'docs_theme' is the pre-unification fallback
+    const savedTheme = localStorage.getItem('workdeck_theme') || localStorage.getItem('docs_theme') || 'dark';
     setThemeState(savedTheme);
 
     // Detect system preference
@@ -27,11 +27,22 @@ export function useTheme() {
     };
     mediaQuery.addEventListener('change', handleChange);
 
+    // Follow theme changes made in other Workdeck tabs
+    const handleStorage = (e) => {
+      if (e.key !== 'workdeck_theme' || !e.newValue) return;
+      const pref = e.newValue;
+      if (pref !== 'light' && pref !== 'dark' && pref !== 'system') return;
+      setThemeState(pref);
+      applyTheme(pref === 'system' ? (mediaQuery.matches ? 'dark' : 'light') : pref);
+    };
+    window.addEventListener('storage', handleStorage);
+
     // Apply initial theme
     applyTheme(savedTheme === 'system' ? (mediaQuery.matches ? 'dark' : 'light') : savedTheme);
 
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 
@@ -51,7 +62,7 @@ export function useTheme() {
    */
   const setTheme = (newTheme) => {
     setThemeState(newTheme);
-    localStorage.setItem('docs_theme', newTheme);
+    localStorage.setItem('workdeck_theme', newTheme);
 
     // Apply the appropriate theme
     if (newTheme === 'system') {

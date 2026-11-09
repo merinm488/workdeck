@@ -2348,6 +2348,7 @@ function setupEventListeners() {
 
 function updateThemeLabel() {
     const label = $('themeText');
+    if (!label) return;
     const saved = wdThemeManager.getPreference();
     const current = wdThemeManager.getCurrentTheme();
     const display = saved === 'system'
@@ -2404,6 +2405,7 @@ if (typeof window !== 'undefined') {
         get state() { return state; },
         saveSettings: saveSettings,
         loadUserData: loadUserData,
+        updateThemeLabel: updateThemeLabel,
         themes: wdThemeManager
     };
 }

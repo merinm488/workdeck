@@ -18,6 +18,7 @@ class ThemeManager {
         // Initialize theme manager
         this.currentTheme = null;
         this.storageKey = APP_CONFIG.themes.storageKey;
+        this.legacyKey = APP_CONFIG.themes.legacyKey;
         this.availableThemes = APP_CONFIG.themes.available;
         this.defaultTheme = APP_CONFIG.themes.default;
 
@@ -57,7 +58,8 @@ class ThemeManager {
             themeName = this.defaultTheme;
         }
 
-        this.setTheme(themeName);
+        // Apply without saving — keeps the stored 'system' preference intact
+        this.applyResolved(themeName);
 
         // Only setup toggle button if it exists (for login page)
         const toggleBtn = document.getElementById('themeToggle');
@@ -67,6 +69,9 @@ class ThemeManager {
 
         // Listen for system theme changes if 'system' is selected
         this.watchSystemTheme();
+
+        // Follow theme changes made in other Workdeck tabs
+        this.watchSharedTheme();
     }
 
     /**
@@ -150,10 +155,8 @@ class ThemeManager {
         // Update toggle button state
 
         if (this.isValidTheme(themeName)){
-            this.applyTheme(themeName);
+            this.applyResolved(themeName);
             this.saveTheme(themeName);
-            this.updateSpreadsheetTheme(themeName);
-            this.updateToggleButtonState();
         }
         else {
             console.error('[THEME] Invalid theme name:', themeName);
@@ -192,7 +195,7 @@ class ThemeManager {
      * @returns {string|null} Saved theme or null
      */
     loadSavedTheme() {
-        return localStorage.getItem(this.storageKey);
+        return localStorage.getItem(this.storageKey) || localStorage.getItem(this.legacyKey);
     }
 
     // ================================================
@@ -271,6 +274,18 @@ class ThemeManager {
     }
 
     /**
+     * Apply a resolved theme without saving
+     * Keeps the stored preference ('system' included) intact
+     * @param {string} themeName - Theme name ('light' or 'dark')
+     */
+    applyResolved(themeName) {
+        if (!this.isValidTheme(themeName)) return;
+        this.applyTheme(themeName);
+        this.updateSpreadsheetTheme(themeName);
+        this.updateToggleButtonState();
+    }
+
+    /**
      * Listen for system theme changes
      * Set up MediaQuery listener
      */
@@ -282,8 +297,21 @@ class ThemeManager {
             const savedPreference = localStorage.getItem(this.storageKey);
             if (savedPreference === 'system') {
                 const newTheme = e.matches ? 'dark' : 'light';
-                this.setTheme(newTheme);
+                this.applyResolved(newTheme);
             }
+        });
+    }
+
+    /**
+     * Follow theme changes made in other Workdeck tabs
+     * The 'storage' event fires only in tabs other than the writer's
+     */
+    watchSharedTheme() {
+        window.addEventListener('storage', (e) => {
+            if (e.key !== this.storageKey) return;
+            const pref = e.newValue;
+            if (pref !== 'system' && !this.isValidTheme(pref)) return;
+            this.applyResolved(pref === 'system' ? this.getSystemTheme() : pref);
         });
     }
 }

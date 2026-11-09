@@ -173,15 +173,21 @@ app.get('/f/:id', (req, res, next) => {
 
 // Published blog /<slug> -> public/blog.html (public read-only view;
 // the slug resolves server-side in api/site.js). Articles: /<slug>/<post>.
-// 'blog' itself is a reserved slug — skip it so /blog serves the app.
+// App paths win over slugs (on Vercel static files beat rewrites) —
+// 'blog' itself is reserved too, so /blog serves the app.
+const RESERVED_SLUGS = new Set([
+  'blog', 'sheets', 'forms', 'slides', 'draw', 'files',
+  'todo', 'calendar', 'kanban', 'docs', 'api', 'js', 'icons', 'f'
+]);
 app.get('/:slug', (req, res, next) => {
-  if (req.params.slug === 'blog') return next();
+  if (RESERVED_SLUGS.has(req.params.slug)) return next();
   if (!/^[a-z0-9-]{3,40}$/.test(req.params.slug)) return next();
   req.url = '/blog.html?site=' + encodeURIComponent(req.params.slug);
   next();
 });
 
 app.get('/:slug/:post', (req, res, next) => {
+  if (RESERVED_SLUGS.has(req.params.slug)) return next();
   if (!/^[a-z0-9-]{3,40}$/.test(req.params.slug)) return next();
   if (!/^[a-z0-9-]{1,80}$/.test(req.params.post)) return next();
   req.url = '/blog.html?site=' + encodeURIComponent(req.params.slug)

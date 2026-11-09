@@ -76,7 +76,8 @@ const APP_CONFIG = {
     themes: {
         default: 'light',
         available: ['light', 'dark'],
-        storageKey: 'sheets_theme',
+        storageKey: 'workdeck_theme',   // suite-wide key — one theme for all apps
+        legacyKey: 'sheets_theme',      // pre-unification key, read-only fallback
     },
 
     // Auto-save configuration

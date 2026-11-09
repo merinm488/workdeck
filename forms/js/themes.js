@@ -2,13 +2,14 @@
  * FormsThemeManager — light/dark/system theme handling for the Forms app.
  *
  * Theme preference lives in localStorage under APP_CONFIG.themes.storageKey
- * ('forms_theme'); values: 'light' | 'dark' | 'system'.
+ * ('workdeck_theme', shared suite-wide); values: 'light' | 'dark' | 'system'.
  *
  */
 
 class FormsThemeManager {
     constructor() {
         this.storageKey = APP_CONFIG.themes.storageKey;
+        this.legacyKey = APP_CONFIG.themes.legacyKey;
         this.availableThemes = APP_CONFIG.themes.available;   // ['light', 'dark']
         this.currentTheme = null;                             // resolved theme actually applied
     }
@@ -30,6 +31,7 @@ class FormsThemeManager {
         }
         this.applyTheme(resolvedTheme);
         this.watchSystemTheme();
+        this.watchSharedTheme();
     }
 
     // ================================================
@@ -41,7 +43,7 @@ class FormsThemeManager {
      * @returns {string|null} 'light' | 'dark' | 'system' | null
      */
     getPreference() {
-        return localStorage.getItem(this.storageKey);
+        return localStorage.getItem(this.storageKey) || localStorage.getItem(this.legacyKey);
     }
 
     /**
@@ -142,6 +144,16 @@ class FormsThemeManager {
             if(this.getPreference() === 'system'){
                 this.applyTheme(e.matches ? 'dark' : 'light');
             }
+        });
+    }
+
+    // Follow theme changes made in other Workdeck tabs.
+    watchSharedTheme() {
+        window.addEventListener('storage', (e) => {
+            if (e.key !== this.storageKey) return;
+            const pref = e.newValue;
+            if (pref !== 'system' && !this.isValidTheme(pref)) return;
+            this.applyTheme(pref === 'system' ? this.getSystemTheme() : pref);
         });
     }
 

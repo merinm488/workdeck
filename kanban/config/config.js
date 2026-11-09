@@ -20,7 +20,8 @@ const APP_CONFIG = {
     themes: {
         default: 'dark',
         available: ['light', 'dark'],
-        storageKey: 'kanban_theme'
+        storageKey: 'workdeck_theme',   // suite-wide key — one theme for all apps
+        legacyKey: 'kanban_theme'       // pre-unification key, read-only fallback
     },
 
     // Card priority values (colors mirror Todo's palette)

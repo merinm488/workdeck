@@ -31,6 +31,7 @@ class WdThemeManager {
 
         this.setTheme(themeName, { skipServerSave: true });
         this.watchSystemTheme();
+        this.watchSharedTheme();
     }
 
     /**
@@ -97,6 +98,18 @@ class WdThemeManager {
             if (this.getPreference() === 'system') {
                 this.setTheme('system', { skipServerSave: true });
             }
+        });
+    }
+
+    // Follow theme changes made in other Workdeck tabs.
+    watchSharedTheme() {
+        window.addEventListener('storage', (e) => {
+            if (e.key !== this.storageKey) return;
+            const pref = e.newValue;
+            if (!this.isValidTheme(pref)) return;
+            this.currentTheme = pref === 'system' ? this.getSystemTheme() : pref;
+            this.applyTheme(this.currentTheme);
+            window.workdeckApp?.updateThemeLabel?.();
         });
     }
 }

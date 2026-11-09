@@ -9,6 +9,7 @@
 class FileboxThemeManager {
     constructor() {
         this.storageKey = APP_CONFIG.themes.storageKey;
+        this.legacyKey = APP_CONFIG.themes.legacyKey;
         this.availableThemes = APP_CONFIG.themes.available;
         this.currentTheme = null;   // resolved theme actually applied
     }
@@ -26,10 +27,11 @@ class FileboxThemeManager {
         }
         this.applyTheme(resolvedTheme);
         this.watchSystemTheme();
+        this.watchSharedTheme();
     }
 
     getPreference() {
-        return localStorage.getItem(this.storageKey);
+        return localStorage.getItem(this.storageKey) || localStorage.getItem(this.legacyKey);
     }
 
     setPreference(pref) {
@@ -76,6 +78,16 @@ class FileboxThemeManager {
             if (this.getPreference() === 'system') {
                 this.applyTheme(e.matches ? 'dark' : 'light');
             }
+        });
+    }
+
+    // Follow theme changes made in other Workdeck tabs.
+    watchSharedTheme() {
+        window.addEventListener('storage', (e) => {
+            if (e.key !== this.storageKey) return;
+            const pref = e.newValue;
+            if (pref !== 'system' && !this.isValidTheme(pref)) return;
+            this.applyTheme(pref === 'system' ? this.getSystemTheme() : pref);
         });
     }
 
