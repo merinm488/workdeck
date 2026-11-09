@@ -99,6 +99,7 @@ create or delete accounts.
                     publishedAt, createdAt, updatedAt } ],   // Blog
       settings: { theme, viewMode, lastOpened, blog: { title, description,
                     address: { slug, publishedAt } | null }, ... }
+                    // address = legacy blog claim — read-only, never set it
     }
 
 ## Endpoints
@@ -139,12 +140,13 @@ create or delete accounts.
 
 ### Blog  —  /api/blog
     GET  -> { posts: [posts], settings, ... }
-    PUT  { action: "createPost",        data: { title?, tagId?, id? } }
+    PUT  { action: "createPost",        data: { title?, html?, tagId?, id? } }
     PUT  { action: "updatePost",        data: { id, title?, html?, tagId? } }
-         (html is Quill HTML, scrubbed server-side; unpublished posts keep
-          a title-derived slug suggestion in `slug`)
+         (html is Quill HTML, scrubbed server-side; only never-published
+          posts keep a title-derived slug suggestion in `slug` — a post
+          that has published before holds its slug even while unpublished)
     PUT  { action: "deletePost",        data: { id } }
-    PUT  { action: "updateBlogSettings",data: { title? } }
+    PUT  { action: "updateBlogSettings",data: { title?, description? } }
     PUT  { action: "publishPost",       data: { id, slug } } -> { blog: { postUrl, path } }
          (makes one post public at /<slug> — the slug is chosen per publish,
           unique across all accounts. Unpublishing keeps the slug reserved:
@@ -152,6 +154,8 @@ create or delete accounts.
           same link revives it, deleting the post frees it.
           Posts published before per-post links keep /<address>/<post>)
     PUT  { action: "unpublishPost",     data: { id } }
+         (the slug stays reserved for the post — republish the same slug
+          to bring the same link back)
     PUT  { action: "updateSettings",    data: { settings: {...} } }
 
 ### Sheets  —  /api/users
@@ -206,7 +210,9 @@ create or delete accounts.
     PUT  { action: "createTag",      data: { name, color? } }
     PUT  { action: "recordOpen",     data: { fileId, app } }   (recency)
     PUT  { action: "renameFile",     data: { fileId, name, app? } }
+         (renaming a never-published blog post re-derives its slug suggestion)
     PUT  { action: "deleteFile",     data: { fileId, app } }
+         (deleting a published blog post also frees its public /<slug>)
     PUT  { action: "createFolder",   data: { name, parentId? } }
     PUT  { action: "updateSettings", data: { settings: {...} } }
 
