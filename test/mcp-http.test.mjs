@@ -68,6 +68,10 @@ test('OAuth code + PKCE binds MCP Todo writes to the authorized account', async 
     }
     const consent = await fetch(auth);
     assert.equal(consent.status, 200);
+    const policy = consent.headers.get('content-security-policy');
+    assert.match(policy, /form-action 'self'/);
+    assert.ok(policy.includes(base));
+    assert.ok(policy.includes(new URL(callback).origin));
     const text = await consent.text();
     assert.match(text, /Allow Todo access/);
     const transaction = /name="transaction" value="([^"]+)"/.exec(text)?.[1];
@@ -79,6 +83,7 @@ test('OAuth code + PKCE binds MCP Todo writes to the authorized account', async 
       body: new URLSearchParams({ transaction, key: `wrong-${key}`, decision: 'approve' })
     });
     assert.equal(wrongKey.status, 401);
+    assert.ok(wrongKey.headers.get('content-security-policy').includes(new URL(callback).origin));
     const approve = await fetch(metadata.authorization_endpoint, {
       method: 'POST', redirect: 'manual',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded',

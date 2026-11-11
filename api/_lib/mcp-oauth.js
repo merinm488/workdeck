@@ -74,9 +74,14 @@ function validRedirect(uri) {
   } catch { return false; }
 }
 
-function html(res, text, status = 200) {
+function html(req, res, text, status = 200, redirectUri) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
+  // Browsers also enforce form-action on a POST's OAuth redirect. Permit only
+  // this validated client's registered callback, plus Workdeck itself.
+  const callbackOrigin = redirectUri && validRedirect(redirectUri)
+    ? new URL(redirectUri).origin : null;
+  const allowedForms = ["'self'", origin(req), callbackOrigin].filter(Boolean).join(' ');
+  res.setHeader('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; form-action ${allowedForms}; base-uri 'none'; frame-ancestors 'none'`);
   res.setHeader('Referrer-Policy', 'no-referrer');
   return res.status(status).send(text);
 }
@@ -137,7 +142,7 @@ async function authorize(req, res) {
       state: q.state, nonce, expiresAt: Date.now() + CONSENT_LIFETIME
     });
     res.setHeader('Set-Cookie', `wd_mcp_consent=${nonce}; Path=/api/mcp-oauth; HttpOnly; SameSite=Lax; Max-Age=600${process.env.NODE_ENV === 'development' ? '' : '; Secure'}`);
-    return html(res, consentPage({ app: app.name, callback: new URL(q.redirect_uri).origin, transaction }));
+    return html(req, res, consentPage({ app: app.name, callback: new URL(q.redirect_uri).origin, transaction }), 200, q.redirect_uri);
   }
   if (req.method !== 'POST') return error(res, 405, 'method_not_allowed');
   const body = bodyOf(req);
@@ -157,9 +162,9 @@ async function authorize(req, res) {
   const accountHash = generateHash(body.key.trim());
   const account = await getUserDoc(accountHash);
   if (!account) {
-    return html(res, consentPage({ app: client(tx.clientId).name,
+    return html(req, res, consentPage({ app: client(tx.clientId).name,
       callback: new URL(tx.redirectUri).origin, transaction: body.transaction,
-      message: 'Account not found. Check your Workdeck key.' }), 401);
+      message: 'Account not found. Check your Workdeck key.' }), 401, tx.redirectUri);
   }
   const accountId = account.settings.mcpAccountId || crypto.randomUUID();
   res.setHeader('Set-Cookie', 'wd_mcp_consent=; Path=/api/mcp-oauth; HttpOnly; SameSite=Lax; Max-Age=0');
