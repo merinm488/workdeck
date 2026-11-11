@@ -1851,6 +1851,51 @@ function hideKeyModal() {
     $('keyModal').classList.remove('active');
 }
 
+async function showConnectAIModal() {
+    closeDropdown($('settingsDropdown'));
+    $('connectAIUrl').textContent = location.origin + '/api/mcp';
+    $('connectAIModal').classList.add('active');
+    $('connectAIStatus').textContent = 'Loading connection…';
+    $('connectAIRevoke').hidden = true;
+    const hash = wdAuth.getUserHash();
+    if (!hash) return;
+    try {
+        const response = await fetch('/api/mcp-connections?hash=' + encodeURIComponent(hash), { cache: 'no-store' });
+        if (!response.ok) throw new Error('Unable to load connection');
+        const result = await response.json();
+        if (!wdAuth.getUserHash() || hash !== wdAuth.getUserHash()) return;
+        if (result.connection) {
+            const c = result.connection;
+            $('connectAIStatus').textContent = 'Connected: ' + (c.clientName || 'AI client') +
+                ' · Expires ' + new Date(c.expiresAt).toLocaleDateString();
+            $('connectAIRevoke').hidden = false;
+        } else {
+            $('connectAIStatus').textContent = 'No active AI connection.';
+        }
+    } catch (error) {
+        $('connectAIStatus').textContent = 'Could not load connection status. Try again later.';
+    }
+}
+
+async function revokeAIConnection() {
+    const hash = wdAuth.getUserHash();
+    if (!hash || !window.confirm('Revoke the Todo AI connection?')) return;
+    $('connectAIRevoke').disabled = true;
+    try {
+        const response = await fetch('/api/mcp-connections', {
+            method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hash })
+        });
+        if (!response.ok) throw new Error('Failed to revoke connection');
+        $('connectAIStatus').textContent = 'Connection revoked.';
+        $('connectAIRevoke').hidden = true;
+    } catch (error) {
+        $('connectAIStatus').textContent = 'Revocation failed. Please try again.';
+    } finally {
+        $('connectAIRevoke').disabled = false;
+    }
+}
+
 function showChangeKeyModal() {
     $('newKeyInput').value = '';
     $('confirmKeyInput').value = '';
@@ -2238,6 +2283,18 @@ function setupEventListeners() {
     });
 
     $('viewKeyBtn').addEventListener('click', showKeyModal);
+    $('connectAIBtn').addEventListener('click', showConnectAIModal);
+    $('connectAIClose').addEventListener('click', function () { $('connectAIModal').classList.remove('active'); });
+    $('connectAICloseBtn').addEventListener('click', function () { $('connectAIModal').classList.remove('active'); });
+    $('connectAIRevoke').addEventListener('click', revokeAIConnection);
+    $('connectAICopy').addEventListener('click', async function () {
+        try {
+            await navigator.clipboard.writeText($('connectAIUrl').textContent);
+            showNotification('MCP URL copied', 'success');
+        } catch (error) {
+            showNotification('Could not copy URL', 'error');
+        }
+    });
 
     $('logoutBtn').addEventListener('click', function () {
         wdAuth.logout();

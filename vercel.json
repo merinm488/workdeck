@@ -5,6 +5,14 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/.well-known/oauth-protected-resource/api/mcp",
+      "destination": "/api/mcp-oauth?route=resource"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "/api/mcp-oauth?route=server"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     },

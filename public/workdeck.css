@@ -1657,6 +1657,9 @@ html[data-theme="dark"] .wd-theme-option-icon {
 }
 
 /* Key modal */
+#connectAIModal [hidden] { display: none !important; }
+#connectAIUrl { text-align: left; font-size: 12px; }
+#connectAICopy { font-size: 12px; padding: 0 12px; }
 .wd-key-display {
     display: flex;
     gap: 8px;

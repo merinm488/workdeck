@@ -52,6 +52,68 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
   never leaves the server).
 - 📱 **Mobile-friendly** — touch devices open files in the same tab.
 
+## AI connector (MCP, Todo pilot)
+
+Workdeck provides a **remote Streamable HTTP MCP** endpoint at `/api/mcp`.
+It exposes only `todo_lists`, `todo_items`, `todo_create_list`,
+`todo_add_task`, and `todo_update_task`. It never provides account keys or the
+whole account document to the model. Existing `/api/todo` behavior is unchanged.
+
+To enable it on Vercel, configure all three environment variables before
+redeploying:
+
+- `PEPPER_SECRET` — the **existing** account pepper, unchanged. Changing it
+  without migrating existing accounts makes them inaccessible; do not replace
+  it merely to enable MCP. MCP fails closed if it is unset in production or
+  uses the publicly documented development default.
+- `MCP_AUTH_SECRET` — generate once with `openssl rand -hex 32`; keep it private
+  and stable. Replacing it invalidates all MCP connections and OAuth client
+  registrations. Do not reuse the pepper.
+- `MCP_PUBLIC_ORIGIN` — exact HTTPS origin, e.g.
+  `https://workdeck-m.vercel.app` (no path or trailing slash). Set a different
+  origin in each preview deployment that should accept MCP connections.
+
+TextDB remains the sole persistent backend. OAuth codes and scoped grants use
+per-record TextDB documents through `api/_lib/mcp-grants.js`; the account's
+Todo data still uses `api/_lib/store.js`. No Vercel instance memory holds
+connection state. These modules separate storage from MCP/OAuth logic so the
+backend can be changed later.
+
+On Workdeck, open **Settings → Connect AI (Todo)** and copy the MCP URL. In a
+remote-MCP-capable client add that URL and choose automatic OAuth client
+registration if offered (in Claude.ai, **Register automatically**, rather
+than **Use Claude's published identity**). Workdeck asks for the key of an
+*existing* account on its own consent page; it never forwards the key to the
+client or creates an account. Approving connects that account's Todo data.
+Workdeck settings shows the active connection and lets the owner revoke it.
+One connection per account is supported for this pilot: reconnecting replaces
+the previous grant. A key change or account deletion invalidates the token;
+reconnect after changing keys.
+
+**Pilot limitations:** access expires after 30 days, after which the owner
+must reconnect. Refresh tokens are intentionally not issued. TextDB has no
+compare-and-swap through the current storage API: under concurrent redemption
+an OAuth code may be exchanged more than once, but both attempts require the
+same PKCE verifier and resolve to the same revocable Todo grant. This is not a
+claim of strict single-use OAuth-code semantics. Browser and agent writes to
+the same Todo list can also race; do not make concurrent edits during this
+pilot. Other MCP clients may need different registration/transport support;
+Claude.ai and Vercel must be tested end-to-end before treating production
+compatibility as verified.
+
+Run the isolated local integration tests with `node --test test/*.test.mjs`.
+To try the browser locally, run `npm install`, put a generated
+`MCP_AUTH_SECRET` in your local `.env`, and start `npm run dev`. Use a **new,
+throwaway local Workdeck account** at `http://localhost:4000` rather than your
+production account. Claude.ai cannot access localhost directly: to test it
+without deploying, expose port 4000 through a trusted HTTPS tunnel, set
+`MCP_PUBLIC_ORIGIN=https://<your-tunnel-host>` in `.env`, and restart the dev
+server. Only share the MCP URL with your client, not your account key. The
+tunnel also exposes the rest of your local Workdeck server; close it after
+testing. Without a tunnel you can still run the automated local MCP/OAuth
+integration tests. The actual Vercel and Claude.ai combination needs a
+staging or production deployment for confirmation.
+
 ## 🏗️ Architecture
 
 ```

@@ -71,6 +71,9 @@ const { default: calendarHandler } = await import('../api/calendar.js');
 const { default: kanbanHandler } = await import('../api/kanban.js');
 const { default: blogHandler } = await import('../api/blog.js');
 const { default: siteHandler } = await import('../api/site.js');
+const { default: mcpHandler } = await import('../api/mcp.js');
+const { default: oauthHandler } = await import('../api/mcp-oauth.js');
+const { default: connectionsHandler } = await import('../api/mcp-connections.js');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -134,6 +137,17 @@ app.all('/api/calendar', (req, res) => calendarHandler(req, res));
 app.all('/api/kanban', (req, res) => kanbanHandler(req, res));
 app.all('/api/blog', (req, res) => blogHandler(req, res));
 app.all('/api/site', (req, res) => siteHandler(req, res));
+app.all('/api/mcp', (req, res) => mcpHandler(req, res));
+app.all('/api/mcp-oauth', (req, res) => oauthHandler(req, res));
+app.all('/api/mcp-connections', (req, res) => connectionsHandler(req, res));
+app.get('/.well-known/oauth-protected-resource/api/mcp', (req, res) => {
+  req.query.route = 'resource';
+  return oauthHandler(req, res);
+});
+app.get('/.well-known/oauth-authorization-server', (req, res) => {
+  req.query.route = 'server';
+  return oauthHandler(req, res);
+});
 
 // ---------- Pretty file URLs ----------
 // Underscore allowed: legacy client-created sheets have ids like mv7xyz_ab12cde
