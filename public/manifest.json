@@ -1,7 +1,7 @@
 {
   "name": "Workdeck",
   "short_name": "Workdeck",
-  "description": "Workdeck — your unified home for Docs documents and Sheets spreadsheets.",
+  "description": "Workdeck — your unified home for your everyday apps and work.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
