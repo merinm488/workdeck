@@ -1,5 +1,5 @@
-import { accountHash, getUserDoc } from './_lib/store.js';
-import { readMcpGrant, writeMcpGrant, grantAccountTag } from './_lib/mcp-grants.js';
+import { accountHash, getUserDoc } from './store.js';
+import { readMcpGrant, writeMcpGrant, grantAccountTag } from './mcp-grants.js';
 
 /** Management uses the existing Workdeck browser session credential. */
 export default async function handler(req, res) {

@@ -220,6 +220,31 @@ function withSettingsDefaults(userData) {
 // ================================================
 
 export default async function handler(req, res) {
+  // Hobby deployments permit 12 functions; reuse the existing Workdeck
+  // function for MCP entrypoints. Ordinary Workdeck requests take the
+  // unchanged path below, and MCP dependencies load only for MCP requests.
+  const mcpRoute = req.query?.__wd_mcp_route;
+  if (mcpRoute === 'http' || mcpRoute === 'oauth' || mcpRoute === 'connections') {
+    try {
+      // Literal paths are necessary for Vercel's function bundler to trace
+      // each helper while keeping the normal Workdeck cold path lightweight.
+      if (mcpRoute === 'http') {
+        const { default: mcpHandler } = await import('./_lib/mcp-http.js');
+        return await mcpHandler(req, res);
+      }
+      if (mcpRoute === 'oauth') {
+        const { default: oauthHandler } = await import('./_lib/mcp-oauth.js');
+        return await oauthHandler(req, res);
+      }
+      const { default: connectionsHandler } = await import('./_lib/mcp-connections.js');
+      return await connectionsHandler(req, res);
+    } catch (error) {
+      console.error('[WORKDECK MCP] Handler failed:', error);
+      if (!res.headersSent) return res.status(503).json({ error: 'MCP unavailable' });
+      return;
+    }
+  }
+
   applyCorsHeaders(req, res);
 
   if (req.method === 'OPTIONS') {

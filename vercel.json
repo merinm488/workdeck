@@ -6,11 +6,23 @@
   "rewrites": [
     {
       "source": "/.well-known/oauth-protected-resource/api/mcp",
-      "destination": "/api/mcp-oauth?route=resource"
+      "destination": "/api/workdeck?__wd_mcp_route=oauth&route=resource"
     },
     {
       "source": "/.well-known/oauth-authorization-server",
-      "destination": "/api/mcp-oauth?route=server"
+      "destination": "/api/workdeck?__wd_mcp_route=oauth&route=server"
+    },
+    {
+      "source": "/api/mcp",
+      "destination": "/api/workdeck?__wd_mcp_route=http"
+    },
+    {
+      "source": "/api/mcp-oauth",
+      "destination": "/api/workdeck?__wd_mcp_route=oauth"
+    },
+    {
+      "source": "/api/mcp-connections",
+      "destination": "/api/workdeck?__wd_mcp_route=connections"
     },
     {
       "source": "/api/:path*",

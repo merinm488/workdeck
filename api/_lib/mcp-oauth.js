@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
-import { generateHash, getUserDoc, saveOwnedSections, getBaseUrl } from './_lib/store.js';
-import { newGrantId, grantAccountTag, readMcpGrant, writeMcpGrant, readMcpCode, writeMcpCode } from './_lib/mcp-grants.js';
-import { sealMcpAccessToken, authenticateMcpBearer, sealMcpState, openMcpState } from './_lib/mcp-auth.js';
+import { generateHash, getUserDoc, saveOwnedSections, getBaseUrl } from './store.js';
+import { newGrantId, grantAccountTag, readMcpGrant, writeMcpGrant, readMcpCode, writeMcpCode } from './mcp-grants.js';
+import { sealMcpAccessToken, authenticateMcpBearer, sealMcpState, openMcpState } from './mcp-auth.js';
 
 const PERMISSIONS = ['todo:read', 'todo:write'];
 const GRANT_LIFETIME = 30 * 24 * 60 * 60 * 1000;

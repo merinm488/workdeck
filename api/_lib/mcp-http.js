@@ -1,8 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { authenticateMcpBearer } from './_lib/mcp-auth.js';
-import { listTodoLists, listTodoItems, createTodoList, addTodoTask, updateTodoTask } from './_lib/mcp-todo.js';
+import { authenticateMcpBearer } from './mcp-auth.js';
+import { listTodoLists, listTodoItems, createTodoList, addTodoTask, updateTodoTask } from './mcp-todo.js';
 
 const id = z.string().min(1).max(128);
 const title = z.string().trim().min(1).max(300);

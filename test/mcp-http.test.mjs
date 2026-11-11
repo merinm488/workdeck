@@ -6,18 +6,24 @@ import express from 'express';
 process.env.NODE_ENV = 'development';
 process.env.MCP_AUTH_SECRET = crypto.randomBytes(32).toString('hex');
 
-const { default: mcp } = await import('../api/mcp.js');
-const { default: oauth } = await import('../api/mcp-oauth.js');
-const { default: connections } = await import('../api/mcp-connections.js');
+const { default: workdeck } = await import('../api/workdeck.js');
 const { generateHash, createUserDoc, deleteUserDoc, getUserDoc } = await import('../api/_lib/store.js');
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.all('/api/mcp', mcp);
-app.all('/api/mcp-oauth', oauth);
-app.all('/api/mcp-connections', connections);
-app.get('/.well-known/oauth-protected-resource/api/mcp', (req, res) => { req.query.route = 'resource'; oauth(req, res); });
-app.get('/.well-known/oauth-authorization-server', (req, res) => { req.query.route = 'server'; oauth(req, res); });
+// Mirror vercel.json's rewrites into the single Workdeck serverless function.
+function viaWorkdeck(route, oauthRoute) {
+  return (req, res) => {
+    req.query.__wd_mcp_route = route;
+    if (oauthRoute) req.query.route = oauthRoute;
+    return workdeck(req, res);
+  };
+}
+app.all('/api/mcp', viaWorkdeck('http'));
+app.all('/api/mcp-oauth', viaWorkdeck('oauth'));
+app.all('/api/mcp-connections', viaWorkdeck('connections'));
+app.get('/.well-known/oauth-protected-resource/api/mcp', viaWorkdeck('oauth', 'resource'));
+app.get('/.well-known/oauth-authorization-server', viaWorkdeck('oauth', 'server'));
 const server = await new Promise(resolve => {
   const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
 });

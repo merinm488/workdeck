@@ -71,9 +71,9 @@ const { default: calendarHandler } = await import('../api/calendar.js');
 const { default: kanbanHandler } = await import('../api/kanban.js');
 const { default: blogHandler } = await import('../api/blog.js');
 const { default: siteHandler } = await import('../api/site.js');
-const { default: mcpHandler } = await import('../api/mcp.js');
-const { default: oauthHandler } = await import('../api/mcp-oauth.js');
-const { default: connectionsHandler } = await import('../api/mcp-connections.js');
+const { default: mcpHandler } = await import('../api/_lib/mcp-http.js');
+const { default: oauthHandler } = await import('../api/_lib/mcp-oauth.js');
+const { default: connectionsHandler } = await import('../api/_lib/mcp-connections.js');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
