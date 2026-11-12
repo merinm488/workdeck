@@ -470,20 +470,30 @@
                 <button class="wd-modal-close" id="connectAIClose" aria-label="Close">&times;</button>
             </div>
             <div class="wd-modal-body">
-                <p class="wd-modal-text">Connect an MCP-compatible AI client to work with your Workdeck apps. Publishing, deletion, and account settings stay private. File uploads require supplied contents and are limited to 100 KB.</p>
+                <p class="wd-modal-text">Connect an MCP-compatible AI client to work with your Workdeck apps.</p>
                 <label class="wd-connect-label" for="connectAIClient">Choose your AI client</label>
                 <select class="wd-connect-select" id="connectAIClient">
                     <option value="other">Other MCP client</option>
                     <option value="chatgpt">ChatGPT</option>
-                    <option value="claude">Claude</option>
+                    <option value="claude">Claude.ai</option>
+                    <option value="claude-code">Claude Code</option>
+                    <option value="claude-desktop">Claude Desktop</option>
                     <option value="codex">Codex</option>
                     <option value="pi">Pi</option>
+                    <option value="cursor">Cursor</option>
+                    <option value="vscode">VS Code</option>
+                    <option value="opencode">OpenCode</option>
                 </select>
                 <div class="wd-connect-steps" id="connectAIInstructions" aria-live="polite">
                     <div data-client="claude" hidden><p>In Claude.ai, open <strong>Settings → Connectors → Add custom connector</strong>. Paste the URL below and connect. If asked, choose <strong>Register automatically</strong> for OAuth.</p></div>
+                    <div data-client="claude-code" hidden><p>Run <code>claude mcp add --transport http workdeck &lt;MCP URL&gt;</code> with the URL below. In Claude Code, use <code>/mcp</code> to sign in to Workdeck.</p></div>
+                    <div data-client="claude-desktop" hidden><p>In Claude Desktop, open <strong>Settings → Connectors → Add custom connector</strong>. Paste the URL below, then connect and authorize Workdeck in your browser.</p></div>
                     <div data-client="chatgpt" hidden><p>In ChatGPT, open <strong>Settings → Apps (or Connectors)</strong> and create a custom app/connector. Enable Developer mode if required, enter the URL below as a remote MCP server, then connect. Availability depends on your ChatGPT plan.</p></div>
-                    <div data-client="codex" hidden><p>In your terminal, run <code>codex mcp add workdeck --url &lt;MCP URL&gt;</code> with the URL below. Then run <code>codex mcp login workdeck</code> to authorize.</p></div>
-                    <div data-client="pi" hidden><p>In your terminal, run <code>pi mcp add workdeck --url &lt;MCP URL&gt;</code> with the URL below. Then run <code>pi mcp login workdeck</code> to authorize (or sign in from <code>/mcp</code>).</p></div>
+                    <div data-client="codex" hidden><p>Run <code>codex mcp add workdeck --url &lt;MCP URL&gt;</code> with the URL below. Then run <code>codex mcp login workdeck</code> to authorize.</p></div>
+                    <div data-client="pi" hidden><p>Run <code>pi mcp add workdeck --url &lt;MCP URL&gt;</code> with the URL below. Then run <code>pi mcp login workdeck</code> to authorize (or sign in from <code>/mcp</code>).</p></div>
+                    <div data-client="cursor" hidden><p>In Cursor, open <strong>Settings → Tools &amp; Integrations → MCP Servers</strong>. Add a remote MCP server named <code>workdeck</code> with the URL below, then sign in when prompted. Menu names may vary by version.</p></div>
+                    <div data-client="vscode" hidden><p>In VS Code, open the Command Palette and run <strong>MCP: Add Server</strong>. Choose <strong>HTTP</strong>, paste the URL below, name it <code>workdeck</code>, and sign in when prompted. MCP support depends on your VS Code version.</p></div>
+                    <div data-client="opencode" hidden><p>In <code>opencode.json</code>, add <code>"mcp": { "workdeck": { "type": "remote", "url": "&lt;MCP URL&gt;" } }</code> using the URL below. Then run <code>opencode mcp auth workdeck</code>.</p></div>
                     <div data-client="other"><p>Add the URL below as a <strong>Streamable HTTP</strong> MCP server in your client. Use OAuth sign-in and automatic client registration if offered. Your client must support remote MCP and OAuth.</p></div>
                 </div>
                 <p class="wd-connect-label">Workdeck MCP server URL</p>

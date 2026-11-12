@@ -95,11 +95,13 @@ connection state. These modules separate storage from MCP/OAuth logic so the
 backend can be changed later.
 
 On Workdeck, open **Settings → Connect AI**, choose your MCP client, and follow
-its instructions using the displayed MCP URL. Claude.ai uses a custom
-connector (choose **Register automatically** for OAuth if prompted). For
-Codex or Pi, add the URL as a remote MCP server and sign in via OAuth. ChatGPT
-custom apps/connectors require a plan with remote MCP support; its settings
-and availability vary. Other remote-MCP clients need Streamable HTTP and OAuth
+its instructions using the displayed MCP URL. The menu includes ChatGPT,
+Claude.ai, Claude Code, Claude Desktop, Codex, Pi, Cursor, VS Code, and OpenCode,
+plus generic instructions for other clients. Claude.ai uses a custom connector
+(choose **Register automatically** for OAuth if prompted). For Codex or Pi,
+add the URL as a remote MCP server and sign in via OAuth. ChatGPT custom
+apps/connectors require a plan with remote MCP support; its settings and
+availability vary. Other remote-MCP clients need Streamable HTTP and OAuth
 with dynamic client registration. Workdeck asks for the key of an
 *existing* account on its own consent page; it never forwards the key to the
 client or creates an account. Approving connects the supported Workdeck apps.
