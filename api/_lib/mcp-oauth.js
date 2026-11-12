@@ -94,7 +94,7 @@ function consentPage({ app, callback, transaction, message = '' }) {
   label{display:block;margin:20px 0 8px}input{box-sizing:border-box;width:100%;padding:12px;background:#111827;color:white;border:1px solid #6b7280;border-radius:8px}
   .buttons{display:flex;gap:10px;margin-top:24px}button{padding:12px 18px;border:0;border-radius:8px;cursor:pointer;background:#60a5fa;color:#111827;font-weight:700}
   button[name=decision][value=deny]{background:#374151;color:white}.error{color:#fca5a5}</style></head><body><main>
-  <h1>Connect AI to Workdeck</h1><p><strong>${escapeHtml(app)}</strong> wants to read records across your Workdeck apps and create or update supported records. This includes Todo tasks, documents, blog drafts, calendars, events, boards, forms, slides and drawings. Sheets and Files expose metadata only; publishing, deletion and account settings are not available.</p>
+  <h1>Connect AI to Workdeck</h1><p><strong>${escapeHtml(app)}</strong> wants to read and edit your Workdeck apps: Todo tasks, documents, blog drafts, calendars, boards and cards, form questions, slides, drawings, spreadsheet cells, folders and small files. File uploads require the client to supply the bytes (not a device path) and are limited to 100 KB. Publishing, deletion and account settings are not available.</p>
   <p>After approval, the connection stays active for up to 30 days. You can revoke it in Workdeck settings.</p>
   <p>Client redirect: <strong>${escapeHtml(callback)}</strong></p>
   ${message ? `<p class="error" role="alert">${escapeHtml(message)}</p>` : ''}

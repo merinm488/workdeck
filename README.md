@@ -56,11 +56,14 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
 
 Workdeck provides a **remote Streamable HTTP MCP** endpoint at `/api/mcp`.
 It offers the Todo task tools plus `workspace_list`, `workspace_read`,
-`workspace_create` and `workspace_update` across Workdeck collections. Docs,
-blog drafts, calendars/events, kanban boards, forms, slides and drawings support
-creation and limited updates; sheets and Files expose metadata only (no workbook
-bodies or file bytes). Publishing, deletion and account settings are not exposed.
-It never provides account keys or the whole account document to the model.
+`workspace_create` and `workspace_update` across Workdeck collections. Content
+operations also support Kanban columns/cards, form questions, slides, Draw
+objects, Sheets cells, Files folders, and base64 file upload/read (100 KB MCP
+limit). The remote connector cannot open a local device path such as
+`/Users/.../file.pdf`: the client must provide the bytes to `file_upload`, or
+the user must upload larger files in the Workdeck Files UI. Publishing,
+deletion and account settings are not exposed. It never provides account keys
+or the whole account document to the model.
 
 To enable it on Vercel, configure all three environment variables before
 redeploying:

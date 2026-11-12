@@ -1,9 +1,9 @@
-import { generateId, getUserDoc, saveOwnedSections } from './store.js';
+import { generateId, getUserDoc, saveOwnedSections, getSheetBody, putSheetBody } from './store.js';
 import { createPostRecord, scrubPostHtml, deriveExcerpt } from './posts.js';
 
 // Explicit allowlist: never expose settings, account keys, OAuth grants, tags or raw file bytes.
 export const COLLECTIONS = ['docs', 'sheets', 'forms', 'slides', 'draws', 'files', 'folders', 'todo', 'calendars', 'events', 'kanban', 'posts'];
-const READ_ONLY = new Set(['sheets', 'files', 'folders', 'todo']); // Todo has dedicated write tools.
+const CREATE_SEPARATELY = new Set(['sheets', 'files', 'folders', 'todo']); // Dedicated content tools.
 
 async function account(hash) {
   const doc = await getUserDoc(hash);
@@ -41,7 +41,7 @@ async function save(hash, app, doc) {
   if (!(await saveOwnedSections(hash, { [app]: doc[app] }))) throw new Error('Could not save Workdeck changes');
 }
 export async function createRecord(hash, app, fields) {
-  if (!COLLECTIONS.includes(app) || READ_ONLY.has(app)) throw new Error('Creation is not supported for this collection');
+  if (!COLLECTIONS.includes(app) || CREATE_SEPARATELY.has(app)) throw new Error('Use the dedicated creation tool for this collection');
   const doc = await account(hash);
   const now = new Date().toISOString();
   let id = generateId();
@@ -67,13 +67,20 @@ export async function createRecord(hash, app, fields) {
   return record;
 }
 export async function updateRecord(hash, app, recordId, changes) {
-  if (!COLLECTIONS.includes(app) || READ_ONLY.has(app)) throw new Error('Updates are not supported for this collection');
+  if (!COLLECTIONS.includes(app) || app === 'todo') throw new Error('Use Todo tools to update tasks');
   if (!Object.keys(changes).length) throw new Error('At least one field required');
   const doc = await account(hash);
   const record = doc[app].find(item => item?.id === recordId);
   if (!record) throw new Error('Record not found');
   if (app === 'posts' && record.publishedAt) throw new Error('Published posts cannot be edited via MCP');
   if (changes.name !== undefined) record[app === 'docs' || app === 'posts' || app === 'events' ? 'title' : 'name'] = changes.name;
+  if (app === 'sheets' && changes.name !== undefined) {
+    const body = await getSheetBody(recordId);
+    if (body) {
+      body.name = changes.name;
+      if (!(await putSheetBody(recordId, body))) throw new Error('Could not rename spreadsheet body');
+    }
+  }
   if (changes.content !== undefined) {
     if (app === 'docs') {
       if (record.contentType !== 'plain-text') throw new Error('Only plain-text documents can be edited via MCP');

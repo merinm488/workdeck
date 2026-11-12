@@ -50,6 +50,15 @@ export async function createTodoList(hash, name) {
   return listSummary(list);
 }
 
+export async function renameTodoList(hash, listId, name) {
+  const doc = await accountTodo(hash);
+  const list = findList(doc, listId);
+  list.name = name;
+  list.updatedAt = new Date().toISOString();
+  await saveTodo(hash, doc);
+  return listSummary(list);
+}
+
 export async function addTodoTask(hash, listId, fields) {
   const doc = await accountTodo(hash);
   const list = findList(doc, listId);

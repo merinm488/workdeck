@@ -2,8 +2,10 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { listRecords, readRecord, createRecord, updateRecord, COLLECTIONS } from './mcp-workspace.js';
+import { addBoardColumn, upsertBoardCard, upsertFormQuestion, addSlide, addCanvasObject, updateCanvasObject,
+  createSheet, sheetCells, createFolder, uploadFile, readFile } from './mcp-content.js';
 import { authenticateMcpBearer } from './mcp-auth.js';
-import { listTodoLists, listTodoItems, createTodoList, addTodoTask, updateTodoTask } from './mcp-todo.js';
+import { listTodoLists, listTodoItems, createTodoList, renameTodoList, addTodoTask, updateTodoTask } from './mcp-todo.js';
 
 const id = z.string().min(1).max(128);
 const title = z.string().trim().min(1).max(300);
@@ -17,6 +19,8 @@ const workspaceApp = z.enum(COLLECTIONS);
 const workspaceFields = { name: title.optional(), content: z.string().max(16000).optional(),
   calId: id.optional(), start: z.string().datetime({ offset: true }).optional(),
   end: z.string().datetime({ offset: true }).optional() };
+const cell = z.object({ row: z.number().int().min(0).max(9999), column: z.number().int().min(0).max(999),
+  value: z.union([z.string().max(4000), z.number().finite(), z.boolean(), z.null()]) });
 
 function mcpServer(binding) {
   const server = new McpServer({ name: 'workdeck', version: '0.2.0' });
@@ -47,6 +51,9 @@ function mcpServer(binding) {
     description: 'Create an empty Todo list in your connected Workdeck account.',
     inputSchema: { name: title }
   }, 'todo:write', ({ name }) => createTodoList(binding.accountHash, name));
+  tool('todo_rename_list', {
+    description: 'Rename an existing Todo list.', inputSchema: { listId: id, name: title }
+  }, 'todo:write', ({ listId, name }) => renameTodoList(binding.accountHash, listId, name));
   tool('todo_add_task', {
     description: 'Add a task to an existing Todo list; use todo_lists to obtain its list ID.',
     inputSchema: { listId: id, title, description: description.optional(),
@@ -66,14 +73,72 @@ function mcpServer(binding) {
     inputSchema: { app: workspaceApp, recordId: id }
   }, 'workspace:read', ({ app, recordId }) => readRecord(binding.accountHash, app, recordId));
   tool('workspace_create', {
-    description: 'Create a document, blog draft, calendar, event, kanban board, empty form, slide deck or drawing. Sheets, files and folders are read-only; use Todo tools for tasks. For events supply calId, start and end (ISO date-times).',
+    description: 'Create a document, blog draft, calendar, event, kanban board, empty form, slide deck or drawing. Use sheet_create for spreadsheets, folder_create and file_upload for Files, and Todo tools for tasks. For events supply calId, start and end (ISO date-times).',
     inputSchema: { app: workspaceApp, ...workspaceFields }
   }, 'workspace:write', ({ app, ...fields }) => createRecord(binding.accountHash, app, fields));
   tool('workspace_update', {
-    description: 'Change a record name/title, plain-text document content, draft blog HTML, or event description/dates. Does not publish or delete anything.',
+    description: 'Rename a Workdeck record (including Sheets, Files and folders), change plain-text document content or draft blog HTML, or edit event description/dates. For structured board, form, slide, drawing and sheet contents use their dedicated tools. Does not publish or delete anything.',
     inputSchema: { app: workspaceApp, recordId: id, name: title.optional(), content: workspaceFields.content,
       start: workspaceFields.start, end: workspaceFields.end }
   }, 'workspace:write', ({ app, recordId, ...changes }) => updateRecord(binding.accountHash, app, recordId, changes));
+  tool('kanban_add_column', {
+    description: 'Add a column to a board. Use kanban_upsert_card to put cards in it.',
+    inputSchema: { boardId: id, label: title }
+  }, 'workspace:write', ({ boardId, label }) => addBoardColumn(binding.accountHash, boardId, label));
+  tool('kanban_upsert_card', {
+    description: 'Create or edit a Kanban card. Supply cardId to edit; column is a column ID from workspace_read.',
+    inputSchema: { boardId: id, cardId: id.optional(), column: id.optional(), label: title.optional(),
+      description: description.optional(), priority: z.enum(['low', 'medium', 'high']).optional(),
+      progress: z.number().min(0).max(100).optional() }
+  }, 'workspace:write', ({ boardId, ...fields }) => upsertBoardCard(binding.accountHash, boardId, fields));
+  tool('form_upsert_question', {
+    description: 'Add or edit a form-js question. Supply questionId to edit; select/radio/checklist require choices. Shared forms must be unshared first.',
+    inputSchema: { formId: id, questionId: id.optional(), label: title.optional(),
+      type: z.enum(['textfield', 'textarea', 'number', 'datetime', 'checkbox', 'select', 'radio', 'checklist']).optional(),
+      required: z.boolean().optional(), choices: z.array(title).min(1).max(30).optional() }
+  }, 'workspace:write', ({ formId, ...fields }) => upsertFormQuestion(binding.accountHash, formId, fields));
+  tool('slides_add_slide', {
+    description: 'Append a slide to a deck, then use canvas_add_object with its slideId.',
+    inputSchema: { deckId: id, name: title.optional() }
+  }, 'workspace:write', ({ deckId, name }) => addSlide(binding.accountHash, deckId, name));
+  tool('canvas_add_object', {
+    description: 'Add text or a rectangle to a slide or Draw canvas. For slides, slideId is required. Coordinates are canvas pixels.',
+    inputSchema: { app: z.enum(['slides', 'draws']), recordId: id, slideId: id.optional(),
+      shape: z.enum(['text', 'rect']).optional(), text: z.string().max(4000).optional(),
+      left: z.number().finite().min(-100000).max(100000), top: z.number().finite().min(-100000).max(100000),
+      width: z.number().min(1).max(10000).optional(), height: z.number().min(1).max(10000).optional(),
+      fontSize: z.number().min(1).max(300).optional(), fill: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }
+  }, 'workspace:write', ({ app, recordId, ...fields }) => addCanvasObject(binding.accountHash, app, recordId, fields));
+  tool('canvas_update_object', {
+    description: 'Update text, position or fill of an existing slide or Draw object. Get its zero-based objectIndex from workspace_read or canvas_add_object.',
+    inputSchema: { app: z.enum(['slides', 'draws']), recordId: id, slideId: id.optional(),
+      objectIndex: z.number().int().min(0), text: z.string().max(4000).optional(),
+      left: z.number().finite().min(-100000).max(100000).optional(),
+      top: z.number().finite().min(-100000).max(100000).optional(),
+      fill: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }
+  }, 'workspace:write', ({ app, recordId, objectIndex, ...fields }) =>
+    updateCanvasObject(binding.accountHash, app, recordId, objectIndex, fields));
+  tool('sheet_create', {
+    description: 'Create a Univer spreadsheet with one empty tab.', inputSchema: { name: title }
+  }, 'workspace:write', ({ name }) => createSheet(binding.accountHash, name));
+  tool('sheet_cells', {
+    description: 'Read up to 200 populated spreadsheet cells, or write up to 100 cells by zero-based row and column. value=null clears a cell. Omit cells to read.',
+    inputSchema: { sheetId: id, tabId: id.optional(), cells: z.array(cell).min(1).max(100).optional() }
+  }, 'workspace:read', ({ sheetId, tabId, cells }) => {
+    if (cells && !binding.permissions.includes('workspace:write')) throw new Error('Permission denied');
+    return sheetCells(binding.accountHash, sheetId, cells, tabId);
+  });
+  tool('folder_create', {
+    description: 'Create a Files folder, optionally inside an existing folder.',
+    inputSchema: { name: title, parentId: id.optional() }
+  }, 'workspace:write', ({ name, parentId }) => createFolder(binding.accountHash, name, parentId));
+  tool('file_upload', {
+    description: 'Upload file bytes supplied as base64 (maximum 100 KB). A remote MCP connector CANNOT read a local path on your device; attach/provide bytes in the AI client, or upload larger files using the Workdeck Files UI.',
+    inputSchema: { name: title, mime: z.string().min(1).max(128), base64: z.string().min(1).max(140000).regex(/^[A-Za-z0-9+/]+={0,2}$/), folderId: id.optional() }
+  }, 'workspace:write', fields => uploadFile(binding.accountHash, fields));
+  tool('file_read', {
+    description: 'Read a Workdeck file as base64 (maximum 100 KB).', inputSchema: { fileId: id }
+  }, 'workspace:read', ({ fileId }) => readFile(binding.accountHash, fileId));
   return server;
 }
 

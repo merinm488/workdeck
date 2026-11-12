@@ -19,10 +19,12 @@ connector at https://workdeck-m.vercel.app/api/mcp. Add it as a custom
 connector using automatic OAuth client registration (if offered). The owner
 enters their account key only on Workdeck's consent page; the MCP client
 receives a revocable scoped connection instead of the key. It provides
-Todo task tools plus workspace listing/reading for app records and limited
-creation/updates for Docs, blog drafts, Calendar, Kanban, Forms, Slides and
-Draw. Sheets and Files expose metadata only (no workbook bodies or file bytes).
-No publishing, deletion or account settings. Connections expire after 30 days
+Todo task tools plus workspace listing/reading and content editing for Docs,
+blog drafts, Calendar, Kanban cards, form questions, slides, drawings and
+spreadsheet cells. Files supports folders and base64 uploads/downloads up to
+100 KB via MCP. A remote client cannot read a local device path: the client
+must supply file bytes or the user must upload via the Files UI. No publishing,
+deletion or account settings. Connections expire after 30 days
 and can be revoked in Workdeck -> Settings -> Connect AI. Production deployment
 must configure the MCP secrets before this endpoint is available.
 
