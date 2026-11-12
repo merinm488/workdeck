@@ -59,7 +59,17 @@ It offers the Todo task tools plus `workspace_list`, `workspace_read`,
 `workspace_create` and `workspace_update` across Workdeck collections. Content
 operations also support Kanban columns/cards, form questions, slides, Draw
 objects, Sheets cells, Files folders, and base64 file upload/read (100 KB MCP
-limit). The remote connector cannot open a local device path such as
+limit). To fill a spreadsheet, call `sheet_create`, then `sheet_write_cells`
+(zero-based row/column; `sheet_read_cells` inspects existing data). To populate
+Kanban, create a board with `kanban_create_board`, then use `kanban_add_column`
+and `kanban_upsert_card`. For Forms, use `form_create` and `form_upsert_question`.
+Use `slides_create_deck` for slides. New decks already have a blank first
+slide: find its ID with `workspace_read`, then use `slides_add_text` (or
+`slides_add_slide` for more slides). Use `draw_create` and `draw_add_text` for
+Draw. Use `file_upload` for Files, not `workspace_create`. Generic
+`workspace_update` only edits names and plain-text content, not structured app
+content. After a deployment, refresh/reconnect the client if it cached an old
+tool list. The remote connector cannot open a local device path such as
 `/Users/.../file.pdf`: the client must provide the bytes to `file_upload`, or
 the user must upload larger files in the Workdeck Files UI. Publishing,
 deletion and account settings are not exposed. It never provides account keys

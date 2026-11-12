@@ -73,7 +73,7 @@ function mcpServer(binding) {
     inputSchema: { app: workspaceApp, recordId: id }
   }, 'workspace:read', ({ app, recordId }) => readRecord(binding.accountHash, app, recordId));
   tool('workspace_create', {
-    description: 'Create a document, blog draft, calendar, event, kanban board, empty form, slide deck or drawing. Use sheet_create for spreadsheets, folder_create and file_upload for Files, and Todo tools for tasks. For events supply calId, start and end (ISO date-times).',
+    description: 'Create a document, blog draft, calendar, event, kanban board, empty form, slide deck or drawing. For structured contents use kanban_add_column/kanban_upsert_card, form_upsert_question, slides_add_text or draw_add_text. Use sheet_create for spreadsheets, folder_create and file_upload for Files, and Todo tools for tasks. For events supply calId, start and end (ISO date-times).',
     inputSchema: { app: workspaceApp, ...workspaceFields }
   }, 'workspace:write', ({ app, ...fields }) => createRecord(binding.accountHash, app, fields));
   tool('workspace_update', {
@@ -81,6 +81,10 @@ function mcpServer(binding) {
     inputSchema: { app: workspaceApp, recordId: id, name: title.optional(), content: workspaceFields.content,
       start: workspaceFields.start, end: workspaceFields.end }
   }, 'workspace:write', ({ app, recordId, ...changes }) => updateRecord(binding.accountHash, app, recordId, changes));
+  tool('kanban_create_board', {
+    description: 'Create a Kanban board with one empty column. Use kanban_add_column and kanban_upsert_card to fill it.',
+    inputSchema: { name: title }
+  }, 'workspace:write', ({ name }) => createRecord(binding.accountHash, 'kanban', { name }));
   tool('kanban_add_column', {
     description: 'Add a column to a board. Use kanban_upsert_card to put cards in it.',
     inputSchema: { boardId: id, label: title }
@@ -91,16 +95,42 @@ function mcpServer(binding) {
       description: description.optional(), priority: z.enum(['low', 'medium', 'high']).optional(),
       progress: z.number().min(0).max(100).optional() }
   }, 'workspace:write', ({ boardId, ...fields }) => upsertBoardCard(binding.accountHash, boardId, fields));
+  tool('form_create', {
+    description: 'Create a form with a Submit button. Use form_upsert_question to add survey questions.',
+    inputSchema: { name: title }
+  }, 'workspace:write', ({ name }) => createRecord(binding.accountHash, 'forms', { name }));
   tool('form_upsert_question', {
     description: 'Add or edit a form-js question. Supply questionId to edit; select/radio/checklist require choices. Shared forms must be unshared first.',
     inputSchema: { formId: id, questionId: id.optional(), label: title.optional(),
       type: z.enum(['textfield', 'textarea', 'number', 'datetime', 'checkbox', 'select', 'radio', 'checklist']).optional(),
       required: z.boolean().optional(), choices: z.array(title).min(1).max(30).optional() }
   }, 'workspace:write', ({ formId, ...fields }) => upsertFormQuestion(binding.accountHash, formId, fields));
+  tool('slides_create_deck', {
+    description: 'Create a slide deck with one blank slide. Use workspace_read with app=slides to get the first slide ID, then slides_add_text.',
+    inputSchema: { name: title }
+  }, 'workspace:write', ({ name }) => createRecord(binding.accountHash, 'slides', { name }));
   tool('slides_add_slide', {
-    description: 'Append a slide to a deck, then use canvas_add_object with its slideId.',
+    description: 'Append a slide to a deck (new decks already contain a blank first slide). Use slides_add_text or canvas_add_object with the returned slide ID.',
     inputSchema: { deckId: id, name: title.optional() }
   }, 'workspace:write', ({ deckId, name }) => addSlide(binding.accountHash, deckId, name));
+  tool('slides_add_text', {
+    description: 'Put text on an existing slide (new decks already contain a blank first slide). Use workspace_read with app=slides to get deckId and slideId. Coordinates are slide pixels (960 x 540).',
+    inputSchema: { deckId: id, slideId: id, text: z.string().min(1).max(4000),
+      left: z.number().finite().min(-100000).max(100000), top: z.number().finite().min(-100000).max(100000),
+      width: z.number().min(1).max(10000).optional(), fontSize: z.number().min(1).max(300).optional(),
+      fill: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }
+  }, 'workspace:write', ({ deckId, ...fields }) => addCanvasObject(binding.accountHash, 'slides', deckId, fields));
+  tool('draw_create', {
+    description: 'Create an empty drawing. Use draw_add_text to populate its canvas.',
+    inputSchema: { name: title }
+  }, 'workspace:write', ({ name }) => createRecord(binding.accountHash, 'draws', { name }));
+  tool('draw_add_text', {
+    description: 'Put text on a Draw canvas. Use workspace_read with app=draws to find the drawing ID. Coordinates are canvas pixels.',
+    inputSchema: { drawingId: id, text: z.string().min(1).max(4000),
+      left: z.number().finite().min(-100000).max(100000), top: z.number().finite().min(-100000).max(100000),
+      width: z.number().min(1).max(10000).optional(), fontSize: z.number().min(1).max(300).optional(),
+      fill: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }
+  }, 'workspace:write', ({ drawingId, ...fields }) => addCanvasObject(binding.accountHash, 'draws', drawingId, fields));
   tool('canvas_add_object', {
     description: 'Add text or a rectangle to a slide or Draw canvas. For slides, slideId is required. Coordinates are canvas pixels.',
     inputSchema: { app: z.enum(['slides', 'draws']), recordId: id, slideId: id.optional(),
@@ -119,8 +149,16 @@ function mcpServer(binding) {
   }, 'workspace:write', ({ app, recordId, objectIndex, ...fields }) =>
     updateCanvasObject(binding.accountHash, app, recordId, objectIndex, fields));
   tool('sheet_create', {
-    description: 'Create a Univer spreadsheet with one empty tab.', inputSchema: { name: title }
+    description: 'Create a Univer spreadsheet with one empty tab. Then use sheet_write_cells to populate it.', inputSchema: { name: title }
   }, 'workspace:write', ({ name }) => createSheet(binding.accountHash, name));
+  tool('sheet_read_cells', {
+    description: 'Read up to 200 populated cells of a spreadsheet. Use workspace_list with app=sheets for sheetId. Optional tabId selects a tab; defaults to first tab.',
+    inputSchema: { sheetId: id, tabId: id.optional() }
+  }, 'workspace:read', ({ sheetId, tabId }) => sheetCells(binding.accountHash, sheetId, undefined, tabId));
+  tool('sheet_write_cells', {
+    description: 'Write up to 100 spreadsheet cells by zero-based row and column. value=null clears a cell. Use sheet_read_cells to find tabId and inspect the result.',
+    inputSchema: { sheetId: id, tabId: id.optional(), cells: z.array(cell).min(1).max(100) }
+  }, 'workspace:write', ({ sheetId, tabId, cells }) => sheetCells(binding.accountHash, sheetId, cells, tabId));
   tool('sheet_cells', {
     description: 'Read up to 200 populated spreadsheet cells, or write up to 100 cells by zero-based row and column. value=null clears a cell. Omit cells to read.',
     inputSchema: { sheetId: id, tabId: id.optional(), cells: z.array(cell).min(1).max(100).optional() }

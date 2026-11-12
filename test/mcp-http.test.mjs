@@ -110,7 +110,7 @@ test('OAuth code + PKCE binds MCP writes to the authorized account', async () =>
       clientInfo: { name: 'test', version: '1' } });
     assert.equal(init.status, 200);
     const listed = await rpc(accessToken, 'tools/list');
-    assert.equal(listed.body.result.tools.length, 21);
+    assert.equal(listed.body.result.tools.length, 29);
     const names = listed.body.result.tools.map(tool => tool.name);
     assert.ok(names.includes('workspace_create'));
     const created = await rpc(accessToken, 'tools/call', {
@@ -146,8 +146,9 @@ test('OAuth code + PKCE binds MCP writes to the authorized account', async () =>
     assert.equal(blocked.body.result.isError, true);
     assert.equal((await getUserDoc(other)).docs.length, 0);
     for (const appName of ['posts', 'calendars', 'kanban', 'forms', 'slides', 'draws']) {
-      const result = await rpc(accessToken, 'tools/call', { name: 'workspace_create',
-        arguments: { app: appName, name: `MCP ${appName}` } });
+      const dedicated = { kanban: 'kanban_create_board', forms: 'form_create', slides: 'slides_create_deck', draws: 'draw_create' };
+      const result = await rpc(accessToken, 'tools/call', { name: dedicated[appName] || 'workspace_create',
+        arguments: { ...(dedicated[appName] ? {} : { app: appName }), name: `MCP ${appName}` } });
       assert.equal(result.body.result.isError, undefined, appName);
       assert.equal((await getUserDoc(hash))[appName].length, 1, appName);
       assert.equal((await getUserDoc(other))[appName].length, 0, appName);
@@ -179,10 +180,11 @@ test('OAuth code + PKCE binds MCP writes to the authorized account', async () =>
       arguments: { formId, type: 'textfield', label: 'Your name', required: true } });
     assert.equal(question.body.result.isError, undefined);
     assert.equal((await getUserDoc(hash)).forms[0].components[0].label, 'Your name');
+    assert.equal((await getUserDoc(hash)).forms[0].components.at(-1).action, 'submit');
     const deckId = (await getUserDoc(hash)).slides[0].id;
     const slideId = (await getUserDoc(hash)).slides[0].slides[0].id;
-    const slideText = await rpc(accessToken, 'tools/call', { name: 'canvas_add_object',
-      arguments: { app: 'slides', recordId: deckId, slideId, left: 40, top: 30, text: 'Hello' } });
+    const slideText = await rpc(accessToken, 'tools/call', { name: 'slides_add_text',
+      arguments: { deckId, slideId, left: 40, top: 30, text: 'Hello' } });
     assert.equal(slideText.body.result.isError, undefined);
     assert.equal((await getUserDoc(hash)).slides[0].slides[0].objects[0].text, 'Hello');
     const slideEdit = await rpc(accessToken, 'tools/call', { name: 'canvas_update_object',
@@ -190,17 +192,23 @@ test('OAuth code + PKCE binds MCP writes to the authorized account', async () =>
     assert.equal(slideEdit.body.result.isError, undefined);
     assert.equal((await getUserDoc(hash)).slides[0].slides[0].objects[0].text, 'Updated slide');
     const drawingId = (await getUserDoc(hash)).draws[0].id;
-    const drawText = await rpc(accessToken, 'tools/call', { name: 'canvas_add_object',
-      arguments: { app: 'draws', recordId: drawingId, left: 10, top: 20, text: 'Drawn' } });
+    const drawText = await rpc(accessToken, 'tools/call', { name: 'draw_add_text',
+      arguments: { drawingId, left: 10, top: 20, text: 'Drawn' } });
     assert.equal(drawText.body.result.isError, undefined);
     assert.equal((await getUserDoc(hash)).draws[0].objects[0].text, 'Drawn');
     const sheet = await rpc(accessToken, 'tools/call', { name: 'sheet_create', arguments: { name: 'Expenses' } });
     assert.equal(sheet.body.result.isError, undefined);
     const sheetId = JSON.parse(sheet.body.result.content[0].text).id;
-    const writeCell = await rpc(accessToken, 'tools/call', { name: 'sheet_cells',
+    const writeCell = await rpc(accessToken, 'tools/call', { name: 'sheet_write_cells',
       arguments: { sheetId, cells: [{ row: 0, column: 0, value: 'Amount' }, { row: 1, column: 0, value: 42 }] } });
     assert.equal(writeCell.body.result.isError, undefined);
     assert.equal(JSON.parse(writeCell.body.result.content[0].text).cells[1].value, 42);
+    const readCells = await rpc(accessToken, 'tools/call', { name: 'sheet_read_cells', arguments: { sheetId } });
+    assert.equal(JSON.parse(readCells.body.result.content[0].text).cells[0].value, 'Amount');
+    const clearCell = await rpc(accessToken, 'tools/call', { name: 'sheet_write_cells',
+      arguments: { sheetId, cells: [{ row: 1, column: 0, value: null }] } });
+    assert.equal(clearCell.body.result.isError, undefined);
+    assert.equal(JSON.parse(clearCell.body.result.content[0].text).cells.length, 1);
     const folder = await rpc(accessToken, 'tools/call', { name: 'folder_create', arguments: { name: 'Uploads' } });
     assert.equal(folder.body.result.isError, undefined);
     const folderId = JSON.parse(folder.body.result.content[0].text).id;

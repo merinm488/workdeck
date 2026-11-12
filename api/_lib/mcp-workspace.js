@@ -58,7 +58,7 @@ export async function createRecord(hash, app, fields) {
       record = { id, calId: fields.calId, title: name, description: fields.content || '', start: fields.start, end: fields.end, allDay: false, createdAt: now, updatedAt: now }; break;
     }
     case 'kanban': record = { id, name, columns: [{ id: generateId(), label: 'Untitled List' }], rows: [], cards: [], links: [], createdAt: now, updatedAt: now }; break;
-    case 'forms': record = { id, name, display: 'form', components: [], sharedId: null, createdAt: now, updatedAt: now }; break;
+    case 'forms': record = { id, name, display: 'form', components: [{ type: 'button', label: 'Submit', action: 'submit' }], sharedId: null, createdAt: now, updatedAt: now }; break;
     case 'slides': record = { id, name, formatVersion: 1, width: 960, height: 540, slides: [{ id: 's1', name: 'Slide 1', background: '#ffffff', objects: [] }], sharedId: null, createdAt: now, updatedAt: now }; break;
     case 'draws': record = { id, name, formatVersion: 1, background: '#ffffff', objects: [], viewport: { zoom: 1, panX: 0, panY: 0 }, sharedId: null, createdAt: now, updatedAt: now }; break;
   }
