@@ -90,7 +90,7 @@ export async function authenticateMcpBearer(header) {
       grant.accountId !== account.settings?.mcpAccountId ||
       grant.accountTag !== grantAccountTag(token.accountHash) ||
       !Array.isArray(grant.permissions) ||
-      !grant.permissions.every(p => p === 'todo:read' || p === 'todo:write') ||
+      !grant.permissions.every(p => ['todo:read', 'todo:write', 'workspace:read', 'workspace:write'].includes(p)) ||
       !Number.isSafeInteger(grant.expiresAt) ||
       grant.expiresAt <= Date.now()) {
     return null;

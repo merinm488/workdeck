@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
+import { listRecords, readRecord, createRecord, updateRecord, COLLECTIONS } from './mcp-workspace.js';
 import { authenticateMcpBearer } from './mcp-auth.js';
 import { listTodoLists, listTodoItems, createTodoList, addTodoTask, updateTodoTask } from './mcp-todo.js';
 
@@ -12,9 +13,13 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
 }, 'Use a real date in YYYY-MM-DD format');
 const priority = z.enum(['low', 'medium', 'high']);
 const description = z.string().max(4000);
+const workspaceApp = z.enum(COLLECTIONS);
+const workspaceFields = { name: title.optional(), content: z.string().max(16000).optional(),
+  calId: id.optional(), start: z.string().datetime({ offset: true }).optional(),
+  end: z.string().datetime({ offset: true }).optional() };
 
 function mcpServer(binding) {
-  const server = new McpServer({ name: 'workdeck-todo', version: '0.1.0' });
+  const server = new McpServer({ name: 'workdeck', version: '0.2.0' });
   const tool = (name, info, permission, run) => {
     server.registerTool(name, info, async args => {
       if (!Array.isArray(binding.permissions) || !binding.permissions.includes(permission)) {
@@ -52,6 +57,23 @@ function mcpServer(binding) {
     inputSchema: { listId: id, taskId: id, title: title.optional(), description: description.optional(),
       dueDate: date.nullable().optional(), priority: priority.optional(), completed: z.boolean().optional() }
   }, 'todo:write', ({ listId, taskId, ...fields }) => updateTodoTask(binding.accountHash, listId, taskId, fields));
+  tool('workspace_list', {
+    description: 'List records from a Workdeck app. Files and sheets list metadata only; Todo has dedicated task tools.',
+    inputSchema: { app: workspaceApp, offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(50).default(50) }
+  }, 'workspace:read', ({ app, offset, limit }) => listRecords(binding.accountHash, app, offset, limit));
+  tool('workspace_read', {
+    description: 'Read one Workdeck record (maximum 64 KB). File bytes and spreadsheet workbook bodies are not included.',
+    inputSchema: { app: workspaceApp, recordId: id }
+  }, 'workspace:read', ({ app, recordId }) => readRecord(binding.accountHash, app, recordId));
+  tool('workspace_create', {
+    description: 'Create a document, blog draft, calendar, event, kanban board, empty form, slide deck or drawing. Sheets, files and folders are read-only; use Todo tools for tasks. For events supply calId, start and end (ISO date-times).',
+    inputSchema: { app: workspaceApp, ...workspaceFields }
+  }, 'workspace:write', ({ app, ...fields }) => createRecord(binding.accountHash, app, fields));
+  tool('workspace_update', {
+    description: 'Change a record name/title, plain-text document content, draft blog HTML, or event description/dates. Does not publish or delete anything.',
+    inputSchema: { app: workspaceApp, recordId: id, name: title.optional(), content: workspaceFields.content,
+      start: workspaceFields.start, end: workspaceFields.end }
+  }, 'workspace:write', ({ app, recordId, ...changes }) => updateRecord(binding.accountHash, app, recordId, changes));
   return server;
 }
 

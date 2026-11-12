@@ -3,7 +3,7 @@ import { generateHash, getUserDoc, saveOwnedSections, getBaseUrl } from './store
 import { newGrantId, grantAccountTag, readMcpGrant, writeMcpGrant, readMcpCode, writeMcpCode } from './mcp-grants.js';
 import { sealMcpAccessToken, authenticateMcpBearer, sealMcpState, openMcpState } from './mcp-auth.js';
 
-const PERMISSIONS = ['todo:read', 'todo:write'];
+const PERMISSIONS = ['todo:read', 'todo:write', 'workspace:read', 'workspace:write'];
 const GRANT_LIFETIME = 30 * 24 * 60 * 60 * 1000;
 const CODE_LIFETIME = 3 * 60 * 1000;
 const CONSENT_LIFETIME = 10 * 60 * 1000;
@@ -94,15 +94,15 @@ function consentPage({ app, callback, transaction, message = '' }) {
   label{display:block;margin:20px 0 8px}input{box-sizing:border-box;width:100%;padding:12px;background:#111827;color:white;border:1px solid #6b7280;border-radius:8px}
   .buttons{display:flex;gap:10px;margin-top:24px}button{padding:12px 18px;border:0;border-radius:8px;cursor:pointer;background:#60a5fa;color:#111827;font-weight:700}
   button[name=decision][value=deny]{background:#374151;color:white}.error{color:#fca5a5}</style></head><body><main>
-  <h1>Connect AI to Workdeck</h1><p><strong>${escapeHtml(app)}</strong> wants to read, create and update <strong>Todo lists and tasks</strong>. It cannot access other Workdeck apps through this connection.</p>
+  <h1>Connect AI to Workdeck</h1><p><strong>${escapeHtml(app)}</strong> wants to read records across your Workdeck apps and create or update supported records. This includes Todo tasks, documents, blog drafts, calendars, events, boards, forms, slides and drawings. Sheets and Files expose metadata only; publishing, deletion and account settings are not available.</p>
   <p>After approval, the connection stays active for up to 30 days. You can revoke it in Workdeck settings.</p>
   <p>Client redirect: <strong>${escapeHtml(callback)}</strong></p>
   ${message ? `<p class="error" role="alert">${escapeHtml(message)}</p>` : ''}
   <form action="/api/mcp-oauth?route=authorize" method="post">
     <input type="hidden" name="transaction" value="${escapeHtml(transaction)}">
     <label for="key">Workdeck account key</label><input id="key" name="key" type="password" required autocomplete="off" maxlength="200">
-    <p>Enter the key for the account whose Todo tasks you want to connect. Your key is sent only to Workdeck, never to the AI client.</p>
-    <div class="buttons"><button name="decision" value="approve">Allow Todo access</button><button name="decision" value="deny" formnovalidate>Cancel</button></div>
+    <p>Enter the key for the Workdeck account you want to connect. Your key is sent only to Workdeck, never to the AI client.</p>
+    <div class="buttons"><button name="decision" value="approve">Allow Workdeck access</button><button name="decision" value="deny" formnovalidate>Cancel</button></div>
   </form></main></body></html>`;
 }
 
@@ -133,7 +133,7 @@ async function authorize(req, res) {
         q.code_challenge_method !== 'S256' ||
         (q.resource && q.resource !== `${origin(req)}/api/mcp`) ||
         (q.state != null && (typeof q.state !== 'string' || q.state.length > 512)) ||
-        (q.scope && q.scope !== 'todo:read todo:write')) {
+        (q.scope && q.scope !== PERMISSIONS.join(' '))) {
       return error(res, 400, 'invalid_authorization_request');
     }
     const nonce = crypto.randomBytes(32).toString('hex');

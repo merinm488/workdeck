@@ -297,7 +297,7 @@
                                     <svg class="wd-item-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1"/><rect x="8" y="8" width="8" height="8" rx="2"/>
                                     </svg>
-                                    <span class="wd-item-text">Connect AI (Todo)</span>
+                                    <span class="wd-item-text">Connect AI</span>
                                 </button>
                                 <div class="wd-dropdown-divider"></div>
                                 <button class="wd-dropdown-item wd-item-danger" id="deleteAccountBtn">
@@ -453,7 +453,7 @@
                     </button>
                 </div>
                 <p class="wd-key-feedback" id="keyCopyFeedback">Copied!</p>
-                <p class="wd-key-hint">This key grants full account access. Only give an agent this key and <code id="keyLlmUrl"></code> if you trust it with your entire workspace. For Todo-only access, use Connect AI instead.</p>
+                <p class="wd-key-hint">This key grants full account access. Only give an agent this key and <code id="keyLlmUrl"></code> if you trust it with your entire workspace. For app-scoped AI access, use Connect AI instead.</p>
                 <div class="wd-key-actions">
                     <button class="wd-secondary-btn" id="changeKeyOpenBtn">Change My Key</button>
                     <button class="wd-secondary-btn wd-key-close" id="keyModalCloseBtn">Close</button>
@@ -462,15 +462,15 @@
         </div>
     </div>
 
-    <!-- Connect AI modal (MCP / Todo only) -->
+    <!-- Connect AI modal (MCP) -->
     <div id="connectAIModal" class="wd-modal">
         <div class="wd-modal-content">
             <div class="wd-modal-header">
-                <h3 class="wd-modal-title">Connect AI · Todo</h3>
+                <h3 class="wd-modal-title">Connect AI · Workdeck</h3>
                 <button class="wd-modal-close" id="connectAIClose" aria-label="Close">&times;</button>
             </div>
             <div class="wd-modal-body">
-                <p class="wd-modal-text">Connect an MCP-compatible AI client to your Todo lists. It can read, create and update lists and tasks; other apps are not available through this connection.</p>
+                <p class="wd-modal-text">Connect an MCP-compatible AI client to your Workdeck account. It can read records across apps and create or update supported records (including Todo, Docs, Blog drafts, Calendar, Kanban, Forms, Slides and Draw). Sheets and Files expose metadata only; publishing, deletion and settings are unavailable.</p>
                 <p class="wd-modal-text">In your AI client's custom connector settings, add this server URL. For Claude.ai, choose <strong>Register automatically</strong> for the OAuth client if prompted.</p>
                 <div class="wd-key-display"><code class="wd-key-text" id="connectAIUrl"></code><button class="wd-key-copy-btn" id="connectAICopy" aria-label="Copy MCP URL" title="Copy URL">Copy</button></div>
                 <p class="wd-key-hint">Sign in on the Workdeck authorization page with the key for the account you want to connect. Do not enter your key in the AI client. Connections expire after 30 days and can be revoked here.</p>

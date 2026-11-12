@@ -12,20 +12,22 @@ https://workdeck-m.vercel.app
 (The same host this file was fetched from. Local development uses
 http://localhost:4000 with the same paths.)
 
-## MCP (Todo only)
+## MCP (Workdeck apps)
 
 For MCP-capable AI clients, Workdeck also offers a remote Streamable HTTP
 connector at https://workdeck-m.vercel.app/api/mcp. Add it as a custom
 connector using automatic OAuth client registration (if offered). The owner
 enters their account key only on Workdeck's consent page; the MCP client
-receives a Todo-scoped connection instead of the key. It provides tools to
-read, create and update Todo lists and tasks, but no delete or other-app
-tools. Connections expire after 30 days and can be revoked in Workdeck ->
-Settings -> Connect AI (Todo). Production deployment must configure the
-MCP secrets before this endpoint is available.
+receives a revocable scoped connection instead of the key. It provides
+Todo task tools plus workspace listing/reading for app records and limited
+creation/updates for Docs, blog drafts, Calendar, Kanban, Forms, Slides and
+Draw. Sheets and Files expose metadata only (no workbook bodies or file bytes).
+No publishing, deletion or account settings. Connections expire after 30 days
+and can be revoked in Workdeck -> Settings -> Connect AI. Production deployment
+must configure the MCP secrets before this endpoint is available.
 
 The HTTP API below is separate. Giving an agent the raw Workdeck key grants
-FULL account access across all apps, unlike the Todo-only MCP connector.
+FULL account access across all apps, unlike the scoped MCP connector.
 
 ## Authentication
 

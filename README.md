@@ -52,12 +52,15 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
   never leaves the server).
 - 📱 **Mobile-friendly** — touch devices open files in the same tab.
 
-## AI connector (MCP, Todo pilot)
+## AI connector (MCP, Workdeck apps)
 
 Workdeck provides a **remote Streamable HTTP MCP** endpoint at `/api/mcp`.
-It exposes only `todo_lists`, `todo_items`, `todo_create_list`,
-`todo_add_task`, and `todo_update_task`. It never provides account keys or the
-whole account document to the model. Existing `/api/todo` behavior is unchanged.
+It offers the Todo task tools plus `workspace_list`, `workspace_read`,
+`workspace_create` and `workspace_update` across Workdeck collections. Docs,
+blog drafts, calendars/events, kanban boards, forms, slides and drawings support
+creation and limited updates; sheets and Files expose metadata only (no workbook
+bodies or file bytes). Publishing, deletion and account settings are not exposed.
+It never provides account keys or the whole account document to the model.
 
 To enable it on Vercel, configure all three environment variables before
 redeploying:
@@ -74,29 +77,29 @@ redeploying:
   origin in each preview deployment that should accept MCP connections.
 
 TextDB remains the sole persistent backend. OAuth codes and scoped grants use
-per-record TextDB documents through `api/_lib/mcp-grants.js`; the account's
-Todo data still uses `api/_lib/store.js`. No Vercel instance memory holds
+per-record TextDB documents through `api/_lib/mcp-grants.js`; app records still uses `api/_lib/store.js`. No Vercel instance memory holds
 connection state. These modules separate storage from MCP/OAuth logic so the
 backend can be changed later.
 
-On Workdeck, open **Settings → Connect AI (Todo)** and copy the MCP URL. In a
+On Workdeck, open **Settings → Connect AI** and copy the MCP URL. In a
 remote-MCP-capable client add that URL and choose automatic OAuth client
 registration if offered (in Claude.ai, **Register automatically**, rather
 than **Use Claude's published identity**). Workdeck asks for the key of an
 *existing* account on its own consent page; it never forwards the key to the
-client or creates an account. Approving connects that account's Todo data.
+client or creates an account. Approving connects the supported Workdeck apps.
 Workdeck settings shows the active connection and lets the owner revoke it.
 One connection per account is supported for this pilot: reconnecting replaces
-the previous grant. A key change or account deletion invalidates the token;
+the previous grant. Existing Todo-only grants remain Todo-only until the owner
+reconnects and approves the expanded access. A key change or account deletion invalidates the token;
 reconnect after changing keys.
 
 **Pilot limitations:** access expires after 30 days, after which the owner
 must reconnect. Refresh tokens are intentionally not issued. TextDB has no
 compare-and-swap through the current storage API: under concurrent redemption
 an OAuth code may be exchanged more than once, but both attempts require the
-same PKCE verifier and resolve to the same revocable Todo grant. This is not a
+same PKCE verifier and resolve to the same revocable grant. This is not a
 claim of strict single-use OAuth-code semantics. Browser and agent writes to
-the same Todo list can also race; do not make concurrent edits during this
+the same collection can also race; do not make concurrent edits during this
 pilot. Other MCP clients may need different registration/transport support;
 Claude.ai and Vercel must be tested end-to-end before treating production
 compatibility as verified.

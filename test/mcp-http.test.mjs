@@ -38,7 +38,7 @@ async function rpc(token, method, params = {}, id = 1) {
   return { status: response.status, body: await response.json() };
 }
 
-test('OAuth code + PKCE binds MCP Todo writes to the authorized account', async () => {
+test('OAuth code + PKCE binds MCP writes to the authorized account', async () => {
   const key = `mcp-test-${crypto.randomUUID()}`;
   const hash = generateHash(key);
   const other = generateHash(`mcp-other-${crypto.randomUUID()}`);
@@ -73,7 +73,8 @@ test('OAuth code + PKCE binds MCP Todo writes to the authorized account', async 
     assert.ok(policy.includes(base));
     assert.ok(policy.includes(new URL(callback).origin));
     const text = await consent.text();
-    assert.match(text, /Allow Todo access/);
+    assert.match(text, /Allow Workdeck access/);
+    assert.match(text, /Sheets and Files expose metadata only/);
     const transaction = /name="transaction" value="([^"]+)"/.exec(text)?.[1];
     assert.ok(transaction);
     const consentCookie = consent.headers.get('set-cookie').split(';')[0];
@@ -109,7 +110,9 @@ test('OAuth code + PKCE binds MCP Todo writes to the authorized account', async 
       clientInfo: { name: 'test', version: '1' } });
     assert.equal(init.status, 200);
     const listed = await rpc(accessToken, 'tools/list');
-    assert.equal(listed.body.result.tools.length, 5);
+    assert.equal(listed.body.result.tools.length, 9);
+    const names = listed.body.result.tools.map(tool => tool.name);
+    assert.ok(names.includes('workspace_create'));
     const created = await rpc(accessToken, 'tools/call', {
       name: 'todo_create_list', arguments: { name: 'Agent errands' }
     });
@@ -125,6 +128,39 @@ test('OAuth code + PKCE binds MCP Todo writes to the authorized account', async 
     assert.equal(JSON.parse(updated.body.result.content[0].text).task.completed, true);
     assert.equal((await getUserDoc(hash)).todo[0].items[0].completed, true);
     assert.equal((await getUserDoc(other)).todo.length, 0);
+    const createdDoc = await rpc(accessToken, 'tools/call', { name: 'workspace_create',
+      arguments: { app: 'docs', name: 'Private notes', content: 'Hello' } });
+    assert.equal(createdDoc.body.result.isError, undefined);
+    const docId = JSON.parse(createdDoc.body.result.content[0].text).id;
+    const docUpdate = await rpc(accessToken, 'tools/call', { name: 'workspace_update',
+      arguments: { app: 'docs', recordId: docId, content: 'Updated' } });
+    assert.equal(docUpdate.body.result.isError, undefined);
+    assert.equal((await getUserDoc(hash)).docs.find(d => d.id === docId).content, 'Updated');
+    const records = await rpc(accessToken, 'tools/call', { name: 'workspace_list', arguments: { app: 'docs' } });
+    assert.equal(JSON.parse(records.body.result.content[0].text).total, 1);
+    const blocked = await rpc(accessToken, 'tools/call', { name: 'workspace_create', arguments: { app: 'files', name: 'No' } });
+    assert.equal(blocked.body.result.isError, true);
+    assert.equal((await getUserDoc(other)).docs.length, 0);
+    for (const appName of ['posts', 'calendars', 'kanban', 'forms', 'slides', 'draws']) {
+      const result = await rpc(accessToken, 'tools/call', { name: 'workspace_create',
+        arguments: { app: appName, name: `MCP ${appName}` } });
+      assert.equal(result.body.result.isError, undefined, appName);
+      assert.equal((await getUserDoc(hash))[appName].length, 1, appName);
+      assert.equal((await getUserDoc(other))[appName].length, 0, appName);
+    }
+    const calendarId = (await getUserDoc(hash)).calendars[0].id;
+    const event = await rpc(accessToken, 'tools/call', { name: 'workspace_create',
+      arguments: { app: 'events', calId: calendarId, name: 'Meeting',
+        start: '2026-01-01T10:00:00Z', end: '2026-01-01T11:00:00Z' } });
+    assert.equal(event.body.result.isError, undefined);
+    const postId = (await getUserDoc(hash)).posts[0].id;
+    const post = await rpc(accessToken, 'tools/call', { name: 'workspace_update',
+      arguments: { app: 'posts', recordId: postId, content: '<script>alert(1)</script><p>Safe</p>' } });
+    assert.equal(post.body.result.isError, undefined);
+    assert.equal((await getUserDoc(hash)).posts[0].html, '<p>Safe</p>');
+    const invalid = await rpc(accessToken, 'tools/call', { name: 'workspace_read',
+      arguments: { app: 'settings', recordId: docId } });
+    assert.equal(invalid.body.result.isError, true);
     const connectionUrl = `${base}/api/mcp-connections?hash=${hash}`;
     assert.equal((await (await fetch(connectionUrl)).json()).connection.clientName, 'Test client');
     const revoked = await fetch(`${base}/api/mcp-connections`, {
