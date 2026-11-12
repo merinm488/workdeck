@@ -94,10 +94,13 @@ per-record TextDB documents through `api/_lib/mcp-grants.js`; app records still 
 connection state. These modules separate storage from MCP/OAuth logic so the
 backend can be changed later.
 
-On Workdeck, open **Settings → Connect AI** and copy the MCP URL. In a
-remote-MCP-capable client add that URL and choose automatic OAuth client
-registration if offered (in Claude.ai, **Register automatically**, rather
-than **Use Claude's published identity**). Workdeck asks for the key of an
+On Workdeck, open **Settings → Connect AI**, choose your MCP client, and follow
+its instructions using the displayed MCP URL. Claude.ai uses a custom
+connector (choose **Register automatically** for OAuth if prompted). For
+Codex or Pi, add the URL as a remote MCP server and sign in via OAuth. ChatGPT
+custom apps/connectors require a plan with remote MCP support; its settings
+and availability vary. Other remote-MCP clients need Streamable HTTP and OAuth
+with dynamic client registration. Workdeck asks for the key of an
 *existing* account on its own consent page; it never forwards the key to the
 client or creates an account. Approving connects the supported Workdeck apps.
 Workdeck settings shows the active connection and lets the owner revoke it.
@@ -113,22 +116,21 @@ an OAuth code may be exchanged more than once, but both attempts require the
 same PKCE verifier and resolve to the same revocable grant. This is not a
 claim of strict single-use OAuth-code semantics. Browser and agent writes to
 the same collection can also race; do not make concurrent edits during this
-pilot. Other MCP clients may need different registration/transport support;
-Claude.ai and Vercel must be tested end-to-end before treating production
-compatibility as verified.
+pilot. Client compatibility varies by version and plan; test your chosen client
+and deployment end-to-end before treating production compatibility as verified.
 
 Run the isolated local integration tests with `node --test test/*.test.mjs`.
 To try the browser locally, run `npm install`, put a generated
 `MCP_AUTH_SECRET` in your local `.env`, and start `npm run dev`. Use a **new,
 throwaway local Workdeck account** at `http://localhost:4000` rather than your
-production account. Claude.ai cannot access localhost directly: to test it
-without deploying, expose port 4000 through a trusted HTTPS tunnel, set
+production account. Hosted AI clients cannot access localhost directly: to test
+one without deploying, expose port 4000 through a trusted HTTPS tunnel, set
 `MCP_PUBLIC_ORIGIN=https://<your-tunnel-host>` in `.env`, and restart the dev
 server. Only share the MCP URL with your client, not your account key. The
 tunnel also exposes the rest of your local Workdeck server; close it after
 testing. Without a tunnel you can still run the automated local MCP/OAuth
-integration tests. The actual Vercel and Claude.ai combination needs a
-staging or production deployment for confirmation.
+integration tests. Your chosen client and the Vercel deployment need staging
+or production testing for confirmation.
 
 ## 🏗️ Architecture
 

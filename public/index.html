@@ -470,10 +470,25 @@
                 <button class="wd-modal-close" id="connectAIClose" aria-label="Close">&times;</button>
             </div>
             <div class="wd-modal-body">
-                <p class="wd-modal-text">Connect an MCP-compatible AI client to your Workdeck account. It can read and work with Todo, Docs, Blog drafts, Calendar, Kanban boards/cards, Forms questions, Slides and Draw objects, and Sheets cells. It can also create Files folders and upload small files when the AI client supplies the file contents (not just a path). File uploads via MCP are limited to 100 KB; for larger files use the Files app. Publishing, deletion and account settings are unavailable.</p>
-                <p class="wd-modal-text">In your AI client's custom connector settings, add this server URL. For Claude.ai, choose <strong>Register automatically</strong> for the OAuth client if prompted.</p>
+                <p class="wd-modal-text">Connect an MCP-compatible AI client to work with your Workdeck apps. Publishing, deletion, and account settings stay private. File uploads require supplied contents and are limited to 100 KB.</p>
+                <label class="wd-connect-label" for="connectAIClient">Choose your AI client</label>
+                <select class="wd-connect-select" id="connectAIClient">
+                    <option value="other">Other MCP client</option>
+                    <option value="chatgpt">ChatGPT</option>
+                    <option value="claude">Claude</option>
+                    <option value="codex">Codex</option>
+                    <option value="pi">Pi</option>
+                </select>
+                <div class="wd-connect-steps" id="connectAIInstructions" aria-live="polite">
+                    <div data-client="claude" hidden><p>In Claude.ai, open <strong>Settings → Connectors → Add custom connector</strong>. Paste the URL below and connect. If asked, choose <strong>Register automatically</strong> for OAuth.</p></div>
+                    <div data-client="chatgpt" hidden><p>In ChatGPT, open <strong>Settings → Apps (or Connectors)</strong> and create a custom app/connector. Enable Developer mode if required, enter the URL below as a remote MCP server, then connect. Availability depends on your ChatGPT plan.</p></div>
+                    <div data-client="codex" hidden><p>In your terminal, run <code>codex mcp add workdeck --url &lt;MCP URL&gt;</code> with the URL below. Then run <code>codex mcp login workdeck</code> to authorize.</p></div>
+                    <div data-client="pi" hidden><p>In your terminal, run <code>pi mcp add workdeck --url &lt;MCP URL&gt;</code> with the URL below. Then run <code>pi mcp login workdeck</code> to authorize (or sign in from <code>/mcp</code>).</p></div>
+                    <div data-client="other"><p>Add the URL below as a <strong>Streamable HTTP</strong> MCP server in your client. Use OAuth sign-in and automatic client registration if offered. Your client must support remote MCP and OAuth.</p></div>
+                </div>
+                <p class="wd-connect-label">Workdeck MCP server URL</p>
                 <div class="wd-key-display"><code class="wd-key-text" id="connectAIUrl"></code><button class="wd-key-copy-btn" id="connectAICopy" aria-label="Copy MCP URL" title="Copy URL">Copy</button></div>
-                <p class="wd-key-hint">Sign in on the Workdeck authorization page with the key for the account you want to connect. Do not enter your key in the AI client. Connections expire after 30 days and can be revoked here.</p>
+                <p class="wd-key-hint">Enter your account key only on Workdeck’s authorization page, never in the AI client. Connections expire after 30 days and can be revoked here. Connecting a new client replaces the current connection.</p>
                 <p class="wd-modal-text" id="connectAIStatus" role="status">Loading connection…</p>
                 <div class="wd-modal-actions"><button class="wd-danger-btn" id="connectAIRevoke" hidden>Revoke connection</button><button class="wd-secondary-btn" id="connectAICloseBtn">Close</button></div>
             </div>

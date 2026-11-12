@@ -1851,8 +1851,16 @@ function hideKeyModal() {
     $('keyModal').classList.remove('active');
 }
 
+function updateConnectAIInstructions() {
+    const client = $('connectAIClient').value;
+    $('connectAIInstructions').querySelectorAll('[data-client]').forEach(function (instructions) {
+        instructions.hidden = instructions.dataset.client !== client;
+    });
+}
+
 async function showConnectAIModal() {
     closeDropdown($('settingsDropdown'));
+    updateConnectAIInstructions();
     $('connectAIUrl').textContent = location.origin + '/api/mcp';
     $('connectAIModal').classList.add('active');
     $('connectAIStatus').textContent = 'Loading connection…';
@@ -1879,7 +1887,7 @@ async function showConnectAIModal() {
 
 async function revokeAIConnection() {
     const hash = wdAuth.getUserHash();
-    if (!hash || !window.confirm('Revoke the Todo AI connection?')) return;
+    if (!hash || !window.confirm('Revoke the AI connection?')) return;
     $('connectAIRevoke').disabled = true;
     try {
         const response = await fetch('/api/mcp-connections', {
@@ -2284,6 +2292,7 @@ function setupEventListeners() {
 
     $('viewKeyBtn').addEventListener('click', showKeyModal);
     $('connectAIBtn').addEventListener('click', showConnectAIModal);
+    $('connectAIClient').addEventListener('change', updateConnectAIInstructions);
     $('connectAIClose').addEventListener('click', function () { $('connectAIModal').classList.remove('active'); });
     $('connectAICloseBtn').addEventListener('click', function () { $('connectAIModal').classList.remove('active'); });
     $('connectAIRevoke').addEventListener('click', revokeAIConnection);
