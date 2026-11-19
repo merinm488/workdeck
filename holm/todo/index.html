@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#188038">
+  <title>Todo — Workdeck</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/todo/styles.css">
+  <script src="/todo/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><div class="wrap topbar-inner">
+    <a href="/account" class="back">← <span>Workdeck</span></a>
+    <span class="brand"><span class="brand-icon">✓</span> Todo</span>
+    <div class="top-actions"><button id="themeToggle" type="button" class="icon-btn" aria-label="Toggle colour theme">◐</button><a class="account-link" href="/account">Account ↗</a></div>
+  </div></header>
+  <main class="wrap main">
+    <div class="eyebrow">WORKDECK / TODO</div>
+    <div class="page-heading"><div><h1 id="pageTitle">A little more <em>done.</em></h1><p id="pageSubtitle">Your plans, one list at a time.</p></div><button id="newListBtn" class="button primary" type="button">+ New list</button></div>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section id="listsPage" aria-label="Task lists" hidden>
+      <div class="section-head"><h2>Your lists <span id="listCount" class="count"></span></h2><label class="search"><span class="sr-only">Search lists and tasks</span><input id="listSearch" type="search" placeholder="Search lists and tasks"></label></div>
+      <div id="listGrid" class="list-grid"></div>
+      <div id="listEmpty" class="empty" hidden><div class="empty-symbol">✓</div><h2>Start with a list.</h2><p>Every good plan begins somewhere. Give yours a name.</p><button id="emptyNewList" class="button primary" type="button">Create your first list</button></div>
+      <div id="searchEmpty" class="empty" hidden><h2>Nothing found.</h2><p>Try searching for a different list or task.</p></div>
+    </section>
+    <section id="tasksPage" aria-label="Tasks" hidden>
+      <div class="list-toolbar"><button id="backToLists" class="text-button" type="button">← All lists</button><div class="list-toolbar-actions"><button id="renameListBtn" class="text-button" type="button">Rename list</button><button id="deleteListBtn" class="text-button danger-text" type="button">Delete list</button></div></div>
+      <div class="task-layout"><form id="taskForm" class="task-form panel">
+        <div class="eyebrow">MAKE A PLAN</div><h2 id="formHeading">Add a task</h2>
+        <label>Task name <input id="taskTitle" type="text" maxlength="200" placeholder="What needs doing?" required></label>
+        <label>Notes <textarea id="taskDescription" maxlength="2000" rows="3" placeholder="Add some details (optional)"></textarea></label>
+        <div class="field-row"><label>Due date <input id="taskDueDate" type="date"></label><label>Priority <select id="taskPriority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label></div>
+        <div class="form-actions"><button id="saveTaskBtn" class="button primary" type="submit">Add task ↗</button><button id="cancelEditBtn" class="text-button" type="button" hidden>Cancel edit</button></div>
+      </form><div class="tasks-panel panel"><div class="section-head"><h2>Tasks <span id="taskCount" class="count"></span></h2><span id="openCount" class="subtle"></span></div><div id="taskRows" class="task-rows"></div><div id="taskEmpty" class="empty small" hidden><div class="empty-symbol">✓</div><h3>A clean slate.</h3><p>Add your first task to get going.</p></div></div></div>
+    </section>
+  </main>
+  <footer class="wrap footer"><span>One step at a time.</span><a href="/apps">Explore Workdeck apps ↗</a></footer>
+  <dialog id="nameDialog" class="dialog"><form id="nameForm"><h2 id="nameHeading">Name your list</h2><label>List name <input id="listName" maxlength="100" required placeholder="e.g. This week"></label><div class="dialog-actions"><button id="cancelName" class="button secondary" type="button">Cancel</button><button class="button primary" type="submit">Save list</button></div></form></dialog>
+  <dialog id="deleteDialog" class="dialog"><h2 id="deleteHeading">Delete?</h2><p id="deleteMessage">This can't be undone.</p><div class="dialog-actions"><button id="cancelDelete" class="button secondary" type="button">Cancel</button><button id="confirmDelete" class="button destructive" type="button">Delete</button></div></dialog>
+</body>
+</html>

@@ -1,8 +1,11 @@
-// Holm-only identity endpoint. Never use the legacy access-key hash to
-// identify users: member.id is supplied by Holm's verified session cookie.
+// Holm-only identity endpoint and private Todo pilot. Never use the legacy
+// access-key hash: the member scope is derived from Holm's session cookie.
+import { handleTodo } from './todo.js';
+
 export default {
   fetch(request, env) {
     const { pathname } = new URL(request.url);
+    if (pathname.startsWith('/api/todo/')) return handleTodo(request, env);
     if (pathname === '/api/me') {
       if (request.method !== 'GET') {
         return new Response(null, { status: 405, headers: { Allow: 'GET' } });
@@ -20,6 +23,10 @@ export default {
     }
     if (pathname.startsWith('/api/')) {
       return Response.json({ error: 'Not found.' }, { status: 404 });
+    }
+    if (pathname.startsWith('/todo/') && pathname !== '/todo/' && !pathname.includes('.', 6)) {
+      // Serve the same Todo shell for a direct visit to /todo/<list-id>.
+      return env.holm.web.fetch(new Request(new URL('/todo/index.html', request.url), request));
     }
     return env.holm.web.fetch(request);
   },

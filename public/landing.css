@@ -106,6 +106,8 @@ html[data-theme="dark"] .lp-intro h2 em,html[data-theme="dark"] .lp-apps h2 em,h
 .lp-app-card h3 { margin-top:20px; font-size:19px; letter-spacing:-.035em; }
 .lp-app-card p { color:var(--lp-muted); font-size:12px; line-height:1.55; max-width:215px; margin-top:8px; }
 .lp-app-tag { display:block; margin-top:19px; font-size:10px; font-weight:700; color:var(--lp-color); }
+.lp-app-open { display:inline-block; margin-top:9px; font-size:11px; font-weight:750; color:var(--lp-color)!important; text-decoration:underline!important; text-underline-offset:3px; }
+.lp-app-open:hover { filter:brightness(1.25); }
 .lp-app-end { background:#facc15; color:#171d26; display:flex; flex-direction:column; justify-content:space-between; }
 .lp-app-end>span { font-size:28px; }
 .lp-app-end p { font-family:var(--lp-display); font-size:23px; line-height:1.05; }

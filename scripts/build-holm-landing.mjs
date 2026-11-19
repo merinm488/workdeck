@@ -41,6 +41,10 @@ for (const match of icons) {
   if (!template && !fallback) throw new Error(`Missing icon for ${match[1]}`);
   landing = landing.replace(match[0], `<span class="lp-app-icon" data-icon="${match[1]}">${template ? template[1].trim() : fallback}</span>`);
 }
+// Only Todo is live so far. Keep every other showcase card informational.
+const todoTag = '<span class="lp-app-tag">Focus &amp; finish</span>';
+if (!landing.includes(todoTag)) throw new Error('Missing Todo catalogue card.');
+landing = landing.replace(todoTag, todoTag + '<a class="lp-app-open" href="/todo/">Open Todo ↗</a>');
 const html = (apps = false) => `<!doctype html>
 <html lang="en">
 <head>
@@ -74,6 +78,7 @@ ${apps ? landing.replace('class="lp"', 'class="lp lp--apps"') : landing}
 `;
 rmSync(output, { recursive: true, force: true });
 mkdirSync(join(web, 'icons'), { recursive: true });
+mkdirSync(join(web, 'todo'), { recursive: true });
 mkdirSync(join(output, 'api'), { recursive: true });
 writeFileSync(join(output, 'holm.json'), JSON.stringify({
   name: 'workdeck', title: 'Workdeck',
@@ -98,8 +103,8 @@ writeFileSync(join(web, 'landing.js'), `(() => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 })();\n`);
-writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v2';
-const FILES = ['/', '/apps', '/account', '/landing.css', '/landing.js', '/account.css', '/account.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
+writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v3';
+const FILES = ['/', '/apps', '/account', '/todo/', '/todo/app.js', '/todo/styles.css', '/landing.css', '/landing.js', '/account.css', '/account.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
@@ -114,5 +119,9 @@ cpSync(join(root, 'public/manifest.json'), join(web, 'manifest.json'));
 for (const file of ['account.html', 'account.css', 'account.js']) {
   cpSync(join(root, 'holm/auth', file), join(web, file));
 }
+cpSync(join(root, 'holm/todo/index.html'), join(web, 'todo/index.html'));
+cpSync(join(root, 'holm/todo/styles.css'), join(web, 'todo/styles.css'));
+cpSync(join(root, 'holm/todo/app.js'), join(web, 'todo/app.js'));
 cpSync(join(root, 'holm/auth/main.js'), join(output, 'api/main.js'));
-console.log(`Holm landing and account package: ${output}`);
+cpSync(join(root, 'holm/todo/api.js'), join(output, 'api/todo.js'));
+console.log(`Holm landing, account and Todo package: ${output}`);
