@@ -4,27 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
 
-    <title>Workdeck</title>
-    <meta name="description" content="Workdeck — your unified home for your daily tools">
-    <meta name="theme-color" content="#4F46E5">
+    <title>Workdeck — Your work, in one place</title>
+    <meta name="description" content="Meet Workdeck: a thoughtful home for your documents, ideas, plans and everyday tools. Explore all the apps before you sign in.">
+    <meta name="theme-color" content="#101622">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Workdeck">
-    <meta property="og:url" content="https://workdeck-m.vercel.app/">
-    <meta property="og:title" content="Workdeck — Your everyday tools, all in one place.">
-    <meta property="og:description" content="Create and organize your work across all your apps in one place. Sign in with your access key and pick up right where you left off.">
-    <meta property="og:image" content="https://workdeck-m.vercel.app/og-image.jpg">
+    <meta property="og:url" content="https://mer-workdeck.fazt.sh/">
+    <meta property="og:title" content="Workdeck — Your work, in one place">
+    <meta property="og:description" content="A thoughtful home for your documents, ideas, plans and everyday tools. Explore the apps before you sign in.">
+    <meta property="og:image" content="https://mer-workdeck.fazt.sh/og-image.jpg">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Workdeck — Your everyday tools, all in one place">
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:url" content="https://workdeck-m.vercel.app/">
-    <meta name="twitter:title" content="Workdeck — Your everyday tools, all in one place.">
-    <meta name="twitter:description" content="Create and organize your work across all your apps in one place. Sign in with your access key and pick up right where you left off.">
-    <meta name="twitter:image" content="https://workdeck-m.vercel.app/og-image.jpg">
+    <meta name="twitter:url" content="https://mer-workdeck.fazt.sh/">
+    <meta name="twitter:title" content="Workdeck — Your work, in one place">
+    <meta name="twitter:description" content="A thoughtful home for your documents, ideas, plans and everyday tools. Explore the apps before you sign in.">
+    <meta name="twitter:image" content="https://mer-workdeck.fazt.sh/og-image.jpg">
 
     <!-- App Icons -->
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
@@ -38,6 +38,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="/workdeck.css">
+    <link rel="stylesheet" href="/landing.css">
 </head>
 <body>
     <!-- Background decoration -->
@@ -46,7 +47,86 @@
         <div class="wd-bg-circle wd-bg-circle-bottom-left"></div>
     </div>
 
-    <!-- ===== LOGIN VIEW ===== -->
+    <!-- Public introduction. No app or account data is loaded for visitors. -->
+    <div id="landingView" class="lp hidden">
+        <a class="lp-skip" href="#lp-main">Skip to content</a>
+        <header class="lp-header">
+            <div class="lp-wrap lp-nav">
+                <a class="lp-brand" href="/" aria-label="Workdeck home">
+                    <img src="/icons/icon-192x192.png" width="36" height="36" alt="">
+                    <span>workdeck<span class="lp-brand-dot">.</span></span>
+                </a>
+                <nav class="lp-nav-links" aria-label="Main navigation">
+                    <a href="/apps">Explore apps</a>
+                    <a href="/#about">The idea</a>
+                </nav>
+                <button type="button" id="landingThemeToggle" class="lp-theme-toggle" aria-label="Switch colour theme" title="Switch colour theme">◐</button>
+                <span class="lp-nav-status"><span class="lp-status-dot"></span> Email sign-in coming soon</span>
+            </div>
+        </header>
+
+        <main id="lp-main">
+            <section class="lp-hero lp-wrap" aria-labelledby="lp-title">
+                <div class="lp-hero-copy">
+                    <span class="lp-eyebrow"><span class="lp-eyebrow-line"></span> A better place to begin</span>
+                    <h1 id="lp-title">All your work.<br><em>One clear space.</em></h1>
+                    <p class="lp-hero-lead">The ideas you write down. The plans you put in motion. The everyday details that keep things moving. Workdeck brings them together, without getting in your way.</p>
+                    <div class="lp-hero-actions">
+                        <a class="lp-button lp-button-primary" href="/apps">Explore the apps <span aria-hidden="true">↗</span></a>
+                        <span class="lp-hero-note">Email sign-in is on its way</span>
+                    </div>
+                    <div class="lp-hero-foot"><span class="lp-foot-rule"></span> Made for the many ways you work</div>
+                </div>
+                <div class="lp-hero-art" aria-label="An illustration of Workdeck's connected apps" role="img">
+                    <div class="lp-art-orbit lp-art-orbit-one"></div><div class="lp-art-orbit lp-art-orbit-two"></div>
+                    <div class="lp-art-label lp-art-label-top">YOUR SPACE, YOUR PACE <span>✳</span></div>
+                    <div class="lp-art-window">
+                        <div class="lp-art-toolbar"><span class="lp-art-dots"><i></i><i></i><i></i></span><span class="lp-art-address">workdeck / your space</span><span class="lp-art-menu">•••</span></div>
+                        <div class="lp-art-body">
+                            <div class="lp-art-rail"><div class="lp-rail-logo">w.</div><span>▦</span><span>▤</span><span>▧</span><span>◷</span><span class="lp-rail-bottom">✳</span></div>
+                            <div class="lp-art-content"><span class="lp-art-kicker">A HOME FOR EVERYTHING</span><strong>Your next great idea<br>starts here<span>.</span></strong><div class="lp-art-content-line"></div>
+                                <div class="lp-art-tiles"><div class="lp-art-tile lp-art-tile-doc"><span>✎</span><b>Docs</b><small>Make it clear</small></div><div class="lp-art-tile lp-art-tile-sheet"><span>▦</span><b>Sheets</b><small>Make it count</small></div><div class="lp-art-tile lp-art-tile-draw"><span>✳</span><b>Draw</b><small>Make it yours</small></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lp-art-sticker">a little more<br><em>room to think.</em><span>↗</span></div>
+                    <div class="lp-art-label lp-art-label-bottom">CREATE · ORGANIZE · KEEP GOING</div>
+                </div>
+            </section>
+
+            <div class="lp-marquee" aria-label="Workdeck tools"><div class="lp-wrap lp-marquee-inner"><span>One workspace</span><i>✳</i><span>Many possibilities</span><i>✳</i><span>Your way of working</span><i>✳</i><span>One workspace</span></div></div>
+
+            <section id="about" class="lp-intro lp-wrap" aria-labelledby="lp-about-title">
+                <div class="lp-section-index">01 / THE IDEA</div>
+                <div><h2 id="lp-about-title">Good work takes<br><em>more than one tool.</em></h2><p>Some days call for a blank page. Others need a board, a calendar, or a quick sketch. Workdeck gives each part of your work a dedicated space—and brings it all back to one home.</p></div>
+            </section>
+
+            <section id="apps" class="lp-apps" aria-labelledby="lp-apps-title">
+                <div class="lp-wrap">
+                    <div class="lp-apps-heading"><div><div class="lp-section-index">02 / THE TOOLKIT</div><h2 id="lp-apps-title">Meet your <em>workspace.</em></h2><p>Different tools for different moments. Explore what belongs in your deck.</p></div><span class="lp-apps-count">11 tools · one home</span></div>
+                    <div class="lp-app-grid">
+                        <article class="lp-app-card" style="--lp-color:#4285f4;--lp-tint:rgba(66,133,244,.12)"><span class="lp-app-icon" data-icon="docs">D</span><span class="lp-app-number">01</span><h3>Docs</h3><p>Find the right words and give every thought a place to land.</p><span class="lp-app-tag">Write &amp; think</span></article>
+                        <article class="lp-app-card" style="--lp-color:#22c55e;--lp-tint:rgba(34,197,94,.12)"><span class="lp-app-icon" data-icon="sheets">S</span><span class="lp-app-number">02</span><h3>Sheets</h3><p>Bring structure to the numbers and details that matter.</p><span class="lp-app-tag">Plan &amp; calculate</span></article>
+                        <article class="lp-app-card" style="--lp-color:#7248b9;--lp-tint:rgba(114,72,185,.12)"><span class="lp-app-icon" data-icon="forms">F</span><span class="lp-app-number">03</span><h3>Forms</h3><p>Ask better questions and collect answers in one place.</p><span class="lp-app-tag">Ask &amp; collect</span></article>
+                        <article class="lp-app-card" style="--lp-color:#ea580c;--lp-tint:rgba(234,88,12,.12)"><span class="lp-app-icon" data-icon="slides">S</span><span class="lp-app-number">04</span><h3>Slides</h3><p>Turn the big picture into a story worth sharing.</p><span class="lp-app-tag">Present &amp; share</span></article>
+                        <article class="lp-app-card" style="--lp-color:#e11d48;--lp-tint:rgba(225,29,72,.12)"><span class="lp-app-icon" data-icon="draw">D</span><span class="lp-app-number">05</span><h3>Draw</h3><p>Sketch freely when words aren't quite enough.</p><span class="lp-app-tag">Sketch &amp; explore</span></article>
+                        <article class="lp-app-card" style="--lp-color:#d9a506;--lp-tint:rgba(217,165,6,.13)"><span class="lp-app-icon" data-icon="filebox">F</span><span class="lp-app-number">06</span><h3>Files</h3><p>Keep the things you need close, organized, and easy to find.</p><span class="lp-app-tag">Store &amp; find</span></article>
+                        <article class="lp-app-card" style="--lp-color:#188038;--lp-tint:rgba(24,128,56,.12)"><span class="lp-app-icon" data-icon="todo">T</span><span class="lp-app-number">07</span><h3>Todo</h3><p>Make progress on the little things and the important ones.</p><span class="lp-app-tag">Focus &amp; finish</span></article>
+                        <article class="lp-app-card" style="--lp-color:#0284c7;--lp-tint:rgba(2,132,199,.12)"><span class="lp-app-icon" data-icon="calendar">C</span><span class="lp-app-number">08</span><h3>Calendar</h3><p>Make time for what needs your attention.</p><span class="lp-app-tag">Schedule &amp; see</span></article>
+                        <article class="lp-app-card" style="--lp-color:#a21caf;--lp-tint:rgba(162,28,175,.12)"><span class="lp-app-icon" data-icon="kanban">K</span><span class="lp-app-number">09</span><h3>Kanban</h3><p>See how projects move from first step to done.</p><span class="lp-app-tag">Track &amp; move</span></article>
+                        <article class="lp-app-card" style="--lp-color:#14b8a6;--lp-tint:rgba(20,184,166,.12)"><span class="lp-app-icon" data-icon="blog">B</span><span class="lp-app-number">10</span><h3>Blog</h3><p>Give your ideas a home beyond the draft.</p><span class="lp-app-tag">Publish &amp; express</span></article>
+                        <article class="lp-app-card" style="--lp-color:#b07843;--lp-tint:rgba(176,120,67,.12)"><span class="lp-app-icon" data-icon="minutes">M</span><span class="lp-app-number">11</span><h3>Minutes</h3><p>Capture the conversations that move things forward.</p><span class="lp-app-tag">Meet &amp; remember</span></article>
+                        <div class="lp-app-end"><span>✳</span><p>There’s more to make<br>when it all connects.</p><small>App migration will happen one by one.</small></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="lp-outro lp-wrap" aria-labelledby="lp-outro-title"><span class="lp-section-index">03 / WHAT'S NEXT</span><h2 id="lp-outro-title">A home for the work<br><em>only you can do.</em></h2><p>We're preparing a new way to get in. Email sign-in will be available as the apps make their way to their new home.</p><span class="lp-coming-soon" aria-label="Email sign-in coming soon">Email sign-in <span>coming soon ↗</span></span></section>
+        </main>
+        <footer class="lp-footer"><div class="lp-wrap lp-footer-inner"><a class="lp-brand" href="/" aria-label="Workdeck home"><img src="/icons/icon-192x192.png" width="32" height="32" alt=""><span>workdeck<span class="lp-brand-dot">.</span></span></a><span>A little more room to do great work.</span><a href="#lp-main">Back to top ↑</a></div></footer>
+    </div>
+
+    <!-- ===== LEGACY LOGIN VIEW (kept for the later authentication migration) ===== -->
     <div id="loginView" class="wd-login-view hidden">
         <div class="wd-login-card">
             <div class="wd-login-logo">

@@ -683,12 +683,16 @@ function saveSettings(patch) {
 // Views: login vs home
 // ================================================
 
+// Public landing for signed-out visitors; the legacy access-key form stays
+// in the DOM for a later auth migration, but is not offered as sign-in.
 function showLogin() {
-    $('loginView').classList.remove('hidden');
+    $('landingView').classList.remove('hidden');
+    $('loginView').classList.add('hidden');
     $('homeView').classList.add('hidden');
 }
 
 function showHome() {
+    $('landingView').classList.add('hidden');
     $('loginView').classList.add('hidden');
     $('homeView').classList.remove('hidden');
 }
@@ -2435,10 +2439,23 @@ function updateThemeLabel() {
 
 async function init() {
     wdThemeManager.init();
+    $('landingThemeToggle').addEventListener('click', function () { wdThemeManager.toggleTheme(); });
+    document.querySelectorAll('.lp-app-icon[data-icon]').forEach(function (node) {
+        const icon = wdIcon(node.dataset.icon);
+        if (icon) node.replaceChildren(icon);
+    });
     renderNewMenus();
     setupEventListeners();
     updateThemeLabel();
     initSidebar();
+
+    const isAppsPage = window.location.pathname.replace(/\/$/, '') === '/apps';
+    if (isAppsPage) {
+        $('landingView').classList.add('lp--apps');
+        document.title = 'Explore the apps — Workdeck';
+        showLogin();
+        return;
+    }
 
     const session = wdAuth.getSession();
     if (!session) {

@@ -185,13 +185,19 @@ app.get('/f/:id', (req, res, next) => {
   next();
 });
 
+// Public app catalogue shares the landing shell; the browser displays only
+// its app listing on this route. Keep it ahead of published blog slugs.
+app.get(['/apps', '/apps/'], (req, res) => {
+  res.sendFile(path.join(ROOT_DIR, 'public', 'index.html'));
+});
+
 // Published blog /<slug> -> public/blog.html (public read-only view;
 // the slug resolves server-side in api/site.js). Articles: /<slug>/<post>.
 // App paths win over slugs (on Vercel static files beat rewrites) —
 // 'blog' itself is reserved too, so /blog serves the app.
 const RESERVED_SLUGS = new Set([
   'blog', 'sheets', 'forms', 'slides', 'draw', 'files',
-  'todo', 'calendar', 'kanban', 'docs', 'api', 'js', 'icons', 'f'
+  'todo', 'calendar', 'kanban', 'docs', 'apps', 'api', 'js', 'icons', 'f'
 ]);
 app.get('/:slug', (req, res, next) => {
   if (RESERVED_SLUGS.has(req.params.slug)) return next();

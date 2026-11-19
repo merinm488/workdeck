@@ -73,6 +73,14 @@
       "destination": "/f.html?id=:id"
     },
     {
+      "source": "/apps",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/apps/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/:slug([a-z0-9-]{3,40})",
       "destination": "/blog.html?site=:slug"
     },
