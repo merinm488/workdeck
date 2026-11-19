@@ -1,0 +1,18 @@
+body { margin:0; }
+.lp-account { display:flex; flex-direction:column; min-height:100vh; }
+.lp-account-main { flex:1; padding-block:100px 130px; }
+.lp-account-main h1 { margin:24px 0; }
+.lp-account-main>p { font-size:15px; color:var(--lp-muted); }
+.lp-account-details { width:min(100%,620px); margin-top:34px; padding:28px; border:1px solid var(--lp-line); border-radius:10px; background:var(--lp-surface); }
+.lp-account-details[hidden],#accountSignIn[hidden] { display:none; }
+.lp-account-identity { display:flex; align-items:center; gap:16px; min-width:0; }
+.lp-account-avatar { display:grid; place-items:center; width:52px; height:52px; flex:none; border-radius:12px; background:var(--lp-yellow); color:#171d26; font-size:25px; }
+.lp-account-identity small { display:block; color:var(--lp-muted); font-size:11px; margin-bottom:5px; }
+.lp-account-identity strong { display:block; overflow-wrap:anywhere; font-size:17px; }
+.lp-account-details p { max-width:480px; margin:26px 0; color:var(--lp-muted); line-height:1.75; font-size:13px; }
+.lp-account-actions { display:flex; flex-wrap:wrap; align-items:center; gap:20px; }
+.lp-account-signout { border:0; padding:12px; background:none; color:var(--lp-muted); font:600 12px Inter,sans-serif; cursor:pointer; }
+.lp-account-signout:hover { color:var(--lp-ink); }
+.lp-account-signout:focus-visible { outline:3px solid #d39a00; }
+#accountSignIn { margin-top:24px; }
+@media(max-width:600px) { .lp-account-main { padding-block:72px 100px; } }

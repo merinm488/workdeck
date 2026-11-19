@@ -36,6 +36,10 @@ html[data-theme="dark"] .lp h1 em { color:#f3d572; }
 .lp-button:hover { transform:translateY(-3px); }
 .lp-button-primary { background:var(--lp-ink); color:var(--lp-bg)!important; }
 .lp-button-primary:hover { background:#8c6a10; color:#fff!important; }
+.lp-button-outline { border:1px solid var(--lp-line); background:var(--lp-surface); }
+.lp-button-outline:hover { background:var(--lp-line); }
+.lp-signin { text-decoration:none; color:var(--lp-ink)!important; }
+.lp-signin:hover { border-color:#c5a453; }
 .lp-button span { font-size:20px; font-weight:400; }
 .lp-hero-note { color:var(--lp-muted); font-size:12px; }
 .lp-hero-foot { display:flex; align-items:center; gap:13px; font-size:11px; font-weight:650; letter-spacing:.05em; color:var(--lp-muted); margin-top:73px; }

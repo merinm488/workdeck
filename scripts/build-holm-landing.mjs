@@ -1,5 +1,5 @@
-// Build a static-only Holm preview from the public Workdeck landing view.
-// No workspace, API, legacy sign-in, or user data is included in this package.
+// Build the public Holm landing and native email-sign-in account shell.
+// No legacy workspace, Vercel API, access key, or user data is included.
 import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +16,19 @@ const close = source.indexOf('<!-- ===== LEGACY LOGIN VIEW', open);
 if (open < 0 || close < 0) throw new Error('Cannot find public landing section.');
 let landing = source.slice(open, close).trim()
   .replace('class="lp hidden"', 'class="lp"');
+// Only the Holm build advertises sign-in. The legacy/Vercel landing continues
+// to say coming soon until the old app is retired.
+const authURL = '/auth/login?redirect=%2Faccount';
+const replacements = [
+  ['<span class="lp-nav-status"><span class="lp-status-dot"></span> Email sign-in coming soon</span>', `<a class="lp-nav-status lp-signin" href="${authURL}">Sign in with email <span aria-hidden="true">↗</span></a>`],
+  ['<span class="lp-hero-note">Email sign-in is on its way</span>', `<a class="lp-button lp-button-outline" href="${authURL}">Sign in with email <span aria-hidden="true">↗</span></a>`],
+  ["We're preparing a new way to get in. Email sign-in will be available as the apps make their way to their new home.", 'Sign in with a code sent to your email to create your new Workdeck account. Apps will arrive one by one.'],
+  ['<span class="lp-coming-soon" aria-label="Email sign-in coming soon">Email sign-in <span>coming soon ↗</span></span>', `<a class="lp-button lp-button-primary" href="${authURL}">Sign in with email <span aria-hidden="true">↗</span></a>`],
+];
+for (const [before, after] of replacements) {
+  if (!landing.includes(before)) throw new Error(`Missing landing sign-in marker: ${before}`);
+  landing = landing.replace(before, after);
+}
 const icons = [...landing.matchAll(/<span class="lp-app-icon" data-icon="([a-z]+)">[^<]*<\/span>/g)];
 if (icons.length !== 11) throw new Error(`Expected 11 app cards; found ${icons.length}.`);
 for (const match of icons) {
@@ -61,6 +74,7 @@ ${apps ? landing.replace('class="lp"', 'class="lp lp--apps"') : landing}
 `;
 rmSync(output, { recursive: true, force: true });
 mkdirSync(join(web, 'icons'), { recursive: true });
+mkdirSync(join(output, 'api'), { recursive: true });
 writeFileSync(join(output, 'holm.json'), JSON.stringify({
   name: 'workdeck', title: 'Workdeck',
   description: 'Your work, in one place.', themeColor: '#facc15',
@@ -84,16 +98,21 @@ writeFileSync(join(web, 'landing.js'), `(() => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 })();\n`);
-writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v1';
-const FILES = ['/', '/apps', '/landing.css', '/landing.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
+writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v2';
+const FILES = ['/', '/apps', '/account', '/landing.css', '/landing.js', '/account.css', '/account.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
-  if (new URL(e.request.url).origin !== self.location.origin || e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (url.origin !== self.location.origin || e.request.method !== 'GET' || url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || Response.error())));
 });\n`);
 cpSync(join(root, 'public/landing.css'), join(web, 'landing.css'));
 cpSync(join(root, 'public/icons'), join(web, 'icons'), { recursive: true });
 cpSync(join(root, 'public/og-image.jpg'), join(web, 'og-image.jpg'));
 cpSync(join(root, 'public/manifest.json'), join(web, 'manifest.json'));
-console.log(`Static Holm landing package: ${output}`);
+for (const file of ['account.html', 'account.css', 'account.js']) {
+  cpSync(join(root, 'holm/auth', file), join(web, file));
+}
+cpSync(join(root, 'holm/auth/main.js'), join(output, 'api/main.js'));
+console.log(`Holm landing and account package: ${output}`);

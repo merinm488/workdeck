@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101622">
+  <title>Your account — Workdeck</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/landing.css">
+  <link rel="stylesheet" href="/account.css">
+  <script src="/landing.js"></script>
+  <script defer src="/account.js"></script>
+</head>
+<body>
+  <div class="lp lp-account">
+    <a class="lp-skip" href="#account-main">Skip to content</a>
+    <header class="lp-header"><div class="lp-wrap lp-nav">
+      <a class="lp-brand" href="/" aria-label="Workdeck home"><img src="/icons/icon-192x192.png" width="36" height="36" alt=""><span>workdeck<span class="lp-brand-dot">.</span></span></a>
+      <nav class="lp-nav-links" aria-label="Main navigation"><a href="/apps">Explore apps</a><a href="/">Home</a></nav>
+      <button type="button" id="landingThemeToggle" class="lp-theme-toggle" aria-label="Switch colour theme" title="Switch colour theme">◐</button>
+    </div></header>
+    <main id="account-main" class="lp-wrap lp-account-main">
+      <div class="lp-section-index">YOUR WORKDECK ACCOUNT</div>
+      <h1>Welcome to<br><em>your space.</em></h1>
+      <p id="accountStatus" role="status" aria-live="polite">Checking your sign-in…</p>
+      <div id="accountDetails" class="lp-account-details" hidden>
+        <div class="lp-account-identity"><span class="lp-account-avatar" aria-hidden="true">✳</span><div><small>Signed in as</small><strong id="accountEmail"></strong></div></div>
+        <p>You're signed in with a Holm account. Your tools will arrive here as we migrate each app. No access key or old Workdeck data is carried over.</p>
+        <div class="lp-account-actions"><a class="lp-button lp-button-primary" href="/apps">Explore the apps <span aria-hidden="true">↗</span></a><button type="button" id="accountSignOut" class="lp-account-signout">Sign out</button></div>
+      </div>
+      <a id="accountSignIn" class="lp-button lp-button-primary" href="/auth/login?redirect=%2Faccount" hidden>Sign in with email <span aria-hidden="true">↗</span></a>
+    </main>
+    <footer class="lp-footer"><div class="lp-wrap lp-footer-inner"><a class="lp-brand" href="/" aria-label="Workdeck home"><img src="/icons/icon-192x192.png" width="32" height="32" alt=""><span>workdeck<span class="lp-brand-dot">.</span></span></a><span>A little more room to do great work.</span><a href="/apps">Explore apps ↗</a></div></footer>
+  </div>
+</body>
+</html>
