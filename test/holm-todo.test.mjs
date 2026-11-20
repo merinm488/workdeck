@@ -8,6 +8,7 @@ function fixture() {
   function member(email) {
     if (!owners.has(email)) owners.set(email, new Map());
     const rows = owners.get(email);
+    const prefs = new Map();
     const tx = {
       find: () => [...rows.values()],
       count: () => rows.size,
@@ -17,7 +18,9 @@ function fixture() {
       delete: (_collection, selector) => { rows.delete(selector.id); },
       transaction: callback => callback(tx),
     };
-    return { holm: { auth: { getMember: () => ({ email, id: email }) }, app: { member: { ds: tx } } } };
+    return { holm: { auth: { getMember: () => ({ email, id: email }) }, app: { member: {
+      ds: tx, kv: { get: key => prefs.get(key), set: (key, value) => prefs.set(key, value) },
+    } } } };
   }
   const anon = { holm: { auth: { getMember: () => null }, app: { member: { ds: null } } } };
   async function call(env, path, method = 'GET', body, origin = 'https://mer-workdeck.fazt.sh') {
@@ -58,6 +61,19 @@ test('Todo creates, edits, and deletes lists only in the signed-in member scope'
   assert.equal((await call(bob, `/api/todo/lists/${id}`, 'DELETE', { version: 2 })).status, 404);
   assert.equal((await call(alice, `/api/todo/lists/${id}`, 'DELETE', { version: 2 })).status, 200);
   assert.deepEqual((await call(alice, '/api/todo/lists')).body.lists, []);
+});
+
+test('Todo theme and Kanban staging use member-private settings', async () => {
+  const { member, call } = fixture();
+  const alice = member('alice@example.test');
+  const bob = member('bob@example.test');
+  assert.equal((await call(alice, '/api/todo/settings', 'PUT', {
+    theme: 'dark', kanbanCards: ['task_0001'],
+  })).status, 200);
+  assert.deepEqual((await call(alice, '/api/todo/lists')).body.settings,
+    { theme: 'dark', kanbanCards: ['task_0001'] });
+  assert.deepEqual((await call(bob, '/api/todo/lists')).body.settings, {});
+  assert.equal((await call(alice, '/api/todo/settings', 'PUT', { theme: 'invalid' })).status, 400);
 });
 
 test('Todo refuses invalid task fields, duplicate IDs, and dangerous payloads', async () => {

@@ -103,8 +103,8 @@ writeFileSync(join(web, 'landing.js'), `(() => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 })();\n`);
-writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v3';
-const FILES = ['/', '/apps', '/account', '/todo/', '/todo/app.js', '/todo/styles.css', '/landing.css', '/landing.js', '/account.css', '/account.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
+writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v4';
+const FILES = ['/', '/apps', '/account', '/todo/', '/todo/editor.js', '/todo/storage.js', '/todo/auth.js', '/todo/config.js', '/todo/themes.js', '/todo/styles.css', '/landing.css', '/landing.js', '/account.css', '/account.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
@@ -119,9 +119,11 @@ cpSync(join(root, 'public/manifest.json'), join(web, 'manifest.json'));
 for (const file of ['account.html', 'account.css', 'account.js']) {
   cpSync(join(root, 'holm/auth', file), join(web, file));
 }
-cpSync(join(root, 'holm/todo/index.html'), join(web, 'todo/index.html'));
-cpSync(join(root, 'holm/todo/styles.css'), join(web, 'todo/styles.css'));
-cpSync(join(root, 'holm/todo/app.js'), join(web, 'todo/app.js'));
+for (const file of ['index.html', 'styles.css', 'editor.js', 'config.js', 'auth.js', 'storage.js']) {
+  cpSync(join(root, 'holm/todo', file), join(web, 'todo', file));
+}
+// Keep Todo's existing light/dark/system theme implementation unchanged.
+cpSync(join(root, 'todo/js/themes.js'), join(web, 'todo/themes.js'));
 cpSync(join(root, 'holm/auth/main.js'), join(output, 'api/main.js'));
 cpSync(join(root, 'holm/todo/api.js'), join(output, 'api/todo.js'));
 console.log(`Holm landing, account and Todo package: ${output}`);

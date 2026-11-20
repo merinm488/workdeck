@@ -54,7 +54,8 @@ export async function handleTodo(request, env) {
   if (!member.email) return json({ error: 'A verified email is required for Todo.' }, 403);
   const ds = env.holm.app.member.ds;
   if (pathname === '/api/todo/lists' && request.method === 'GET') {
-    return json({ lists: ds.find(COLLECTION, {}, { limit: MAX_LISTS, order: 'desc' }).map(exposed) });
+    return json({ lists: ds.find(COLLECTION, {}, { limit: MAX_LISTS, order: 'desc' }).map(exposed),
+      settings: env.holm.app.member.kv.get('todo_settings') || {} });
   }
   if (!['POST', 'PUT', 'DELETE'].includes(request.method)) return json({ error: 'Not found.' }, 404);
   // Holm protects cookie-authenticated writes; also require an exact same-origin
@@ -62,6 +63,23 @@ export async function handleTodo(request, env) {
   if (request.headers.get('origin') !== url.origin) return json({ error: 'Invalid origin.' }, 403);
   const data = await inputOf(request);
   if (!data) return json({ error: 'Invalid JSON or request too large.' }, 400);
+
+  if (pathname === '/api/todo/settings' && request.method === 'PUT') {
+    const next = { ...env.holm.app.member.kv.get('todo_settings') || {} };
+    if ('theme' in data) {
+      if (!['light', 'dark', 'system'].includes(data.theme)) return json({ error: 'Invalid theme.' }, 400);
+      next.theme = data.theme;
+    }
+    if ('kanbanCards' in data) {
+      if (!Array.isArray(data.kanbanCards) || data.kanbanCards.length > 1000 ||
+          data.kanbanCards.some(id => typeof id !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(id))) {
+        return json({ error: 'Invalid Kanban staging.' }, 400);
+      }
+      next.kanbanCards = [...new Set(data.kanbanCards)];
+    }
+    env.holm.app.member.kv.set('todo_settings', next);
+    return json({ settings: next });
+  }
 
   if (pathname === '/api/todo/lists' && request.method === 'POST') {
     const name = listName(data.name);
