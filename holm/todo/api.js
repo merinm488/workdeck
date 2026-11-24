@@ -51,11 +51,13 @@ export async function handleTodo(request, env) {
   const { pathname } = url;
   const member = env.holm.auth.getMember();
   if (!member) return json({ error: 'Sign in to continue.' }, 401);
-  if (!member.email) return json({ error: 'A verified email is required for Todo.' }, 403);
+  // Holm's member ID, not an email address, scopes member-private storage.
+  // Telegram and other supported sign-ins need not supply an email.
   const ds = env.holm.app.member.ds;
   if (pathname === '/api/todo/lists' && request.method === 'GET') {
+    const shared = env.holm.app.member.kv.get('workdeck_settings') || {};
     return json({ lists: ds.find(COLLECTION, {}, { limit: MAX_LISTS, order: 'desc' }).map(exposed),
-      settings: env.holm.app.member.kv.get('todo_settings') || {} });
+      settings: { ...(env.holm.app.member.kv.get('todo_settings') || {}), ...(shared.theme ? { theme: shared.theme } : {}) } });
   }
   if (!['POST', 'PUT', 'DELETE'].includes(request.method)) return json({ error: 'Not found.' }, 404);
   // Holm protects cookie-authenticated writes; also require an exact same-origin
@@ -76,6 +78,10 @@ export async function handleTodo(request, env) {
         return json({ error: 'Invalid Kanban staging.' }, 400);
       }
       next.kanbanCards = [...new Set(data.kanbanCards)];
+    }
+    if ('theme' in data) {
+      const current = env.holm.app.member.kv.get('workdeck_settings') || {};
+      env.holm.app.member.kv.set('workdeck_settings', { ...current, theme: data.theme });
     }
     env.holm.app.member.kv.set('todo_settings', next);
     return json({ settings: next });
@@ -116,5 +122,14 @@ export async function handleTodo(request, env) {
   });
   if (result.status === 404) return json({ error: 'List not found.' }, 404);
   if (result.status === 409) return json({ error: 'List changed in another tab. Reload and try again.' }, 409);
+  if (request.method === 'DELETE') {
+    const kv = env.holm.app.member.kv;
+    const prefs = kv.get('workdeck_settings');
+    if (prefs?.lastOpened?.[match[1]]) {
+      const lastOpened = { ...prefs.lastOpened };
+      delete lastOpened[match[1]];
+      kv.set('workdeck_settings', { ...prefs, lastOpened });
+    }
+  }
   return json(result.list ? { list: result.list } : { deleted: true });
 }

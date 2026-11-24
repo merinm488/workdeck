@@ -1,0 +1,175 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { handleBlog, handleSite, publicArticle } from '../holm/blog/api.js';
+import { handleWorkspace } from '../holm/auth/workspace.js';
+
+function fixture() {
+  let seq = 0;
+  const members = new Map(), publicRows = new Map();
+  const clone = value => value == null ? value : structuredClone(value);
+  const realm = rows => {
+    const col = name => { if (!rows.has(name)) rows.set(name, new Map()); return rows.get(name); };
+    const ds = {
+      find: (name, query = {}, opts = {}) => {
+        const found = [...col(name).values()].filter(row => Object.entries(query).every(([key, value]) => row[key] === value));
+        return (opts.order === 'desc' ? found.reverse() : found).slice(0, opts.limit || Infinity).map(clone);
+      },
+      findOne: (name, id) => clone(col(name).get(typeof id === 'string' ? id : id.id) || null),
+      count: name => col(name).size,
+      insert: (name, record) => { const id = `record_${++seq}_abcdef`; col(name).set(id, clone({ ...record, id })); return id; },
+      update: (name, query, patch) => col(name).set(query.id, clone({ ...col(name).get(query.id), ...patch.$set })),
+      delete: (name, query) => col(name).delete(query.id),
+      transaction: fn => fn(ds),
+    };
+    return ds;
+  };
+  const globalDS = realm(publicRows);
+  const web = { fetch: request => new Response(`shell:${new URL(request.url).pathname}`, {
+    status: new URL(request.url).pathname === '/blog-public' ? 200 : 404,
+  }) };
+  function member(id) {
+    if (!members.has(id)) members.set(id, { rows: new Map(), kv: new Map() });
+    const { rows, kv } = members.get(id);
+    return { holm: { auth: { getMember: () => ({ id }) }, app: {
+      member: { ds: realm(rows), kv: { get: key => clone(kv.get(key)), set: (key, value) => kv.set(key, clone(value)) } },
+      ds: globalDS,
+    }, web } };
+  }
+  const anon = { holm: { auth: { getMember: () => null }, app: { ds: globalDS }, web } };
+  async function call(handler, env, method = 'GET', body, path, origin = 'https://workdeck.test') {
+    const route = path || (handler === handleBlog ? '/api/blog' : handler === handleSite ? '/api/site' : '/api/workdeck');
+    const request = new Request('https://workdeck.test' + route, {
+      method, headers: body === undefined ? {} : { Origin: origin, 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return handler(request, env);
+  }
+  async function json(...args) { const response = await call(...args); return { status: response.status,
+    body: await response.json(), headers: response.headers }; }
+  const put = (handler, env, action, data, origin) => json(handler, env, 'PUT', { action, data }, undefined, origin);
+  const site = (env, slug, method = 'GET') => json(handleSite, env, method, undefined, `/api/site?slug=${slug}`);
+  return { member, anon, call, json, put, site, globalDS };
+}
+
+test('Blog drafts stay private; public API reveals only published whitelisted snapshots', async () => {
+  const { member, anon, json, put, site, globalDS } = fixture();
+  const alice = member('alice'), bob = member('bob');
+  assert.equal((await json(handleBlog, anon)).status, 401);
+  assert.equal((await site(anon, 'private-entry')).status, 404);
+  assert.equal((await site(anon, 'private-entry', 'PUT')).status, 405);
+  assert.equal((await put(handleBlog, alice, 'createPost', { title: 'Oops' }, 'https://evil.test')).status, 403);
+  assert.equal((await json(handleBlog, alice, 'PUT', { hash: 'bob', action: 'createPost', data: {} })).status, 400);
+  const created = await put(handleBlog, alice, 'createPost', {
+    title: 'Private Entry', html: '<p>Draft</p><script>steal()</script>', });
+  assert.equal(created.status, 200);
+  const post = created.body.post;
+  assert.equal(post.slug, 'private-entry');
+  assert.equal(created.body.data.posts[0].id, post.id);
+  assert.equal((await json(handleBlog, bob)).body.data.posts.length, 0);
+  assert.equal((await put(handleBlog, bob, 'publishPost', { id: post.id, slug: 'private-entry' })).status, 404);
+  assert.equal((await put(handleBlog, bob, 'updatePost', { id: post.id, html: 'mine' })).status, 404);
+  assert.equal((await site(bob, 'private-entry')).status, 404);
+  assert.equal((await put(handleBlog, alice, 'publishPost', { id: post.id, slug: 'files' })).status, 400);
+  assert.equal((await put(handleBlog, alice, 'updatePost', { id: post.id, html: '<p>Public</p><img onerror="alert(1)" src="javascript:evil()"><style>bad</style>' })).status, 200);
+  const published = await put(handleBlog, alice, 'publishPost', { id: post.id, slug: 'private-entry' });
+  assert.equal(published.status, 200);
+  assert.equal(published.body.blog.postUrl, 'https://workdeck.test/private-entry');
+  const response = await site(anon, 'private-entry');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(response.body.site.slug, 'private-entry');
+  assert.equal(response.body.post.title, 'Private Entry');
+  assert.doesNotMatch(JSON.stringify(response.body), /ownerMemberId|tagId|hash|steal\(|onerror|javascript:|<style>/);
+  assert.equal(globalDS.find('blog_public_posts', {}, { limit: 200 }).length, 1);
+  assert.equal((await site(anon, 'bogus-post')).status, 404);
+  assert.equal((await put(handleBlog, bob, 'publishPost', { id: post.id, slug: 'another-entry' })).status, 404);
+  const theirs = (await put(handleBlog, bob, 'createPost', { title: 'Theirs' })).body.post;
+  assert.equal((await put(handleBlog, bob, 'publishPost', { id: theirs.id, slug: 'private-entry' })).status, 409);
+  assert.equal((await site(bob, 'private-entry')).status, 200); // public to every visitor
+  assert.equal((await json(handleBlog, bob)).body.data.posts[0].html, '');
+});
+
+test('Blog unpublish, republish, change link, delete, and cross-member claims', async () => {
+  const { member, anon, put, site } = fixture();
+  const alice = member('alice'), bob = member('bob');
+  const post = (await put(handleBlog, alice, 'createPost', { title: 'First' })).body.post;
+  const other = (await put(handleBlog, bob, 'createPost', { title: 'Second' })).body.post;
+  assert.equal((await put(handleBlog, alice, 'publishPost', { id: post.id, slug: 'first-link' })).status, 200);
+  assert.equal((await put(handleBlog, alice, 'publishPost', { id: post.id, slug: 'new-link' })).status, 409);
+  assert.equal((await put(handleBlog, alice, 'unpublishPost', { id: post.id })).status, 200);
+  assert.equal((await site(anon, 'first-link')).status, 404);
+  assert.equal((await put(handleBlog, bob, 'publishPost', { id: other.id, slug: 'first-link' })).status, 409);
+  assert.equal((await put(handleBlog, alice, 'publishPost', { id: post.id, slug: 'new-link' })).status, 200);
+  assert.equal((await site(anon, 'first-link')).status, 404);
+  assert.equal((await site(anon, 'new-link')).status, 200);
+  assert.equal((await put(handleBlog, bob, 'publishPost', { id: other.id, slug: 'first-link' })).status, 200);
+  assert.equal((await put(handleBlog, bob, 'deletePost', { id: post.id })).status, 404);
+  assert.equal((await put(handleBlog, alice, 'deletePost', { id: post.id })).status, 200);
+  assert.equal((await site(anon, 'new-link')).status, 404);
+  assert.equal((await put(handleBlog, bob, 'publishPost', { id: other.id, slug: 'new-link' })).status, 409); // must unpublish before moving
+  assert.equal((await put(handleBlog, bob, 'unpublishPost', { id: other.id })).status, 200);
+  assert.equal((await put(handleBlog, bob, 'publishPost', { id: other.id, slug: 'new-link' })).status, 200);
+});
+
+test('Blog integrates with workspace, title/setting changes, tag cascade, and reload-safe routes', async () => {
+  const { member, anon, put, site, json, call } = fixture();
+  const alice = member('alice'), bob = member('bob');
+  const tag = (await put(handleWorkspace, alice, 'createTag', { name: 'Thoughts' })).body.data.tags[0];
+  const workspace = (await put(handleWorkspace, alice, 'createPost', { tagId: tag.id })).body.data;
+  const post = workspace.posts[0];
+  assert.equal(post.tagId, tag.id);
+  assert.equal((await put(handleWorkspace, alice, 'recordOpen', { app: 'blog', fileId: post.id })).body.data.settings.lastOpened[post.id] !== undefined, true);
+  assert.equal((await put(handleWorkspace, bob, 'renameFile', { app: 'blog', fileId: post.id, name: 'Stolen' })).status, 404);
+  assert.equal((await put(handleWorkspace, alice, 'renameFile', { app: 'blog', fileId: post.id, name: 'My Thoughts' })).body.data.posts[0].slug, 'my-thoughts');
+  assert.equal((await put(handleBlog, alice, 'publishPost', { id: post.id, slug: 'my-thoughts' })).status, 200);
+  assert.equal((await put(handleWorkspace, alice, 'renameFile', { app: 'blog', fileId: post.id, name: 'Renamed' })).status, 200);
+  assert.equal((await site(anon, 'my-thoughts')).body.post.title, 'Renamed');
+  assert.equal((await put(handleBlog, alice, 'updateBlogSettings', { title: 'Little Garden', description: 'Shared stories' })).status, 200);
+  assert.equal((await site(anon, 'my-thoughts')).body.blog.title, 'Little Garden');
+  assert.equal((await json(handleWorkspace, bob)).body.data.posts.length, 0);
+  assert.equal(publicArticle(anon, 'my-thoughts')?.post.title, 'Renamed');
+  assert.equal(publicArticle(anon, 'unpublished-entry'), null);
+  const deletedTag = await put(handleWorkspace, alice, 'deleteTag', { tagId: tag.id });
+  assert.equal(deletedTag.body.data.posts.length, 0);
+  assert.equal((await site(anon, 'my-thoughts')).status, 404);
+  assert.equal((await put(handleWorkspace, bob, 'createPost', { tagId: tag.id })).body.data.posts[0].tagId, null);
+  const next = (await put(handleWorkspace, alice, 'createPost', {})).body.data.posts[0];
+  assert.equal((await put(handleBlog, alice, 'publishPost', { id: next.id, slug: 'second-thoughts' })).status, 200);
+  assert.equal((await put(handleWorkspace, bob, 'deleteFile', { app: 'blog', fileId: next.id })).status, 404);
+  assert.equal((await put(handleWorkspace, alice, 'deleteFile', { app: 'blog', fileId: next.id })).status, 200);
+  assert.equal((await site(anon, 'second-thoughts')).status, 404);
+});
+
+test('Blog package keeps manager/reader UI with local Quill and no access-key controls', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'holm-blog-test-'));
+  try {
+    execFileSync('node', ['scripts/build-holm-landing.mjs', dir], { cwd: process.cwd(), timeout: 120_000, stdio: 'pipe' });
+    const editor = readFileSync(join(dir, 'web/blog/index.html'), 'utf8');
+    assert.match(editor, /Quill|vendor-quill\.js/);
+    assert.match(editor, /publishPostModal|postTitleInput|href="\/account"/);
+    assert.doesNotMatch(editor, /View My Key|Your Access Key|Delete Account|cdn\.jsdelivr\.net\/npm\/quill/);
+    assert.match(readFileSync(join(dir, 'web/blog-public.html'), 'utf8'), /id="postBody"/);
+    assert.match(readFileSync(join(dir, 'web/js/workdeck.js'), 'utf8'), /'filebox', 'blog'/);
+    assert.match(readFileSync(join(dir, 'web/blog/js/app.js'), 'utf8'), /searchParams\.set\('post', postId\)/);
+    assert.match(readFileSync(join(dir, 'api/main.js'), 'utf8'), /publicArticle\(env, slug\)/);
+    assert.match(readFileSync(join(dir, 'web/js/wd-links.js'), 'utf8'), /blog: 'post'/);
+    assert.equal(readFileSync(join(dir, 'api/blog.js'), 'utf8').includes('ownerMemberId'), true);
+    const { member, anon, call, put } = fixture();
+    const alice = member('alice');
+    const main = (await import(pathToFileURL(join(dir, 'api/main.js')).href)).default;
+    const draft = (await put(handleBlog, alice, 'createPost', { title: 'Live reader' })).body.post;
+    const root = '/live-reader';
+    assert.equal((await call(main.fetch.bind(main), anon, 'GET', undefined, root)).status, 404);
+    assert.equal((await put(handleBlog, alice, 'publishPost', { id: draft.id, slug: 'live-reader' })).status, 200);
+    const shell = await call(main.fetch.bind(main), anon, 'GET', undefined, root);
+    assert.equal(shell.status, 200);
+    assert.equal(await shell.text(), 'shell:/blog-public');
+    assert.equal((await put(handleBlog, alice, 'unpublishPost', { id: draft.id })).status, 200);
+    assert.equal((await call(main.fetch.bind(main), anon, 'GET', undefined, root)).status, 404);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

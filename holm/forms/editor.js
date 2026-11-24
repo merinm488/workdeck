@@ -1,0 +1,1773 @@
+/**
+ * ================================================
+ * FORMS - Editor Application (editor.html)
+ * ================================================
+ * Coordinates everything on the form editor page:
+ *   - session check
+ *   - loading the form record and rendering the form-js EDITOR
+ *   - save (manual Ctrl+S + auto-save) via FormsStorage
+ *   - rename by clicking the title
+ *   - settings dropdown: Theme / View My Key / Share / Delete Account / Logout
+ *
+ *
+ * =====================================================
+ * FORM-JS QUICK REFERENCE (the only library APIs you need)
+ * =====================================================
+ *   FormEditor.createFormEditor(options) -> Promise<editorInstance>
+ *       options : { container: DOM node (e.g. #builder),
+ *                   schema: { type: 'default', components: [ ... ] } }
+ *                 (also accepts palettes/keyboard, but the defaults are fine)
+ *
+ *   editorInstance.saveSchema()      -> CURRENT schema incl. edits:
+ *                                       { type: 'default', components: [...] }
+ *                                       (+ id/schemaVersion/exporter metadata)
+ *   editorInstance.on('changed', cb) -> fires whenever the user edits the form
+ *   editorInstance.destroy()         -> free the DOM when leaving the page
+ *
+ *   Tap-to-add: the palette supports DRAG (desktop) and Enter (keyboard)
+ *   only, so on touch devices we bind click ourselves and call the same
+ *   modeling.addFormField() the Enter path uses. See initBuilder().
+ *
+ *   (For the shared/public side you'll use FormViewer.createForm —
+ *    see js/shared.js.)
+ * =====================================================
+ */
+
+/**
+ * Every field type the form-js palette offers (verified against the
+ * @bpmn-io/form-js 1.25.0 bundle). Used to detect records saved with the
+ * old form.io schema so they can be reset instead of crashing the builder.
+ */
+const FORMJS_FIELD_TYPES = new Set([
+    // Input
+    'textfield', 'textarea', 'number', 'datetime', 'filepicker', 'expression',
+    // Selection
+    'checkbox', 'checklist', 'radio', 'select', 'taglist',
+    // Presentation
+    'text', 'image', 'table', 'html', 'documentPreview', 'spacer', 'separator',
+    // Containers
+    'group', 'dynamiclist', 'iframe',
+    // Action
+    'button'
+]);
+
+class FormsEditorApp {
+    constructor() {
+        this.isInitialized = false;
+        this.formId = null;          // from ?id=...
+        this.formRecord = null;      // { id, name, components, sharedId, ... }
+        this.builderInstance = null; // form-js editor handle
+        this.hasUnsavedChanges = false;
+        // Rename reminder: dismissed once per form (either button)
+        this.renamePromptDismissed = false;
+        this.autoSaveInterval = null;
+        this.titleElementReplaced = false;
+        // The Responses view (js/responses.js). Created during init once the
+        // form id is known; null until then.
+        this.responsesView = null;
+        // Which tab is open: 'questions' | 'responses'
+        this.activeTab = 'questions';
+        // Status footer: response count 
+        this.responseCount = 0;
+    }
+
+    // ================================================
+    // Tabs (Questions / Responses)
+    // ================================================
+
+    /**
+     * Swap between the builder tab and the Responses summary tab.
+     * @param {'questions'|'responses'} tabName
+     */
+    async switchTab(tabName) {
+        if (this.activeTab === tabName) return;
+        this.activeTab = tabName;
+
+        const tabQuestions = document.getElementById('tabQuestions');
+        const tabResponses = document.getElementById('tabResponses');
+        if (tabQuestions) {
+            tabQuestions.classList.toggle('active', this.activeTab === 'questions');
+            tabQuestions.setAttribute('aria-selected',
+                this.activeTab === 'questions' ? 'true' : 'false');
+        }
+        if (tabResponses) {
+            tabResponses.classList.toggle('active', this.activeTab === 'responses');
+            tabResponses.setAttribute('aria-selected',
+                this.activeTab === 'responses' ? 'true' : 'false');
+        }
+
+        const builderTabPanel = document.getElementById('builderTabPanel');
+        const responsesTabPanel = document.getElementById('responsesTabPanel');
+        if (builderTabPanel) {
+            builderTabPanel.classList.toggle('hidden', this.activeTab !== 'questions');
+        }
+        if (responsesTabPanel) {
+            responsesTabPanel.classList.toggle('hidden', this.activeTab !== 'responses');
+        }
+        if (tabName === 'responses' && this.responsesView) {
+            await this.responsesView.load(this.formId);
+        }
+    }
+
+    // ================================================
+    // Initialization
+    // ================================================
+
+    /**
+
+     * @returns {Promise<boolean>} success
+     */
+    async init() {
+        try {
+            // Holm session supplies the suite theme before the editor paints.
+            if (!(await formsAuth.verifySession())) {
+                location.assign('/auth/login?redirect=' + encodeURIComponent(location.pathname + location.search));
+                return false;
+            }
+            formsThemeManager.init();
+
+            // 3. Which form did Workdeck ask us to open?
+            this.formId = this.parseURL('id');
+            if (!this.formId) {
+                goToWorkdeck();
+                return false;
+            }
+
+            // 4. Wire every button before anything slow happens
+            this.setupEventListeners();
+            this.updateThemeIndicator();   // label + active mark reflect the saved theme
+
+            // 5-6. Load the record (or seed a default one on first open)
+            this.showLoading();
+            const form = await formsStorage.getForm(this.formId);
+            if (!form) {
+                this.hideLoading();
+                this.showError('Form not found. Please create one from Forms home.');
+                return false;
+            }
+            this.formRecord = form;
+
+            if (this.parseURL('fill') === '1') {
+                const shared = await formsStorage.shareForm(this.formId);
+                if (shared && shared.shareId) {
+                    window.location.replace('/forms/shared.html?shared=' + encodeURIComponent(shared.shareId));
+                    return true;
+                }
+                this.showNotification('Could not open the fill view — share the form first', 'error');
+            }
+
+            // Address bar shows the canonical hard link (/forms/<id>).
+            if (window.WDLinks) {
+                window.history.replaceState(null, '', '/forms/editor.html?id=' + encodeURIComponent(this.formId));
+            }
+
+            // 7. Show the saved name in nav + browser tab
+            this.updateFormTitle(this.formRecord.name);
+
+            // 7a. Status footer: responses arrive async.
+            this.updateFormsFooter();
+            formsStorage.getResponses(this.formId)
+                .then(result => this.updateResponseCount(result && result.responses ? result.responses.length : 0))
+                .catch(() => { /* footer stays at 0 responses */ });
+
+            // 7b. Responses view — create the handle now (it reads
+            //     this.formId when its tab is opened).
+            this.responsesView = new FormsResponsesView();
+
+            // 8. Build the drag-and-drop editor
+            await this.initBuilder();
+
+            // 9. Periodic background save
+            if (APP_CONFIG.autoSave.enabled) {
+                this.setupAutoSave();
+            }
+
+            // 10. Ready. ?id= stays in the address bar on purpose: a refresh
+            //     then reloads THIS form in THIS tab. (Stripping it made the
+            //     auth guard treat every refresh as "no form requested" and
+            //     bounce the tab to Workdeck, where re-opening the form
+            //     spawned yet another tab.)
+            this.hideLoading();
+
+            // 11.
+            this.isInitialized = true;
+            return true;
+        } catch (error) {
+            console.error('[FORMS EDITOR] Init error:', error);
+            this.showError('Failed to initialize application');
+            return false;
+        }
+    }
+
+  
+    createDefaultFormRecord(id) {
+        return {
+            id: id,
+            name: 'Untitled Form',
+            // form-js does NOT add a submit button automatically — seed one so a fresh form is submittable as-is.
+            // Last, so fields added by the owner land above it. The owner
+            // can relabel or delete it in the builder.
+            components: [
+                { type: 'button', label: 'Submit', action: 'submit' }
+            ],
+            sharedId: null
+        };
+    }
+
+    /**
+     * The public page can only submit via a button field, and form-js has
+     * no form-level submit control — if the owner deleted every button the
+     * share link would collect nothing. ensureSubmitButton() re-adds one
+     * when the schema has none; the builder's own saveSchema() output keeps
+     * everything else intact.
+     * @param {Array} components - schema components (mutated in place)
+     */
+    ensureSubmitButton(components) {
+        const hasButton = components.some(c => c && c.type === 'button');
+        if (!hasButton) {
+            components.push({ type: 'button', label: 'Submit', action: 'submit' });
+        }
+    }
+
+    // ================================================
+    // Builder (form-js)
+    // ================================================
+
+    /**
+     * Create the drag-and-drop builder inside #builder.
+     * The 'changed' hook is what drives auto-save.
+     *
+     * Tap-to-add: form-js only wires its palette to DRAG (and to Enter for
+     * keyboard users — same API), so on touch devices there is no way to
+     * add a field. We bind click/tap ourselves and call the same
+     * modeling.addFormField() the Enter path uses, reading data-field-type
+     * off the palette button. 
+     */
+    async initBuilder() {
+        if (typeof FormEditor === 'undefined') {
+            this.showError('Form library failed to load. Please refresh.');
+            return;
+        }
+
+        // Stored records keep { name, components }; the builder wants the
+        // schema root { type: 'default', components }. Legacy records saved
+        // before form-js (form.io shapes) don't import cleanly — start the
+        // owner on the seeded default rather than crashing the builder.
+        let components = this.formRecord.components || [];
+        const isLegacy = components.some(c => c.type && !FORMJS_FIELD_TYPES.has(c.type));
+        if (isLegacy) {
+            components = [];
+            this.showNotification('Form rebuilt for the new editor — please re-add its fields', 'info');
+        }
+        const schema = {
+            type: 'default',
+            components
+        };
+
+        const element = document.getElementById('builder');
+        this.builderInstance = await FormEditor.createFormEditor({
+            container: element,
+            schema: schema
+        });
+        this.builderInstance.on('changed', () => {
+            this.markAsChanged();
+            this.updateFormsFooter();
+        });
+
+        // Mobile/narrow properties drawer: selecting a field slides the
+        // properties panel in from the right (CSS on
+        // #builderTabPanel.properties-open); deselecting closes it. On
+        // wide screens the panel is a static third pane and the class
+        // is harmless.
+        this.builderInstance.on('selection.changed', (event) => {
+            document.getElementById('builderTabPanel')?.classList
+                .toggle('properties-open', !!event?.selection);
+        });
+
+        // Tap-to-add (see docstring above). Delegated on #builder — the
+        // container form-js renders INTO, never replaces — so the handler
+        // survives palette redraws. Scoped to palette entry buttons; canvas
+        // rows carry the same class family but sit outside .fjs-palette.
+        // addFormField goes through the command stack, so undo/redo and the
+        // 'changed' event fire exactly like a drag-drop add does, keeping
+        // dirty tracking and auto-save working. On phones the palette is a
+        // drawer (see setupPaletteDrawer), so a tap also closes it.
+        element.addEventListener('click', (e) => {
+            if (!this.builderInstance) return;
+            const paletteBtn = e.target.closest('.fjs-palette .fjs-palette-field');
+            if (!paletteBtn) return;
+            e.preventDefault();
+            this.addPaletteField(paletteBtn.dataset.fieldType);
+        });
+
+        this.setupPaletteDrawer();
+
+        // Keep the caret in properties-panel inputs when form-js's canvas
+        // re-render steals focus mid-typing (see setupFocusPreservation).
+        this.setupFocusPreservation();
+
+        // "@" typing in properties-panel fields (see setupMentionTyping).
+        this.setupMentionTyping();
+
+        // On touchscreens dragula (form-js's DnD engine) starts a drag on
+        // the first few pixels of movement, so every scroll swipe across
+        // the canvas grabbed a field. Gate it behind a long press.
+        this.setupTouchDragGate();
+    }
+
+    /**
+     * Add a field of the given type (tap-to-add + the palette drawer's
+     * entry point).
+     * @param {string} type - form-js field type, e.g. 'textfield'
+     */
+    addPaletteField(type) {
+        if (!this.builderInstance || !type) return;
+        const modeling = this.builderInstance.get('modeling');
+        const { schema: current } = this.builderInstance._getState();
+        const comps = current.components || [];
+        let index = comps.length;
+        if (comps.length > 0 && comps[comps.length - 1].type === 'button') {
+            index -= 1;
+        }
+        modeling.addFormField({ type }, current, index);
+        this.closePaletteDrawer();
+    }
+
+    // ================================================
+    // File references (@Link)
+    // ================================================
+
+    /** Cross-app file picker anchored to the toolbar button. */
+    openMentionPicker(anchorEl) {
+        if (!window.WDMentions) {
+            this.showNotification('File links unavailable (libraries failed to load)', 'error');
+            return;
+        }
+        WDMentions.open({
+            anchor: anchorEl.getBoundingClientRect(),
+            excludeIds: this.formId ? [this.formId] : [],
+            onPick: (entry) => this.insertReferenceComponent(entry)
+        });
+    }
+
+    /**
+     * "Insert reference": adds a text component whose content links to the
+     * picked file. form-js text components render a small HTML/markdown
+     * subset, so [@Name](/sheets/<id>) shows as a clickable link in the
+     * preview pane and on the public fill page (the builder canvas keeps
+     * it inert, like every other control there).
+     */
+    insertReferenceComponent(entry) {
+        if (!this.builderInstance) return;
+        const modeling = this.builderInstance.get('modeling');
+        const { schema: current } = this.builderInstance._getState();
+        const comps = current.components || [];
+        let index = comps.length;
+        if (comps.length > 0 && comps[comps.length - 1].type === 'button') {
+            index -= 1;
+        }
+
+        const beforeIds = comps.map(c => c && c.id);
+        modeling.addFormField({ type: 'text' }, current, index);
+
+        const { schema: updated } = this.builderInstance._getState();
+        const added = (updated.components || []).find(
+            c => c && c.type === 'text' && !beforeIds.includes(c.id)
+        );
+        if (added && typeof modeling.editFormField === 'function') {
+            modeling.editFormField(added, 'text',
+                WDMentions.mentionMarkdown(entry.app, entry.id, entry.name));
+        }
+        this.markAsChanged();
+    }
+
+
+    setupMentionTyping() {
+        if (!window.WDMentions || this.mentionSession) return;
+        const ALLOWED_LABELS = new Set([
+            'text', 'label', 'description', 'prefix', 'suffix',
+            'html', 'placeholder', 'title', 'alt text', 'image source'
+        ]);
+        this._mentionHost = null;
+
+        const session = WDMentions.createMentionSession({
+            isActive: () => !!this._mentionHost,
+            getText: () => this._mentionHost ? this.editableTextAndCaret(this._mentionHost).text : '',
+            getCaret: () => this._mentionHost ? this.editableTextAndCaret(this._mentionHost).caret : null,
+            getAnchor: () => {
+                const sel = window.getSelection();
+                if (!sel || !sel.rangeCount) return null;
+                const rect = sel.getRangeAt(0).getBoundingClientRect();
+                if (!rect || (!rect.width && !rect.height)) {
+                    return this._mentionHost ? this._mentionHost.getBoundingClientRect() : null;
+                }
+                return rect;
+            },
+            excludeIds: () => this.formId ? [this.formId] : [],
+            onPick: (entry, range) => this.insertEditableMention(entry, range)
+        });
+        this.mentionSession = session;
+
+        const hostOf = (e) => {
+            const el = e.target;
+            if (!(el instanceof HTMLElement) || (el.closest && el.closest('.wdm-pop'))) return null;
+            if (el instanceof HTMLTextAreaElement) return el;
+            if (el instanceof HTMLInputElement) {
+                return el.type === 'text' && el.closest('.fjs-properties-panel') ? el : null;
+            }
+            if (el.isContentEditable && el.closest('.fjs-properties-panel')) {
+                const field = el.closest('.bio-properties-panel-entry');
+                const label = field ? field.querySelector('.bio-properties-panel-label') : null;
+                return label && ALLOWED_LABELS.has(label.textContent.trim().toLowerCase()) ? el : null;
+            }
+            return null;
+        };
+
+        this.mentionKeydown = (e) => { if (hostOf(e)) session.keydown(e); };
+        this.mentionSync = (e) => {
+            const host = hostOf(e);
+            if (!host) return;
+            this._mentionHost = host;
+            session.sync();
+        };
+        this.mentionFocus = (e) => {
+            const host = hostOf(e);
+            this._mentionHost = host || null;
+        };
+
+        document.addEventListener('keydown', this.mentionKeydown, true);
+        document.addEventListener('input', this.mentionSync, true);
+        document.addEventListener('keyup', this.mentionSync, true);
+        document.addEventListener('focusin', this.mentionFocus, true);
+    }
+
+    editableTextAndCaret(el) {
+        if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+            return { text: el.value, caret: typeof el.selectionStart === 'number' ? el.selectionStart : null };
+        }
+        const sel = window.getSelection();
+        const anchorNode = sel && sel.rangeCount ? sel.anchorNode : null;
+        const anchorOffset = sel ? sel.anchorOffset : 0;
+        let text = '';
+        let caret = null;
+        const walk = (line, separator) => {
+            text += separator;
+            const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+            let n;
+            while ((n = w.nextNode())) {
+                if (caret == null && n === anchorNode) caret = text.length + anchorOffset;
+                text += n.textContent;
+            }
+        };
+        const lines = el.querySelectorAll('.cm-line');
+        if (lines.length) {
+            lines.forEach((line, i) => walk(line, i ? '\n' : ''));
+        } else {
+            walk(el, '');
+        }
+        return { text: text, caret: caret };
+    }
+
+    /** DOM position (text node + offset) of a joined-text offset. */
+    locateOffset(el, target) {
+        const lines = el.querySelectorAll('.cm-line');
+        let pos = 0;
+        const advance = (line) => {
+            const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+            let n;
+            while ((n = w.nextNode())) {
+                const len = n.textContent.length;
+                if (pos + len >= target) return { node: n, offset: target - pos };
+                pos += len;
+            }
+            return null;
+        };
+        if (lines.length) {
+            for (let i = 0; i < lines.length; i++) {
+                if (i > 0) {
+                    if (pos === target) pos += 1;   // the stitched newline
+                    else pos += 1;
+                }
+                const hit = advance(lines[i]);
+                if (hit) return hit;
+            }
+        } else {
+            return advance(el);
+        }
+        return null;
+    }
+
+    /** Splice the markdown mention into the field the picker came from. */
+    insertEditableMention(entry, range) {
+        const el = this._mentionHost;
+        if (!el || !window.WDMentions) return;
+        const markdown = WDMentions.mentionMarkdown(entry.app, entry.id, entry.name);
+
+        if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+            // The user may have kept typing since the last sync — re-derive.
+            const hit = WDMentions.mentionAt(el.value, el.selectionStart) || range;
+            if (typeof el.setRangeText === 'function') {
+                el.setRangeText(markdown, hit.from, hit.to, 'end');
+            } else {
+                el.value = el.value.slice(0, hit.from) + markdown + el.value.slice(hit.to);
+            }
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.focus();
+            return;
+        }
+
+        const { text, caret } = this.editableTextAndCaret(el);
+        const hit = WDMentions.mentionAt(text, caret) || range;
+        const start = this.locateOffset(el, hit.from);
+        const end = this.locateOffset(el, hit.to);
+        const sel = window.getSelection();
+        if (!start || !end || !sel) return;
+        const rg = document.createRange();
+        rg.setStart(start.node, start.offset);
+        rg.setEnd(end.node, end.offset);
+        sel.removeAllRanges();
+        sel.addRange(rg);
+        document.execCommand('insertText', false, markdown);
+    }
+
+    /**
+     * Phone-only palette drawer: the FAB opens it, the backdrop closes it.
+     * On desktop both controls are display:none (CSS) and drag just works.
+     */
+    setupPaletteDrawer() {
+        const builderPanel = document.getElementById('builderTabPanel');
+        const addBtn = document.getElementById('builderAddBtn');
+        const backdrop = document.getElementById('builderBackdrop');
+        if (!builderPanel || !addBtn || !backdrop) return;
+
+        addBtn.addEventListener('click', () => {
+            builderPanel.classList.toggle('palette-open');
+        });
+        backdrop.addEventListener('click', () => {
+            this.closePaletteDrawer();
+            this.closePropertiesDrawer();
+        });
+    }
+
+    closePaletteDrawer() {
+        document.getElementById('builderTabPanel')?.classList.remove('palette-open');
+    }
+
+    /** Slide the properties drawer back out (mobile/narrow layouts). */
+    closePropertiesDrawer() {
+        document.getElementById('builderTabPanel')?.classList.remove('properties-open');
+    }
+
+    /**
+     * Long-press gate for the builder's touch drag-and-drop.
+     */
+    setupTouchDragGate() {
+        const isTouchDevice = window.matchMedia('(pointer: coarse)').matches ||
+            navigator.maxTouchPoints > 0;
+        if (!isTouchDevice) return;
+
+        const builder = document.getElementById('builder');
+        if (!builder) return;
+
+        const LONG_PRESS_MS = 400;      // hold still this long to arm a drag
+        const SCROLL_THRESHOLD_PX = 10; // movement before the timer = scroll
+        const JITTER_PX = 6;            // sensor drift allowed while holding
+
+        const GRABBABLE = '.fjs-drag-move, .fjs-drag-copy, .fjs-drag-row-move';
+        // Native behavior wins over arming a drag.
+        const NOT_ARMABLE = 'input, textarea, select, button, a, [contenteditable="true"], .fjs-no-move';
+        // dragula refuses to grab drop containers themselves — a press
+        // starting directly on one must keep scrolling.
+        const CONTAINER_CLASSES = [
+            'fjs-drag-container', 'fjs-drop-container-vertical', 'fjs-drop-container-horizontal'
+        ];
+        let press = null;
+
+        const disarmClass = () => {
+            builder.querySelectorAll('.touch-drag-armed').forEach(el =>
+                el.classList.remove('touch-drag-armed'));
+        };
+
+        const endPress = () => {
+            if (press) clearTimeout(press.timer);
+            press = null;
+            disarmClass();
+        };
+
+        document.addEventListener('pointerdown', (e) => {
+            if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+            if (!e.isPrimary || !builder.contains(e.target)) return;
+            const target = e.target;
+            if (CONTAINER_CLASSES.some(cls => target.classList.contains(cls))) return;
+            if (target.closest(NOT_ARMABLE)) return;
+            const grabbable = target.closest(GRABBABLE);
+            if (!grabbable) return;
+
+            endPress();
+            press = {
+                x: e.clientX,
+                y: e.clientY,
+                lastX: e.clientX,
+                lastY: e.clientY,
+                state: 'pending',
+                el: grabbable
+            };
+            press.timer = setTimeout(() => {
+                if (!press || press.state !== 'pending') return;
+                // A finger that drifted while "holding" was a slow scroll,
+                // not a long press. Pure sensor jitter still arms.
+                const drifted =
+                    Math.hypot(press.lastX - press.x, press.lastY - press.y) > JITTER_PX;
+                press.state = drifted ? 'scrolling' : 'armed';
+                if (press.state === 'armed') {
+                    press.el.classList.add('touch-drag-armed');
+                    navigator.vibrate?.(30); // no-op on iOS
+                }
+            }, LONG_PRESS_MS);
+        }, true);
+
+        // Registered on `document`, which precedes dragula's
+        // documentElement listener in the capture phase.
+        document.addEventListener('pointermove', (e) => {
+            if (!press || (e.pointerType !== 'touch' && e.pointerType !== 'pen')) return;
+            if (press.state === 'armed') return; // real drag — let it through
+
+            press.lastX = e.clientX;
+            press.lastY = e.clientY;
+            if (press.state === 'pending') {
+                const dx = e.clientX - press.x;
+                const dy = e.clientY - press.y;
+                if (dx * dx + dy * dy > SCROLL_THRESHOLD_PX * SCROLL_THRESHOLD_PX) {
+                    clearTimeout(press.timer);
+                    press.state = 'scrolling';
+                }
+            }
+            // Pending or scrolling: dragula must not see these moves.
+            e.stopPropagation();
+        }, true);
+
+        document.addEventListener('touchmove', (e) => {
+            if (press && press.state === 'armed') e.preventDefault();
+        }, { passive: false });
+
+        // Android fires contextmenu on long-press; it would interrupt an
+        // armed drag or an about-to-arm hold.
+        document.addEventListener('contextmenu', (e) => {
+            if (press && builder.contains(e.target)) e.preventDefault();
+        });
+
+        document.addEventListener('pointerup', endPress, true);
+        document.addEventListener('pointercancel', endPress, true);
+    }
+
+
+    setupFocusPreservation() {
+        const builderElement = document.getElementById('builder');
+        let snapshot = null;   // { el, caret } — where the user was typing
+        let restoreTimer = null;
+
+        const isTextEntry = (el) =>
+            el instanceof HTMLElement &&
+            (el.isContentEditable ||
+             el instanceof HTMLInputElement ||
+             el instanceof HTMLTextAreaElement);
+
+        const captureCaret = (active) => {
+            if (active instanceof HTMLInputElement ||
+                active instanceof HTMLTextAreaElement) {
+                return { kind: 'text', start: active.selectionStart, end: active.selectionEnd };
+            }
+            // Contenteditable entries (label/description use a CodeMirror
+            // editor): the DOM selection is the caret.
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount && active.contains(sel.anchorNode)) {
+                return { kind: 'dom', range: sel.getRangeAt(0).cloneRange() };
+            }
+            return { kind: 'end' };
+        };
+
+        const placeCaretAtEnd = (el) => {
+            const sel = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        };
+
+        const restore = () => {
+            restoreTimer = null;
+            if (!snapshot) return;
+            const { el, caret } = snapshot;
+            snapshot = null;
+
+            // Panel entry ids are stable, so the same input is found even
+            // if a re-render did replace the node (it usually does not).
+            const target = el.isConnected ? el
+                : (el.id ? document.getElementById(el.id) : null);
+            if (!target) return;
+
+            // Only step in when form-js actually stole focus — never when
+            // the user deliberately clicked somewhere else in the meantime.
+            const now = document.activeElement;
+            const stolen = now === document.body ||
+                (now instanceof Element && now.classList.contains('fjs-editor-selected'));
+            if (!stolen) return;
+
+            target.focus();
+
+            if (caret.kind === 'text') {
+                // Plain input: ?? (not ||) so a caret at position 0 counts.
+                try {
+                    const end = caret.end ?? target.value.length;
+                    target.setSelectionRange(caret.start ?? end, end);
+                } catch {
+                    // Some input types (e.g. number) have no selection API.
+                }
+            } else if (caret.kind === 'dom' && caret.range.startContainer.isConnected) {
+                try {
+                    const range = document.createRange();
+                    range.setStart(caret.range.startContainer, caret.range.startOffset);
+                    range.setEnd(caret.range.endContainer, caret.range.endOffset);
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                } catch {
+                    placeCaretAtEnd(target);
+                }
+            } else {
+                placeCaretAtEnd(target);
+            }
+        };
+
+        this.builderInstance.on('changed', () => {
+            const panel = builderElement.querySelector('.bio-properties-panel');
+            const active = document.activeElement;
+            if (panel && active && panel.contains(active) && isTextEntry(active)) {
+                snapshot = { el: active, caret: captureCaret(active) };
+                if (restoreTimer) clearTimeout(restoreTimer);
+                // The library's re-render + focus steal land in the next
+                // microtask flush, so a macrotask is safely after them.
+                restoreTimer = setTimeout(restore, 0);
+            }
+        });
+    }
+
+    /**
+     * Snapshot the builder's current schema for saving.
+     * @returns {object|null} formData for formsStorage.saveForm()
+     */
+    getBuilderSchema() {
+        if(!this.builderInstance) return null;
+        const schema = this.builderInstance.saveSchema();
+        const components = schema.components || [];
+        this.ensureSubmitButton(components);
+        return {
+            name: (this.formRecord && this.formRecord.name) || this.currentTitle(),
+            components
+        };
+    }
+
+    // ================================================
+    // Saving
+    // ================================================
+
+    /**
+     * On explicit saves, if the form has never been named, show a rename
+     * reminder first (Rename = name it then save; Later = save as
+     * 'Untitled Form'). Auto-save bypasses the reminder.
+     *
+     * @param {object} [options] - { explicit: true } default; autosave passes false
+     * @returns {Promise<boolean>}
+     */
+    async save(options = {}) {
+        const { explicit = true } = options;
+
+        // Rename reminder: only on user-initiated saves, only while the
+        // name is still the default, and only until dismissed once.
+        if (explicit && !this.renamePromptDismissed && this.isUntitledForm()) {
+            this.openRenamePrompt();
+            return false; // Actual save happens after Rename/Later is chosen
+        }
+
+        const formData = this.getBuilderSchema();
+        if(!formData) {
+            this.showError('Nothing to save');
+            return false;
+        }
+        const ok = await formsStorage.saveForm(this.formId,formData);
+        if(!ok){
+            this.showError('Failed to save form');
+            return false;
+        }
+        else {
+            this.hasUnsavedChanges = false;
+            this.showNotification('Form Saved', 'success');
+            return true;
+        }
+    }
+
+    /**
+   
+     */
+    setupAutoSave() {
+        clearInterval(this.autoSaveInterval);
+       this.autoSaveInterval = setInterval(() => {
+        if(this.hasUnsavedChanges) {
+            this.save({explicit:false});
+        }
+       }, APP_CONFIG.autoSave.interval);
+    }
+
+    /** Mark dirty (called from the builder 'change' hook). */
+    markAsChanged() {
+        this.hasUnsavedChanges = true;
+    }
+
+    // ================================================
+    // Status footer
+    // ================================================
+
+    countQuestions() {
+        let components = null;
+        try {
+            if (this.builderInstance) {
+                const state = this.builderInstance._getState();
+                components = (state && state.schema && state.schema.components) || null;
+            }
+        } catch (err) { /* fall back to the saved record */ }
+        if (!components && this.formRecord) components = this.formRecord.components || [];
+        return (components || []).filter(c => c && c.type !== 'button').length;
+    }
+
+    updateFormsFooter() {
+        const el = document.getElementById('formsFooterStats');
+        if (!el) return;
+        const questions = this.countQuestions();
+        const responses = this.responseCount || 0;
+        el.textContent = questions + (questions === 1 ? ' question' : ' questions')
+            + ' · ' + responses + (responses === 1 ? ' response' : ' responses');
+    }
+
+    updateResponseCount(count) {
+        this.responseCount = count || 0;
+        this.updateFormsFooter();
+    }
+
+    // ================================================
+    // Rename reminder (untitled explicit saves)
+
+    // ================================================
+
+    /**
+
+     * @returns {boolean} True if the name is empty or a default untitled name
+     */
+    isUntitledForm() {
+        const currentName = (this.formRecord?.name || this.currentTitle() || '').trim().toLowerCase();
+        return !currentName || currentName === 'untitled' || currentName === 'untitled form';
+    }
+
+    /** Wire up rename reminder modal event handlers */
+    setupRenamePrompt() {
+        const confirmBtn = document.getElementById('renamePromptConfirm');
+        const laterBtn = document.getElementById('renamePromptLater');
+        const closeBtn = document.getElementById('renamePromptClose');
+        const modal = document.getElementById('renamePromptModal');
+        const input = document.getElementById('renamePromptInput');
+
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => this.closeRenamePrompt(true));
+        }
+        if (laterBtn) {
+            laterBtn.addEventListener('click', () => this.closeRenamePrompt(false));
+        }
+        // The X and backdrop count as "Later" - the save must still go through
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.closeRenamePrompt(false));
+        }
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closeRenamePrompt(false);
+                }
+            });
+        }
+        // Enter = Rename, Escape = Later
+        if (input) {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.closeRenamePrompt(true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    this.closeRenamePrompt(false);
+                }
+            });
+        }
+    }
+
+    /** Open the rename reminder modal */
+    openRenamePrompt() {
+        const modal = document.getElementById('renamePromptModal');
+        const input = document.getElementById('renamePromptInput');
+        if (!modal) {
+            // Modal missing (e.g. stale markup) - never block saving
+            this.renamePromptDismissed = true;
+            return;
+        }
+        if (input) input.value = '';
+        modal.classList.add('active');
+        setTimeout(() => input && input.focus(), 100);
+    }
+
+    /**
+     * Close the rename reminder modal
+     * @param {boolean} renamed - True if the user chose Rename with a name
+     */
+    closeRenamePrompt(renamed) {
+        const modal = document.getElementById('renamePromptModal');
+        if (modal) modal.classList.remove('active');
+
+        // Don't nag again for this form after either choice
+        this.renamePromptDismissed = true;
+
+        const input = document.getElementById('renamePromptInput');
+        const newName = (input ? input.value : '').trim();
+
+        const proceed = () => {
+            if (renamed && newName) {
+                // Apply the new name, then continue the interrupted save
+                this.formRecord.name = newName;
+                this.updateFormTitle(newName);
+            }
+            this.save({ explicit: false });
+        };
+
+        if (renamed && newName) {
+            // Input still visible for a frame - close first, then act
+            setTimeout(proceed, 50);
+        } else {
+            proceed();
+        }
+    }
+
+    // ================================================
+    // Title / rename
+    // ================================================
+
+    /**Read the title currently shown in the top nav. */
+    currentTitle() {
+        const el = document.getElementById('formTitle');
+        return el ? el.textContent.trim() : 'Untitled Form';
+    }
+
+    /** Set the title text in the top nav. */
+    updateFormTitle(name) {
+        const el = document.getElementById('formTitle');
+        if (el) el.textContent = name || 'Untitled Form';
+        document.title = (name || 'Untitled Form') + ' - Forms';
+    }
+
+    /**
+    
+     */
+    makeTitleEditable() {
+        const h1 = document.getElementById('formTitle');
+        if (!h1) return;
+
+        const currentTitle = this.currentTitle();
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-title-input';
+        input.value = currentTitle;
+
+        h1.parentNode.replaceChild(input, h1);
+        input.focus();
+        input.select();
+
+        // Commit on blur (Enter triggers blur). Escape cancels.
+        const commit = async () => {
+            const newName = input.value.trim() || 'Untitled Form';
+            if (newName !== currentTitle) {
+                this.formRecord.name = newName;
+                this.updateFormTitle(newName);
+                await formsStorage.saveForm(this.formId, this.getBuilderSchema());
+            }
+            this.restoreTitleDisplay(newName);
+        };
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                input.blur();
+            } else if (e.key === 'Escape') {
+                this.restoreTitleDisplay(currentTitle);
+            }
+        });
+
+        input.addEventListener('blur', commit);
+    }
+
+    /**
+     * Put the <h1> back after editing (called by makeTitleEditable's commit path).
+     * @param {string} title
+     */
+    restoreTitleDisplay(title) {
+        const input = document.querySelector('.form-title-input');
+        if (!input) return;
+
+        const h1 = document.createElement('h1');
+        h1.id = 'formTitle';
+        h1.className = 'form-title';
+        h1.title = 'Click to rename';
+        h1.textContent = title;
+
+        input.parentNode.replaceChild(h1, input);
+
+        h1.addEventListener('click', () => this.makeTitleEditable());
+    }
+
+    // ================================================
+    // Event listeners
+    // ================================================
+
+    /**
+     * Wire every interactive element once. One listener per element; the
+     * modal helpers below do the heavy lifting.
+     *
+ 
+     */
+    setupEventListeners() {
+        // --- Top nav ---
+        const homeBtn = document.getElementById('homeBtn');
+        if (homeBtn) {
+            homeBtn.addEventListener('click', () => {
+                window.location.href = '/forms/';
+            });
+        }
+
+        // --- Tabs: Questions / Responses ---
+        const tabQuestions = document.getElementById('tabQuestions');
+        const tabResponses = document.getElementById('tabResponses');
+        if (tabQuestions) {
+            tabQuestions.addEventListener('click', () => this.switchTab('questions'));
+        }
+        if (tabResponses) {
+            tabResponses.addEventListener('click', () => this.switchTab('responses'));
+        }
+
+        // --- Responses tab controls ---
+        const responsesRefreshBtn = document.getElementById('responsesRefreshBtn');
+        if (responsesRefreshBtn) {
+            responsesRefreshBtn.addEventListener('click', () => this.responsesView?.refresh());
+        }
+
+        const responsesDeleteAllBtn = document.getElementById('responsesDeleteAllBtn');
+        if (responsesDeleteAllBtn) {
+            responsesDeleteAllBtn.addEventListener('click', () => {
+                this.hideResponsesMoreMenu();
+                this.showClearResponsesModal();
+            });
+        }
+
+        // Summary / Individual sub-tabs
+        const responsesSubtabSummary = document.getElementById('responsesSubtabSummary');
+        if (responsesSubtabSummary) {
+            responsesSubtabSummary.addEventListener('click',
+                () => this.responsesView?.switchView('summary'));
+        }
+
+        const responsesSubtabIndividual = document.getElementById('responsesSubtabIndividual');
+        if (responsesSubtabIndividual) {
+            responsesSubtabIndividual.addEventListener('click',
+                () => this.responsesView?.switchView('individual'));
+        }
+
+        const responsesSubtabTable = document.getElementById('responsesSubtabTable');
+        if (responsesSubtabTable) {
+            responsesSubtabTable.addEventListener('click',
+                () => this.responsesView?.switchView('table'));
+        }
+
+        // Individual response navigation (‹ ›)
+        const individualPrevBtn = document.getElementById('individualPrevBtn');
+        if (individualPrevBtn) {
+            individualPrevBtn.addEventListener('click',
+                () => this.responsesView?.moveIndividual(-1));
+        }
+
+        const individualNextBtn = document.getElementById('individualNextBtn');
+        if (individualNextBtn) {
+            individualNextBtn.addEventListener('click',
+                () => this.responsesView?.moveIndividual(1));
+        }
+
+        // Link to Sheets: opens the spreadsheet when linked, the link
+        // modal when not.
+        const responsesSheetsBtn = document.getElementById('responsesSheetsBtn');
+        if (responsesSheetsBtn) {
+            responsesSheetsBtn.addEventListener('click', () => this.handleSheetsButtonClick());
+        }
+
+        // More menu (⋮)
+        const responsesMoreBtn = document.getElementById('responsesMoreBtn');
+        if (responsesMoreBtn) {
+            responsesMoreBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('responsesMoreMenu')?.classList.toggle('active');
+            });
+        }
+
+        const responsesCsvBtn = document.getElementById('responsesCsvBtn');
+        if (responsesCsvBtn) {
+            responsesCsvBtn.addEventListener('click', () => {
+                this.hideResponsesMoreMenu();
+                this.responsesView?.downloadCsv();
+            });
+        }
+
+        const responsesUnlinkItem = document.getElementById('responsesUnlinkBtn');
+        if (responsesUnlinkItem) {
+            responsesUnlinkItem.addEventListener('click', () => {
+                this.hideResponsesMoreMenu();
+                this.showUnlinkSheetModal();
+            });
+        }
+
+        // --- Link to Sheets modal ---
+        const linkSheetModalClose = document.getElementById('linkSheetModalClose');
+        if (linkSheetModalClose) {
+            linkSheetModalClose.addEventListener('click', () => this.hideLinkSheetModal());
+        }
+
+        const cancelLinkSheet = document.getElementById('cancelLinkSheet');
+        if (cancelLinkSheet) {
+            cancelLinkSheet.addEventListener('click', () => this.hideLinkSheetModal());
+        }
+
+        const confirmLinkSheet = document.getElementById('confirmLinkSheet');
+        if (confirmLinkSheet) {
+            confirmLinkSheet.addEventListener('click', () => this.confirmLinkSheet());
+        }
+
+        // --- Unlink from Sheets modal ---
+        const unlinkSheetModalClose = document.getElementById('unlinkSheetModalClose');
+        if (unlinkSheetModalClose) {
+            unlinkSheetModalClose.addEventListener('click', () => this.hideUnlinkSheetModal());
+        }
+
+        const cancelUnlinkSheet = document.getElementById('cancelUnlinkSheet');
+        if (cancelUnlinkSheet) {
+            cancelUnlinkSheet.addEventListener('click', () => this.hideUnlinkSheetModal());
+        }
+
+        const confirmUnlinkSheet = document.getElementById('confirmUnlinkSheet');
+        if (confirmUnlinkSheet) {
+            confirmUnlinkSheet.addEventListener('click', () => this.confirmUnlinkSheet());
+        }
+
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => this.save());
+        }
+
+        // @ Link: insert a reference component pointing at any Workdeck file
+        const mentionBtn = document.getElementById('mentionBtn');
+        if (mentionBtn) {
+            mentionBtn.addEventListener('click', () => this.openMentionPicker(mentionBtn));
+        }
+
+        // Settings > Copy link: the form's canonical hard link
+        const copyLinkBtn = document.getElementById('copyLinkBtn');
+        if (copyLinkBtn) {
+            copyLinkBtn.addEventListener('click', async () => {
+                if (!window.WDLinks || !this.formId) return;
+                try {
+                    await navigator.clipboard.writeText(window.location.origin + WDLinks.url('forms', this.formId));
+                    this.showNotification('Link copied', 'success');
+                } catch (err) {
+                    this.showNotification('Copy failed — copy the URL from the address bar', 'error');
+                }
+                document.getElementById('settingsDropdown')?.classList.remove('open');
+            });
+        }
+
+        // Rename reminder modal (untitled explicit saves)
+        this.setupRenamePrompt();
+
+        // --- Settings dropdown ---
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsDropdown = document.getElementById('settingsDropdown');
+        if (settingsBtn && settingsDropdown) {
+            settingsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                settingsDropdown.classList.toggle('active');
+            });
+        }
+
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const themeSubmenu = document.getElementById('themeSubmenu');
+
+        const closeThemeSubmenu = () => {
+            if (themeSubmenu) themeSubmenu.classList.remove('active');
+            const themeContainer = themeToggleBtn && themeToggleBtn.closest('.theme-dropdown-container');
+            if (themeContainer) themeContainer.classList.remove('active');
+        };
+
+        // Theme toggle - expands the submenu inline (docs pattern)
+        if (themeToggleBtn && themeSubmenu) {
+            themeToggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = themeSubmenu.classList.contains('active');
+                themeSubmenu.classList.toggle('active');
+                const themeContainer = themeToggleBtn.closest('.theme-dropdown-container');
+                if (themeContainer) {
+                    themeContainer.classList.toggle('active', !isOpen);
+                }
+            });
+        }
+
+        // Theme option selection
+        const themeOptions = document.querySelectorAll('.theme-option');
+        themeOptions.forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                formsThemeManager.setTheme(option.dataset.theme);
+                this.updateThemeIndicator();
+                closeThemeSubmenu();
+            });
+        });
+
+        // Close dropdown / submenu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (settingsDropdown && !e.target.closest('.top-nav-settings')) {
+                settingsDropdown.classList.remove('active');
+                closeThemeSubmenu();
+            }
+            if (themeSubmenu && !e.target.closest('.theme-dropdown-container')) {
+                closeThemeSubmenu();
+            }
+            if (!e.target.closest('.responses-more')) {
+                this.hideResponsesMoreMenu();
+            }
+        });
+
+        // --- Settings menu items ---
+        const shareBtn = document.getElementById('shareBtn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', () => this.showShareModal());
+        }
+
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => formsAuth.logout());
+        }
+
+        // --- Title rename ---
+        const formTitle = document.getElementById('formTitle');
+        if (formTitle) {
+            formTitle.addEventListener('click', () => this.makeTitleEditable());
+        }
+
+        // --- Share modal ---
+        const shareModalClose = document.getElementById('shareModalClose');
+        if (shareModalClose) {
+            shareModalClose.addEventListener('click', () => this.hideShareModal());
+        }
+
+        const shareModalCloseBtn = document.getElementById('shareModalCloseBtn');
+        if (shareModalCloseBtn) {
+            shareModalCloseBtn.addEventListener('click', () => this.hideShareModal());
+        }
+
+        const copyShareUrlBtn = document.getElementById('copyShareUrlBtn');
+        if (copyShareUrlBtn) {
+            copyShareUrlBtn.addEventListener('click', () => this.copyShareUrl());
+        }
+
+        // --- Clear responses modal ---
+        const clearResponsesModalClose = document.getElementById('clearResponsesModalClose');
+        if (clearResponsesModalClose) {
+            clearResponsesModalClose.addEventListener('click', () => this.hideClearResponsesModal());
+        }
+
+        const cancelClearResponses = document.getElementById('cancelClearResponses');
+        if (cancelClearResponses) {
+            cancelClearResponses.addEventListener('click', () => this.hideClearResponsesModal());
+        }
+
+        const confirmClearResponses = document.getElementById('confirmClearResponses');
+        if (confirmClearResponses) {
+            confirmClearResponses.addEventListener('click', () => this.confirmClearResponses());
+        }
+
+        // --- Keyboard shortcuts ---
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                this.save();
+            }
+        });
+
+        // --- Warn before leaving with unsaved changes ---
+        window.addEventListener('beforeunload', (e) => {
+            if (this.hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+    }
+
+    // ================================================
+    // Theme indicator (settings menu label)
+    // ================================================
+
+
+    updateThemeIndicator() {
+        const themeText = document.getElementById('themeText');
+        if (!themeText) return;
+        const label = formsThemeManager.getDisplayLabel();
+
+        themeText.textContent = 'Theme: ' + label;
+
+        const pref = formsThemeManager.getPreference();
+        document.querySelectorAll('.theme-option').forEach(option => {
+            option.classList.toggle('active', option.dataset.theme === pref);
+        });
+    }
+
+    // ================================================
+    // Clear responses modal
+    // ================================================
+
+    /** Show the confirm dialog (mirrors showDeleteAccountModal). */
+    showClearResponsesModal() {
+        if (!this.formRecord?.sharedId) {
+            this.showError('This form has not been shared yet');
+            return;
+        }
+
+        const modal = document.getElementById('clearResponsesModal');
+        const settingsDropdown = document.getElementById('settingsDropdown');
+        const errorEl = document.getElementById('clearResponsesError');
+
+        if (modal) {
+            modal.classList.add('active');
+        }
+        if (settingsDropdown) {
+            settingsDropdown.classList.remove('active');
+        }
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.classList.add('hidden');
+        }
+    }
+
+    /** Hide the confirm dialog (mirrors hideDeleteAccountModal). */
+    hideClearResponsesModal() {
+        const modal = document.getElementById('clearResponsesModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    /**
+     * The dangerous button: wipe every response for this form.
+     * Mirrors confirmDeleteAccount()'s shape.
+     */
+    async confirmClearResponses() {
+        const ok = await formsStorage.deleteResponses(this.formId);
+
+        if (!ok) {
+            const errorEl = document.getElementById('clearResponsesError');
+            if (errorEl) {
+                errorEl.textContent = 'Failed to delete responses';
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+
+        this.hideClearResponsesModal();
+        this.showNotification('All responses deleted', 'success');
+        await this.responsesView?.refresh();
+    }
+
+    // ================================================
+    // Responses: more menu + Sheets link
+    // ================================================
+
+    /** Collapse the ⋮ menu (outside click, item click, or item action). */
+    hideResponsesMoreMenu() {
+        document.getElementById('responsesMoreMenu')?.classList.remove('active');
+    }
+
+    /**
+     * The green Sheets button: linked -> open the spreadsheet in a new
+     * tab (synchronous, so the user gesture carries); unlinked -> the
+     * link modal.
+     */
+    handleSheetsButtonClick() {
+        const url = this.responsesView?.sheetUrl;
+        if (url) {
+            this.openSheetsTab(url);
+            return;
+        }
+        this.showLinkSheetModal();
+    }
+
+    /**
+     * @param {string} url
+     * @returns {Window|null} the new tab, or null when pop-ups are blocked
+     */
+    openSheetsTab(url) {
+        const win = window.open(url, '_blank');
+        if (win) {
+            win.opener = null;
+        }
+        return win;
+    }
+
+    // ================================================
+    // Link to Sheets modal
+    // ================================================
+
+    /** Show the link dialog (Google-Forms-style destination picker). */
+    showLinkSheetModal() {
+        if (!this.formRecord?.sharedId) {
+            this.showError('Share the form before linking it to Sheets');
+            return;
+        }
+
+        const name = this.formRecord?.name || 'Untitled Form';
+        const formNameEl = document.getElementById('linkSheetFormName');
+        const sheetNameEl = document.getElementById('linkSheetSheetName');
+        const errorEl = document.getElementById('linkSheetError');
+
+        if (formNameEl) {
+            formNameEl.textContent = name;
+        }
+        if (sheetNameEl) {
+            sheetNameEl.textContent = `${name} (Responses)`;
+        }
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.classList.add('hidden');
+        }
+        document.getElementById('linkSheetModal')?.classList.add('active');
+    }
+
+    hideLinkSheetModal() {
+        document.getElementById('linkSheetModal')?.classList.remove('active');
+    }
+
+    /**
+     * Create "<Form> (Responses)" via the API and adopt the link. The
+     * spreadsheet is opened in a new tab when the browser allows it
+     * (the await drops user activation, so pop-ups can be blocked —
+     * the now-green Sheets icon always works as a fallback).
+     */
+    async confirmLinkSheet() {
+        const button = document.getElementById('confirmLinkSheet');
+        if (button) {
+            button.disabled = true;
+        }
+
+        const result = await formsStorage.linkSheet(this.formId);
+
+        if (button) {
+            button.disabled = false;
+        }
+
+        if (!result) {
+            const errorEl = document.getElementById('linkSheetError');
+            if (errorEl) {
+                errorEl.textContent = 'Failed to create the spreadsheet';
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+
+        // Adopt the link immediately so the header flips to "Open in
+        // Sheets" without a refetch.
+        if (this.responsesView) {
+            this.responsesView.linkedSheet = { sheetId: result.sheetId };
+            this.responsesView.updateSheetsUI();
+        }
+
+        this.hideLinkSheetModal();
+        this.showNotification(
+            result.alreadyLinked ? 'Already linked to a spreadsheet' : 'Spreadsheet created',
+            'success'
+        );
+
+        if (result.sheetUrl) {
+            const win = this.openSheetsTab(result.sheetUrl);
+            if (!win) {
+                this.showNotification(
+                    'Pop-up blocked — use the green Sheets icon to open the spreadsheet',
+                    'info'
+                );
+            }
+        }
+    }
+
+    // ================================================
+    // Unlink from Sheets modal
+    // ================================================
+
+    showUnlinkSheetModal() {
+        if (!this.responsesView?.linkedSheet) {
+            return;
+        }
+        const errorEl = document.getElementById('unlinkSheetError');
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.classList.add('hidden');
+        }
+        document.getElementById('unlinkSheetModal')?.classList.add('active');
+    }
+
+    hideUnlinkSheetModal() {
+        document.getElementById('unlinkSheetModal')?.classList.remove('active');
+    }
+
+    /** Drop the link; the spreadsheet and its copied rows stay. */
+    async confirmUnlinkSheet() {
+        const ok = await formsStorage.unlinkSheet(this.formId);
+        if (!ok) {
+            const errorEl = document.getElementById('unlinkSheetError');
+            if (errorEl) {
+                errorEl.textContent = 'Failed to unlink the spreadsheet';
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+
+        this.hideUnlinkSheetModal();
+        this.responsesView?.clearLinkedSheet();
+        this.showNotification('Form unlinked from Sheets', 'success');
+    }
+
+    // ================================================
+    // Share modal
+    // ================================================
+
+  
+    async showShareModal() {
+        if (!this.formId) {
+            this.showError('No form to share');
+            return;
+        }
+
+        const shareFormName = document.getElementById('shareFormName');
+        const shareUrlInput = document.getElementById('shareUrlInput');
+        const shareModal = document.getElementById('shareModal');
+        const settingsDropdown = document.getElementById('settingsDropdown');
+
+        if (shareFormName) {
+            shareFormName.textContent = this.formRecord?.name || 'Untitled Form';
+        }
+        if (shareUrlInput) {
+            shareUrlInput.value = 'Generating share link...';
+        }
+        if (shareModal) {
+            shareModal.classList.add('active');
+        }
+        if (settingsDropdown) {
+            settingsDropdown.classList.remove('active');
+        }
+
+        const result = await formsStorage.shareForm(this.formId);
+        if (result && result.shareUrl) {
+            if (shareUrlInput) {
+                shareUrlInput.value = result.shareUrl;
+            }
+            this.formRecord.sharedId = result.shareId;
+        } else {
+            this.showError('Failed to generate share link');
+            this.hideShareModal();
+        }
+    }
+
+    /** Hide #shareModal and reset the copy button (text 'Copy', drop .copied). */
+    hideShareModal() {
+        const shareModal = document.getElementById('shareModal');
+        if (shareModal) {
+            shareModal.classList.remove('active');
+        }
+
+        const copyShareUrlBtn = document.getElementById('copyShareUrlBtn');
+        const copyButtonText = document.getElementById('copyButtonText');
+
+        if (copyButtonText) {
+            copyButtonText.textContent = 'Copy';
+        }
+        if (copyShareUrlBtn) {
+            copyShareUrlBtn.classList.remove('copied');
+        }
+    }
+
+    async copyShareUrl() {
+        const input = document.getElementById('shareUrlInput');
+        const copyShareUrlBtn = document.getElementById('copyShareUrlBtn');
+        const copyButtonText = document.getElementById('copyButtonText');
+
+        if (!input || !input.value) {
+            this.showError('No share link to copy');
+            return;
+        }
+
+        const showCopied = () => {
+            if (copyShareUrlBtn) copyShareUrlBtn.classList.add('copied');
+            if (copyButtonText) copyButtonText.textContent = 'Copied!';
+            setTimeout(() => {
+                if (copyShareUrlBtn) copyShareUrlBtn.classList.remove('copied');
+                if (copyButtonText) copyButtonText.textContent = 'Copy';
+            }, 2000);
+        };
+
+        try {
+            // Modern browsers: async Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(input.value);
+                showCopied();
+                return;
+            }
+
+            // Fallback for older browsers
+            input.select();
+            input.setSelectionRange(0, 99999);
+            const successful = document.execCommand('copy');
+            if (successful) {
+                showCopied();
+            } else {
+                this.showError('Failed to copy link');
+            }
+        } catch (err) {
+            console.error('[FORMS EDITOR] Copy share link failed:', err);
+            this.showError('Failed to copy link');
+        }
+    }
+
+    // ================================================
+    // URL helpers
+    // ================================================
+
+    /**
+     * Read a query param from the URL.
+     * @param {string} name
+     * @returns {string|null}
+     */
+    parseURL(name) {
+        // Hard link (/forms/<id>) first, legacy ?id= second.
+        if (name === 'id' && window.WDLinks) {
+            const loc = WDLinks.parseLocation();
+            if (loc && loc.app === 'forms' && loc.id) return loc.id;
+        }
+        return new URLSearchParams(window.location.search).get(name);
+    }
+
+    // ================================================
+    // Loading / notifications
+    // ================================================
+
+    /** Show the loading overlay. */
+    showLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.classList.remove('hidden');
+    }
+
+    /** Hide the loading overlay. */
+    hideLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.classList.add('hidden');
+    }
+
+    /**
+     * Toast notification.
+     * @param {string} message
+     * @param {'success'|'error'|'info'} [type]
+     */
+    showNotification(message, type = 'info') {
+        const el = document.getElementById('notification');
+        if (!el) return;
+        el.textContent = message;
+        el.className = 'notification ' + (type || 'info');
+        void el.offsetWidth;            // restart transition
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    /** @param {string} message */
+    showError(message) {
+        this.showNotification(message, 'error');
+    }
+
+    // ================================================
+    // Teardown
+    // ================================================
+
+
+    async destroy() {
+        if (this.hasUnsavedChanges) {
+            await this.save({ explicit: false });
+        }
+        clearInterval(this.autoSaveInterval);
+        if (this.builderInstance) {
+            this.builderInstance.destroy();
+            this.builderInstance = null;
+        }
+    }
+}
+
+// ================================================
+// Boot
+// ================================================
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // Wait for the form-js CDN bundle (up to 10s)
+        let attempts = 0;
+        while (typeof FormEditor === 'undefined' && attempts < 100) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+
+        if (typeof FormEditor === 'undefined') {
+            document.body.replaceChildren(
+                document.getElementById('formFailTemplate').content.cloneNode(true));
+            return;
+        }
+
+        const app = new FormsEditorApp();
+        const success = await app.init();
+
+        if (!success && document.getElementById('loadingOverlay')) {
+            // init() only returns false when it redirected away; nothing to show.
+        }
+
+        window.formsEditorApp = app;   // debugging handle
+    } catch (error) {
+        console.error('[FORMS EDITOR] Boot error:', error);
+    }
+});
+
+// Free the builder DOM when leaving the page.
+window.addEventListener('beforeunload', () => {
+    if (window.formsEditorApp) {
+        window.formsEditorApp.destroy();
+    }
+});
+
+// Global error surfaces
+window.addEventListener('error', (event) => {
+    console.error('Application error:', event.error);
+    if (window.formsEditorApp) window.formsEditorApp.showError('An unexpected error occurred');
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    if (window.formsEditorApp) window.formsEditorApp.showError('An unexpected error occurred');
+    event.preventDefault();
+});

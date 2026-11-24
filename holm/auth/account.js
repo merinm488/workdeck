@@ -9,21 +9,15 @@
     if (!response.ok) throw new Error('Unable to check your session.');
     const session = await response.json();
     if (!session.member) {
-      status.textContent = 'Sign in using your email to create or open your Workdeck account.';
+      status.textContent = 'Sign in to create or open your Workdeck account.';
       signIn.href = session.loginURL;
       signIn.hidden = false;
       return;
     }
-    if (!session.member.email) {
-      status.textContent = 'This sign-in has no verified email. Please sign out and use an email address to continue.';
-      signOut.addEventListener('click', () => logOut(session.logoutURL));
-      details.hidden = false;
-      email.textContent = session.member.name || 'Account without verified email';
-      return;
-    }
     status.textContent = 'Your account is ready.';
-    email.textContent = session.member.email;
+    email.textContent = session.member.email || session.member.name || 'Signed-in member';
     details.hidden = false;
+    document.getElementById('accountSignIns').href = session.accountURL;
     signOut.addEventListener('click', () => logOut(session.logoutURL));
   } catch (_) {
     status.textContent = 'We could not check your account. Please refresh the page and try again.';

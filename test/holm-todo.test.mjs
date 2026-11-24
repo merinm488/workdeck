@@ -37,9 +37,11 @@ function fixture() {
 const item = { id: 'task_0001', title: 'Make a plan', description: '', priority: 'medium',
   dueDate: null, completed: false, createdAt: '2026-11-19T12:00:00.000Z' };
 
-test('Todo requires verified Holm email and same-origin writes', async () => {
+test('Todo requires a Holm member and same-origin writes, not an email address', async () => {
   const { member, anon, call } = fixture();
   assert.equal((await call(anon, '/api/todo/lists')).status, 401);
+  assert.equal((await call(member(null), '/api/todo/lists', 'POST', { name: 'Telegram list' })).status, 201);
+  assert.equal((await call(member(null), '/api/todo/lists')).body.lists[0].name, 'Telegram list');
   assert.equal((await call(member('alice@example.test'), '/api/todo/lists', 'POST', { name: 'Hi' }, 'https://evil.test')).status, 403);
   assert.equal((await call(member('alice@example.test'), '/api/todo/lists', 'POST', { name: '' })).status, 400);
 });

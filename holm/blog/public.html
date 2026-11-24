@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Public, indexable: published blogs want to be found. -->
+    <title>Blog</title>
+    <meta name="description" id="metaDescription" content="">
+    <meta name="theme-color" content="#0d9488">
+
+    <!-- App Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
+
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/blog.css">
+</head>
+<body>
+    <!-- ===== LOADING / ERROR (no blog data yet) ===== -->
+    <div id="blogLoading" class="wb-state">
+        <div class="wb-spinner"></div>
+        <p>Loading blog…</p>
+    </div>
+
+    <div id="blogError" class="wb-state" hidden>
+        <h1 id="errorTitle">Blog not found</h1>
+        <p id="errorMessage">This address doesn't point to a published blog.</p>
+    </div>
+
+    <!-- ===== READER ===== -->
+    <div id="blogReader" hidden>
+        <header class="wb-header">
+            <div class="wb-header-inner">
+                <div class="wb-brand" id="wbBrand">
+                    <span class="wb-brand-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                            <path d="m15 5 4 4"/>
+                        </svg>
+                    </span>
+                    <div class="wb-brand-text">
+                        <h1 id="blogTitle">Blog</h1>
+                        <p id="blogDescription" hidden></p>
+                    </div>
+                </div>
+                <button id="themeToggle" class="wb-theme-toggle" type="button" aria-label="Toggle theme">
+                    <svg class="wb-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="4"/>
+                        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                    </svg>
+                    <svg class="wb-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <main id="postList" class="wb-main" hidden></main>
+
+        <main id="articleView" class="wb-main" hidden>
+            <a id="backLink" class="wb-back" href="#">← All posts</a>
+            <article class="wb-article">
+                <h1 id="postTitle"></h1>
+                <p id="postDate" class="wb-post-date"></p>
+                <div id="postBody" class="wb-post-body"></div>
+            </article>
+        </main>
+
+        <section id="emptyState" class="wb-state" hidden>
+            <h1>No posts yet</h1>
+            <p>Nothing has been published here so far.</p>
+        </section>
+    </div>
+
+    <footer class="wb-footer">
+        <a class="wb-footer-badge" href="/">Powered by Workdeck</a>
+    </footer>
+
+    <template id="wbPostRowTemplate">
+        <a class="wb-post-row" href="#">
+            <div class="wb-post-row-main">
+                <h2 class="wb-post-row-title"></h2>
+                <p class="wb-post-row-excerpt"></p>
+            </div>
+            <span class="wb-post-row-date"></span>
+        </a>
+    </template>
+
+    <script src="/js/themes.js"></script>
+    <script src="/js/blog.js"></script>
+</body>
+</html>

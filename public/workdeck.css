@@ -2553,3 +2553,10 @@ body.wd-sidebar-open .wd-sidebar-scrim {
     margin-top: 0;
     max-height: 220px;
 }
+
+/* Minutes app identity */
+:root { --minutes-accent: #5451a6; --minutes-accent-soft: rgba(84, 81, 166, .12); }
+.wd-app-icon-minutes, .wd-file-icon-minutes, .wd-file-app-badge.minutes {
+    background: var(--minutes-accent-soft);
+    color: var(--minutes-accent);
+}

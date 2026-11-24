@@ -1,0 +1,9 @@
+/* Holm landing navigation: signed-in status and sign-out stay visible on mobile. */
+.lp-auth-nav { display:flex; align-items:center; gap:8px; }
+.lp-auth-nav .lp-nav-status { justify-content:center; min-height:38px; }
+.lp-auth-nav .lp-signout { background:transparent; cursor:pointer; font:inherit; font-size:11px; font-weight:650; color:var(--lp-muted); }
+.lp-auth-nav .lp-signout:hover { border-color:#c5a453; color:var(--lp-ink); }
+.lp-auth-nav .lp-signout:focus-visible { outline:3px solid #d39a00; outline-offset:3px; }
+.lp-auth-nav .lp-signout[hidden] { display:none; }
+@media(max-width:750px) { .lp-auth-nav .lp-nav-status { display:inline-flex; } .lp-auth-nav { margin-left:auto; } .lp-nav-links { display:none; } .lp-nav { gap:12px; } }
+@media(max-width:470px) { .lp-auth-nav { gap:5px; } .lp-auth-nav .lp-nav-status { padding:8px; font-size:10px; } .lp-theme-toggle { width:30px; height:30px; } }

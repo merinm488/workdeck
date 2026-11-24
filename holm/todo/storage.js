@@ -1,5 +1,6 @@
 // Adapter for the original Todo editor. Only the persistence boundary changes:
-// Holm uses the verified session cookie and member-private SQLite storage.
+// Holm uses the session cookie and member-private SQLite storage. An email
+// address is optional (for example, Telegram sign-in).
 class TodoStorage {
   constructor() { this.lists = new Map(); }
 

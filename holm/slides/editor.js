@@ -1,0 +1,2385 @@
+/**
+ * ================================================
+ * SLIDES - Deck Editor  
+ * ================================================
+ */
+
+// ================================================
+// State
+// ================================================
+
+const editorState = {
+    deck: null,             // deck record (see schema in js/storage.js)
+    deckId: null,           // from ?id= (the inline auth check guarantees it)
+    currentSlideIndex: 0,
+    canvas: null,           // the fabric.Canvas instance
+    activeTool: 'select',   // 'select' | 'text' | 'rect' | 'ellipse' | 'triangle' | 'line' | 'draw'
+    zoom: 1,
+    isDirty: false,
+    isSaving: false,
+    renamePromptDismissed: false,  // rename reminder shows at most once per session (either button)
+    undoStack: [],          // JSON strings of the CURRENT slide's objects
+    redoStack: [],
+    isRestoring: false,     // true while undo/redo reloads the canvas (don't re-record)
+    autoSaveTimer: null,
+    presentIndex: 0,
+    presentCanvas: null
+};
+
+let undoSnapshotTimer = null;
+let notificationTimer = null;
+
+// ================================================
+// Status footer
+// ================================================
+
+function updateSlideFooter() {
+    const el = $('slidesFooterStats');
+    if (!el || !editorState.deck) return;
+    const total = editorState.deck.slides.length;
+    el.textContent = `Slide ${editorState.currentSlideIndex + 1} of ${total}`;
+}
+
+// ================================================
+// Boot
+// ================================================
+
+
+
+async function init() {
+    setLoading(true);
+    // Hard link (/slides/<id>) first, legacy ?id= second — the inline guard
+    // guarantees one of them is present.
+    const loc = window.WDLinks ? WDLinks.parseLocation() : null;
+    editorState.deckId = (loc && loc.app === 'slides' && loc.id)
+        || new URLSearchParams(location.search).get('id');
+    if (!(await slidesAuth.verifySession())) {
+        location.assign('/auth/login?redirect=' + encodeURIComponent(location.pathname + location.search));
+        return;
+    }
+    slidesThemeManager.init();
+
+    await document.fonts.ready;
+
+    editorState.deck = await slidesStorage.getDeck(editorState.deckId);
+    if (!editorState.deck) {
+        showNotification('Deck not found', true);
+        goToWorkdeck();
+        return;
+    }
+    if (window.WDLinks && editorState.deckId) {
+        window.history.replaceState(null, '', '/slides/editor.html?id=' + encodeURIComponent(editorState.deckId));
+    }
+
+    const userData = await slidesStorage.loadUserData();
+    if (userData && userData.settings && userData.settings.theme) {
+        slidesThemeManager.applyFromServer(userData.settings.theme);
+    }
+
+    initCanvas();
+
+    $('deckTitle').textContent = editorState.deck.name;
+
+    // skipSync: the canvas was JUST created and is empty 
+    loadSlide(0, true);
+    buildThumbs();
+    zoomToFit();
+
+    bindToolbar();
+    bindSlidePanel();
+    bindStageNav();
+    bindSwipeNavigation();
+    bindTopNav();
+    bindModals();
+    bindKeyboard();
+    setupMentionTyping();
+    startAutoSave();
+
+    setLoading(false);
+
+    offerTemplatesForNewDeck();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+// ================================================
+// Fabric canvas
+// ================================================
+
+function initCanvas() {
+    editorState.canvas = new fabric.Canvas('slideCanvas', {
+        width: APP_CONFIG.slide.width,       // logical size; CSS zoom is separate
+        height: APP_CONFIG.slide.height,
+        backgroundColor: '#ffffff',          
+        selection: true,                     // rubber-band multi-select
+        preserveObjectStacking: true         // keep z-order on select
+      });
+
+      const onObjectChanged = () => {
+        if (editorState.isRestoring) return;
+        recordUndoSnapshot();
+        markDirty();
+        syncCurrentSlideFromCanvas();
+        renderThumb(editorState.currentSlideIndex);
+      };
+    editorState.canvas.on('object:added', onObjectChanged);
+    editorState.canvas.on('object:removed', onObjectChanged);
+    editorState.canvas.on('object:modified', onObjectChanged);
+
+    editorState.canvas.on('selection:created', syncToolbarFromSelection);
+    editorState.canvas.on('selection:updated', syncToolbarFromSelection);
+    editorState.canvas.on('selection:cleared', syncToolbarFromSelection);
+
+    editorState.canvas.on('mouse:down', (opt) => {
+        if (editorState.activeTool !== 'select' && editorState.activeTool !== 'draw') {
+            insertObjectAtPointer(opt);
+        }
+    });
+
+    // Mentions: pointer cursor on hover; clicking an already-selected
+    // mention (no drag) opens the target — the first click selects/moves
+    // it like any object.
+    let mentionPress = null;
+    editorState.canvas.on('mouse:down', (opt) => {
+        const t = opt.target;
+        mentionPress = (t && t.wdRef && editorState.activeTool === 'select')
+            ? { target: t, x: opt.viewportPoint.x, y: opt.viewportPoint.y }
+            : null;
+    });
+    editorState.canvas.on('mouse:up', (opt) => {
+        if (!mentionPress) return;
+        const press = mentionPress;
+        mentionPress = null;
+        const moved = Math.hypot(opt.viewportPoint.x - press.x, opt.viewportPoint.y - press.y);
+        if (moved > 4 || press.target !== editorState.canvas.getActiveObject() || press.target.isEditing) return;
+        if (window.WDLinks) WDLinks.open(press.target.wdRef.app, press.target.wdRef.id);
+    });
+    editorState.canvas.on('mouse:over', (opt) => {
+        if (opt.target && opt.target.wdRef) editorState.canvas.hoverCursor = 'pointer';
+    });
+    editorState.canvas.on('mouse:out', (opt) => {
+        if (opt.target && opt.target.wdRef) editorState.canvas.hoverCursor = 'default';
+    });
+}
+
+/**
+ * Render slide `index` onto the stage.
+ */
+function loadSlide(index, skipSync = false) {
+    if (!skipSync) {
+        syncCurrentSlideFromCanvas();
+      }
+
+    const slide = editorState.deck.slides[index];
+    if (!slide) return;
+
+    editorState.currentSlideIndex = index;
+    $('stageCounter').textContent = `${index + 1} / ${editorState.deck.slides.length}`;
+    updateSlideFooter();
+    editorState.undoStack = [];
+    editorState.redoStack = [];
+    clearTimeout(undoSnapshotTimer);
+
+    editorState.isRestoring = true;
+
+    return editorState.canvas.loadFromJSON({ objects: slide.objects || [] }).then(() => {
+        editorState.canvas.backgroundColor = slide.background || APP_CONFIG.slide.defaultBackground;
+        editorState.canvas.discardActiveObject();
+        editorState.canvas.requestRenderAll();
+        editorState.isRestoring = false;
+
+        refreshMentionTexts();
+        updateThumbsActiveState();
+    });
+}
+
+/** Object props that must survive serialization (file mentions). */
+const EXTRA_SERIALIZED_PROPS = ['wdRef'];
+
+/**
+ * Copy the canvas back into the current slide record (save direction).
+ */
+function syncCurrentSlideFromCanvas() {
+    const slide = editorState.deck.slides[editorState.currentSlideIndex];
+    if(!slide) return;
+
+    slide.objects = editorState.canvas.toObject(EXTRA_SERIALIZED_PROPS).objects;
+    slide.background = editorState.canvas.backgroundColor || APP_CONFIG.slide.defaultBackground;
+}
+
+// ================================================
+// File mentions (@Link)
+// ================================================
+
+const MENTION_COLOR = '#4285f4';
+
+/**
+ * Insert a mention text object pointing at another Workdeck file. The
+ * target rides on the object as wdRef {app, id} (kept by
+ * EXTRA_SERIALIZED_PROPS); the label refreshes to the current name on load.
+ */
+function insertMentionObject(entry) {
+    const canvas = editorState.canvas;
+    const obj = new fabric.Textbox('@' + entry.name, {
+        left: APP_CONFIG.slide.width / 2 - 100,
+        top: APP_CONFIG.slide.height / 2 - 16,
+        width: 320,
+        fontSize: 24,
+        fontFamily: 'Inter',
+        fill: MENTION_COLOR,
+        underline: true,
+        wdRef: { app: entry.app, id: entry.id }
+    });
+    canvas.add(obj);
+    canvas.setActiveObject(obj);
+    canvas.requestRenderAll();
+    markDirty();
+    saveDeck();   // mentions are deliberate acts — persist right away
+}
+
+function openMentionPicker(anchorEl) {
+    if (!window.WDMentions) {
+        showNotification('File links unavailable (libraries failed to load)', true);
+        return;
+    }
+    WDMentions.open({
+        anchor: anchorEl.getBoundingClientRect(),
+        excludeIds: editorState.deckId ? [editorState.deckId] : [],
+        onPick: insertMentionObject
+    });
+}
+
+// ================================================
+// "@" typing inside a text object
+// ================================================
+
+let typingMentionSession = null;
+
+function setupMentionTyping() {
+    if (!window.WDMentions || typingMentionSession) return;
+    typingMentionSession = WDMentions.createMentionSession({
+        isActive: () => !!mentionEditHost(),
+        getText: () => {
+            const host = mentionEditHost();
+            return host ? host.textarea.value : '';
+        },
+        getCaret: () => {
+            const host = mentionEditHost();
+            return host && typeof host.textarea.selectionStart === 'number'
+                ? host.textarea.selectionStart : null;
+        },
+        getAnchor: () => {
+            const host = mentionEditHost();
+            if (!host) return null;
+            try {
+                const br = host.obj.getBoundingRect(true);
+                const cr = editorState.canvas.getElement().getBoundingClientRect();
+                return {
+                    left: cr.left + br.left, right: cr.left + br.left,
+                    top: cr.top + br.top, bottom: cr.top + br.top + 20
+                };
+            } catch (err) { return null; }
+        },
+        excludeIds: () => editorState.deckId ? [editorState.deckId] : [],
+        onPick: insertTypedMention
+    });
+
+    const onKey = (e) => { if (mentionEditHost(e.target)) typingMentionSession.keydown(e); };
+    const onSync = (e) => { if (mentionEditHost(e.target)) typingMentionSession.sync(); };
+    document.addEventListener('keydown', onKey, true);
+    ['input', 'keyup', 'click'].forEach((type) => document.addEventListener(type, onSync, true));
+}
+
+/** The hidden textarea Fabric uses while a text object is in edit mode. */
+function mentionEditHost(target) {
+    const obj = editorState.canvas && editorState.canvas.getActiveObject
+        ? editorState.canvas.getActiveObject() : null;
+    if (!obj || !obj.isEditing || !obj.hiddenTextarea) return null;
+    if (target && target !== obj.hiddenTextarea) return null;
+    return { obj: obj, textarea: obj.hiddenTextarea };
+}
+
+/** Splice the mention into the object's text via the hidden textarea. */
+function insertTypedMention(entry, range) {
+    const host = mentionEditHost();
+    if (!host) return;
+    const name = String(entry.name || '').replace(/[\r\n@]/g, ' ').trim() || 'Untitled';
+    const label = '@' + name;
+    // The user may have kept typing since the last sync — re-derive.
+    const hit = WDMentions.mentionAt(host.textarea.value, host.textarea.selectionStart) || range;
+    const next = host.textarea.value.slice(0, hit.from) + label + host.textarea.value.slice(hit.to);
+    host.textarea.value = next;
+    const caret = hit.from + label.length;
+    host.textarea.setSelectionRange(caret, caret);
+    host.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+    if (next === label) {
+        host.obj.set({
+            wdRef: { app: entry.app, id: entry.id },
+            fill: MENTION_COLOR,
+            underline: true
+        });
+        editorState.canvas.requestRenderAll();
+        saveDeck();   // mentions are deliberate acts — persist right away
+    }
+}
+
+/** Settings > Copy link: the deck's canonical hard link. */
+async function copyDeckLink() {
+    if (!window.WDLinks || !editorState.deckId) return;
+    const url = window.location.origin + WDLinks.url('slides', editorState.deckId);
+    try {
+        await navigator.clipboard.writeText(url);
+        showNotification('Link copied');
+    } catch (err) {
+        showNotification('Copy failed — copy the URL from the address bar', true);
+    }
+}
+
+/**
+ * Mention labels follow their target's current name; deleted targets turn
+ * muted with a " (deleted)" suffix. Rendering-only: no dirty flag.
+ */
+async function refreshMentionTexts() {
+    if (!window.WDMentions || !window.WDLinks) return;
+    const data = await WDMentions.getUnifiedDoc().catch(() => null);
+    if (!data) return;
+    let changed = false;
+    editorState.canvas.getObjects().forEach((obj) => {
+        if (!obj.wdRef) return;
+        const hit = WDLinks.resolve(obj.wdRef.id, data);
+        const base = obj.text.replace(/\s*\(deleted\)$/, '').replace(/^@/, '');
+        const desired = hit ? '@' + hit.name : '@' + base + ' (deleted)';
+        if (obj.text !== desired) {
+            obj.set('text', desired);
+            changed = true;
+        }
+        obj.set('opacity', hit ? 1 : 0.5);
+    });
+    if (changed) {
+        editorState.canvas.requestRenderAll();
+        renderThumb(editorState.currentSlideIndex);
+    }
+}
+
+
+function goToSlide(index) {
+    const clamped = Math.max(0, Math.min(editorState.deck.slides.length - 1, index));
+    if (clamped !== editorState.currentSlideIndex) {
+        loadSlide(clamped);
+    }
+}
+
+// ================================================
+// Slide management (sorter panel)
+// ================================================
+
+function bindSlidePanel() {
+    $('addSlideBtn').addEventListener('click', addSlide);
+    bindThumbDragDrop();
+    bindThumbTouchReorder();
+}
+
+function bindStageNav() {
+    $('stagePrevBtn').addEventListener('click', () => goToSlide(editorState.currentSlideIndex - 1));
+    $('stageNextBtn').addEventListener('click', () => goToSlide(editorState.currentSlideIndex + 1));
+}
+
+/**
+ * Push a blank slide after the current one and switch to it
+ */
+function addSlide() {
+    const n = editorState.deck.slides.length;
+    const newSlide = {
+        id: 's'+ Date.now().toString(36),
+        name: 'Slide ' + (n + 1),
+        background: APP_CONFIG.slide.defaultBackground,
+        objects: []
+    };
+    editorState.deck.slides.splice(editorState.currentSlideIndex + 1, 0, newSlide);
+    loadSlide(editorState.currentSlideIndex + 1);
+    buildThumbs();
+    markDirty();
+}
+
+/**
+ * Clone the current slide right after it (deep-copy objects via JSON
+ * round-trip so the two slides never share object references).
+ */
+function duplicateSlide(index) {
+    const source = editorState.deck.slides[index];
+    if(!source) return;
+    const copy = JSON.parse(JSON.stringify(source));
+    copy.id = 's' + Date.now().toString(36);
+    copy.name = source.name + ' copy';
+
+    editorState.deck.slides.splice(index +1, 0, copy);
+
+    loadSlide(index + 1);
+    buildThumbs();
+    markDirty();
+}
+
+/**
+ * Delete slide `index` — keep at least ONE slide (block + notify).
+ */
+function deleteSlide(index) {
+    const slides = editorState.deck.slides;
+    if(slides.length<=1){
+        showNotification('A deck needs at least 1 slide', true);
+        return;
+    }
+    const deletingCurrentSlide = index === editorState.currentSlideIndex;
+    slides.splice(index,1);
+    if(editorState.currentSlideIndex >= slides.length){
+        editorState.currentSlideIndex = slides.length-1;
+    } else if (editorState.currentSlideIndex > index){
+        editorState.currentSlideIndex -=1;
+    }
+    loadSlide(editorState.currentSlideIndex,deletingCurrentSlide);
+    buildThumbs();
+    markDirty();
+
+}
+
+// ================================================
+// Slide reordering (drag & drop in the sorter)
+// ================================================
+
+let dragSlideId = null;
+
+// At <=640px the sorter is the horizontal bottom filmstrip (styles.css),
+// so drop position is measured along X, not Y.
+const FILMSTRIP_QUERY = window.matchMedia('(max-width: 640px)');
+
+function bindThumbDragDrop() {
+    const list = $('slideThumbs');
+
+    list.addEventListener('dragstart', (e) => {
+        const card = e.target.closest('.thumb-card');
+        if (!card) return;
+        dragSlideId = card.dataset.slideId;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        // setData is what makes Firefox start the drag at all
+        e.dataTransfer.setData('text/plain', dragSlideId);
+    });
+
+    list.addEventListener('dragover', (e) => {
+        if (!dragSlideId) return;
+        e.preventDefault();               // required for the drop to fire
+        e.dataTransfer.dropEffect = 'move';
+        paintDropIndicator(getDropIndex(e));
+    });
+
+    list.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!dragSlideId) return;
+        const dropIndex = getDropIndex(e); // measure BEFORE rebuild
+        const movedId = dragSlideId;
+        dragSlideId = null;
+        reorderSlides(movedId, dropIndex);
+    });
+
+    list.addEventListener('dragend', () => {
+        // fires after drop AND after a cancelled drag (dropped outside)
+        dragSlideId = null;
+        clearDropIndicator();
+        document.querySelectorAll('.thumb-card.dragging')
+            .forEach((card) => card.classList.remove('dragging'));
+    });
+}
+
+
+/**
+ * Index the pointer would insert at, measured along the strip's axis:
+ * clientY against card midpoints for the desktop side panel, clientX for
+ * the mobile filmstrip.
+ */
+function getDropIndex(e) {
+    const horizontal = FILMSTRIP_QUERY.matches;
+    const cards = [...document.querySelectorAll('.thumb-card:not(.dragging)')];
+    for (let i = 0; i < cards.length; i++) {
+        const box = cards[i].getBoundingClientRect();
+        const pos = horizontal ? e.clientX : e.clientY;
+        const mid = horizontal ? box.left + box.width / 2 : box.top + box.height / 2;
+        if (pos < mid) return i;
+    }
+    return cards.length;
+}
+
+// ================================================
+// Slide reordering (long-press drag, touch)
+// ================================================
+
+const LONG_PRESS_MS = 320;
+const LONG_PRESS_SLOP = 10;     // px of drift before a press becomes a scroll
+const STRIP_EDGE_ZONE = 48;     // px band at the strip edge that auto-scrolls
+
+function bindThumbTouchReorder() {
+    const list = $('slideThumbs');
+    let pressTimer = null;
+    let pending = null;   // touch waiting out the long-press
+    let session = null;   // active drag
+
+    const cancelPending = () => {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+        pending = null;
+    };
+
+    const release = (commit) => {
+        if (!session) return;
+        const { card, id } = session;
+        card.style.transform = '';
+        card.classList.remove('dragging', 'touch-dragging');
+        if (commit) {
+            // the card's DOM slot already IS the requested order
+            const dropIndex = [...list.children].indexOf(card);
+            if (dropIndex !== -1) {
+                reorderSlides(id, dropIndex);
+            }
+        }
+        session = null;
+    };
+
+    list.addEventListener('touchstart', (e) => {
+        cancelPending();
+        release(false);   // a new finger abandons any live drag
+        if (e.touches.length !== 1) return;
+
+        const card = e.target.closest('.thumb-card');
+        // the per-card duplicate/delete buttons stay plain taps
+        if (!card || e.target.closest('.thumb-act-btn')) return;
+
+        const t = e.touches[0];
+        const rect = card.getBoundingClientRect();
+        pending = {
+            card,
+            id: card.dataset.slideId,
+            startX: t.clientX,
+            startY: t.clientY,
+            grabX: t.clientX - rect.left,   // keep the card anchored to
+            grabY: t.clientY - rect.top,    // where the finger landed
+            tx: 0,
+            ty: 0
+        };
+
+        pressTimer = setTimeout(() => {
+            pressTimer = null;
+            session = pending;
+            pending = null;
+            session.card.classList.add('dragging', 'touch-dragging');
+            if (navigator.vibrate) {
+                navigator.vibrate(10);   // subtle "lifted" cue
+            }
+        }, LONG_PRESS_MS);
+    }, { passive: true });
+
+    list.addEventListener('touchmove', (e) => {
+        const t = e.touches[0];
+
+        if (!session) {
+            // drift before the timer fires — it's a strip scroll, not a drag
+            if (pending &&
+                Math.hypot(t.clientX - pending.startX, t.clientY - pending.startY) > LONG_PRESS_SLOP) {
+                cancelPending();
+            }
+            return;
+        }
+
+        e.preventDefault();   // the strip must not scroll mid-drag
+
+        // Float the card with the finger. 
+        const rect = session.card.getBoundingClientRect();
+        session.tx = (t.clientX - session.grabX) - (rect.left - session.tx);
+        session.ty = (t.clientY - session.grabY) - (rect.top - session.ty);
+        session.card.style.transform = `translate(${session.tx}px, ${session.ty}px)`;
+
+        // Live-reorder: keep the card's slot under the pointer (same index
+        // semantics as the mouse path — getDropIndex skips .dragging).
+        const dropIndex = getDropIndex(t);
+        const siblings = [...list.children].filter((c) => c !== session.card);
+        if (dropIndex >= siblings.length) {
+            if (session.card !== list.lastElementChild) {
+                list.appendChild(session.card);
+            }
+        } else if (siblings[dropIndex] !== session.card.nextElementSibling) {
+            list.insertBefore(session.card, siblings[dropIndex]);
+        }
+
+        // Edge auto-scroll keeps decks longer than the strip reachable
+        const box = list.getBoundingClientRect();
+        if (FILMSTRIP_QUERY.matches) {
+            if (t.clientX < box.left + STRIP_EDGE_ZONE) {
+                list.scrollLeft -= 6;
+            } else if (t.clientX > box.right - STRIP_EDGE_ZONE) {
+                list.scrollLeft += 6;
+            }
+        } else {
+            if (t.clientY < box.top + STRIP_EDGE_ZONE) {
+                list.scrollTop -= 6;
+            } else if (t.clientY > box.bottom - STRIP_EDGE_ZONE) {
+                list.scrollTop += 6;
+            }
+        }
+    }, { passive: false });
+
+    list.addEventListener('touchend', (e) => {
+        if (!session) {
+            cancelPending();
+            return;
+        }
+        // suppress the synthetic click so a drag never also switches slides
+        e.preventDefault();
+        release(true);
+    });
+
+    list.addEventListener('touchcancel', () => {
+        cancelPending();
+        release(false);
+    });
+
+    // a long-press must not pop the browser context menu mid-drag
+    list.addEventListener('contextmenu', (e) => {
+        if (session || pressTimer) {
+            e.preventDefault();
+        }
+    });
+}
+
+
+function paintDropIndicator(dropIndex) {
+    clearDropIndicator();
+    const cards = [...document.querySelectorAll('.thumb-card:not(.dragging)')];
+    const after = cards[dropIndex];      // insert before this card...
+    const before = cards[dropIndex - 1]; // ...or after this one (end of list)
+    if (before) before.classList.add('drop-below');
+    else if (after) after.classList.add('drop-above');
+}
+
+function clearDropIndicator() {
+    document.querySelectorAll('.thumb-card.drop-above, .thumb-card.drop-below')
+        .forEach((card) => card.classList.remove('drop-above', 'drop-below'));
+}
+
+
+function reorderSlides(fromId, dropIndex) {
+    const slides = editorState.deck.slides;
+    const fromIndex = slides.findIndex((s) => s.id === fromId);
+    if (fromIndex === -1 || dropIndex === fromIndex) return;
+
+    syncCurrentSlideFromCanvas(); // unsaved canvas edits travel with their slide
+
+    const currentId = slides[editorState.currentSlideIndex].id;
+    const [moved] = slides.splice(fromIndex, 1);
+    slides.splice(dropIndex, 0, moved);
+
+    editorState.currentSlideIndex = slides.findIndex((s) => s.id === currentId);
+    $('stageCounter').textContent = `${editorState.currentSlideIndex + 1} / ${slides.length}`;
+    updateSlideFooter();
+    buildThumbs();
+    markDirty();
+}
+
+/**
+ * Render the sorter
+ */
+
+function buildThumbs() {
+    const tpl = document.getElementById('slideThumbTemplate');
+    $('slideThumbs').replaceChildren(...editorState.deck.slides.map((slide, i) => {
+        const card = tpl.content.firstElementChild.cloneNode(true);
+        card.dataset.slideId = slide.id;
+        card.classList.toggle('active', i === editorState.currentSlideIndex);
+        card.querySelector('.thumb-num').textContent = i + 1;
+        return card;
+    }));
+      editorState.deck.slides.forEach((slide, i) => renderThumb(i));
+
+      document.querySelectorAll('.thumb-card').forEach((card) => {
+          card.addEventListener('click', (e) => {
+              const index = editorState.deck.slides.findIndex(
+                  (s) => s.id === card.dataset.slideId
+              );
+              const actionBtn = e.target.closest('.thumb-act-btn');
+
+              if (actionBtn && index !== -1) {
+                  if (actionBtn.dataset.action === 'duplicate') {
+                      duplicateSlide(index);
+                  } else {
+                      deleteSlide(index);
+                  }
+              } else if (index !== -1) {
+                  loadSlide(index);
+              }
+          });
+        });
+}
+
+/**
+ * Re-render ONE thumbnail 
+ */
+async function renderThumb(index) {
+    const slide = editorState.deck.slides[index];
+    if (!slide) return;
+
+    const dataUrl = await renderSlideToPng(slide, 0.2);
+    const card = document.querySelector(`.thumb-card[data-slide-id="${slide.id}"]`);
+    if (card) {
+        card.querySelector('.thumb-img').src = dataUrl;
+    }
+}
+
+function updateThumbsActiveState() {
+    const currentSlide = editorState.deck.slides[editorState.currentSlideIndex];
+    if (!currentSlide) return;
+
+    document.querySelectorAll('.thumb-card').forEach((card) => {
+        const isActive = card.dataset.slideId === currentSlide.id;
+        card.classList.toggle('active', isActive);
+        if (isActive) {
+            // keep the sorter following along when paging with keys/buttons
+            card.scrollIntoView({ block: 'nearest' });
+        }
+    });
+}
+
+// ================================================
+// Toolbar
+// ================================================
+
+function toggleBold() {
+    const obj = editorState.canvas.getActiveObjects()[0];
+    if (!obj) return;
+
+    const isBold = obj.fontWeight === 700 || obj.fontWeight === '700';
+    applyToSelection('fontWeight', isBold ? 400 : 700);
+}
+
+function toggleItalic() {
+    const obj = editorState.canvas.getActiveObjects()[0];
+    if (!obj) return;
+
+    const isItalic = obj.fontStyle === 'italic';
+    applyToSelection('fontStyle', isItalic ? 'normal' : 'italic');
+}
+
+function toggleUnderline() {
+    const obj = editorState.canvas.getActiveObjects()[0];
+    if (!obj) return;
+
+    const isUnderlined = obj.underline === true;
+    applyToSelection('underline', !isUnderlined);
+}
+
+function toggleStrikethrough() {
+    const obj = editorState.canvas.getActiveObjects()[0];
+    if (!obj) return;
+
+    applyToSelection('linethrough', !obj.linethrough);
+}
+
+function bindTextControls() {
+    $('fontFamilySelect').addEventListener('change', () => {
+        applyToSelection('fontFamily', $('fontFamilySelect').value);
+    });
+
+    $('fontSizeInput').addEventListener('change', () => {
+        applyToSelection('fontSize', Number($('fontSizeInput').value));
+    });
+
+    $('textBoldBtn').addEventListener('click', toggleBold);
+    $('textItalicBtn').addEventListener('click', toggleItalic);
+    $('textUnderlineBtn').addEventListener('click', toggleUnderline);
+    $('textStrikeBtn').addEventListener('click', toggleStrikethrough);
+
+    // text alignment lives in the Align dropdown (bindAlignDropdown)
+
+    $('charSpacingInput').addEventListener('change', () => {
+        applyToSelection('charSpacing', Number($('charSpacingInput').value));
+    });
+}
+
+function bindStyleControls() {
+    $('fillColorInput').addEventListener('input', () => {
+        applyToSelection('fill', $('fillColorInput').value);
+    });
+
+    $('strokeColorInput').addEventListener('input', () => {
+        applyToSelection('stroke', $('strokeColorInput').value);
+        // the pencil brush draws with the border color too
+        if (editorState.canvas.isDrawingMode) {
+            editorState.canvas.freeDrawingBrush.color = $('strokeColorInput').value;
+        }
+    });
+
+    $('strokeWidthInput').addEventListener('change', () => {
+        applyToSelection('strokeWidth', Number($('strokeWidthInput').value));
+        if (editorState.canvas.isDrawingMode) {
+            editorState.canvas.freeDrawingBrush.width =
+                Math.max(1, Number($('strokeWidthInput').value) || 2);
+        }
+    });
+
+    $('opacityInput').addEventListener('input', () => {
+        applyToSelection('opacity', Number($('opacityInput').value) / 100);
+    });
+}
+
+function bindToolbar() {
+    bindToolModeButtons();
+    bindShapeDropdown();
+    bindImageInsert();
+    bindTextControls();
+    bindAlignDropdown();
+    bindStyleControls();
+    bindArrangeControls();
+    bindTransformControls();
+    bindGroupControls();
+    bindEditButtons();
+    bindFiltersMenu();
+    bindZoomControls();
+
+    document.querySelector('.toolbar').addEventListener('scroll', () => closeAllToolbarDropdowns());
+    window.addEventListener('resize', () => closeAllToolbarDropdowns());
+}
+
+function bindToolModeButtons() {
+    Object.keys(TOOL_BUTTON_IDS).forEach((name) => {
+        $(TOOL_BUTTON_IDS[name]).addEventListener('click', () => {
+            setActiveTool(name);
+        });
+    });
+
+    // @ Link file mention
+    $('toolMentionBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openMentionPicker(e.currentTarget);
+    });
+}
+
+/**
+ * Insert an object where the user clicked 
+ */
+
+const TOOL_BUTTON_IDS = {
+    select: 'toolSelectBtn',
+    text: 'toolTextBtn',
+    draw: 'toolDrawBtn'
+};
+
+// insert tools that live inside the Shapes dropdown
+const SHAPE_TOOLS = ['rect', 'ellipse', 'triangle', 'line'];
+
+function setActiveTool(tool) {
+    editorState.activeTool = tool;
+
+    Object.keys(TOOL_BUTTON_IDS).forEach((name) => {
+        $(TOOL_BUTTON_IDS[name]).classList.toggle('active', name === tool);
+    });
+
+    const isShape = SHAPE_TOOLS.includes(tool);
+    $('toolShapeBtn').classList.toggle('active', isShape);
+    if (isShape) {
+        setShapeIcon(tool);
+    }
+
+    // 'draw' hands the pointer to fabric's freehand engine; every other
+    // tool runs with isDrawingMode off
+    const isDraw = tool === 'draw';
+    editorState.canvas.isDrawingMode = isDraw;
+    if (isDraw) {
+        configureFreehandBrush();
+    }
+
+    editorState.canvas.defaultCursor = tool === 'select' ? 'default' : 'crosshair';
+}
+
+/**
+ * Build the freehand brush from the current border color/width inputs.
+ * Called on entering draw mode and when those inputs change mid-mode.
+ */
+function configureFreehandBrush() {
+    const brush = new fabric.PencilBrush(editorState.canvas);
+    brush.color = $('strokeColorInput').value;
+    brush.width = Math.max(1, Number($('strokeWidthInput').value) || 2);
+    brush.decimate = 2;
+    editorState.canvas.freeDrawingBrush = brush;
+}
+
+// ================================================
+// Toolbar dropdowns (Shapes, Alignment)
+// ================================================
+
+/** Copy a dropdown item's svg onto a dropdown button's icon holder. */
+function mirrorDropdownIcon(dropdownId, selector, holderId) {
+    const item = document.querySelector(`#${dropdownId} ${selector}`);
+    if (item && item.querySelector('svg')) {
+        $(holderId).replaceChildren(item.querySelector('svg').cloneNode(true));
+    }
+}
+
+function setShapeIcon(tool) {
+    mirrorDropdownIcon('shapeDropdown', `[data-tool="${tool}"]`, 'shapeIconHolder');
+}
+
+function setAlignIcon(align) {
+    mirrorDropdownIcon('alignDropdown', `[data-align="${align}"]`, 'alignIconHolder');
+}
+
+/** Anchor a toolbar dropdown below its trigger. The menus are position:fixed
+ * because the toolbar's overflow-x scroll would clip absolute children. */
+function positionToolbarDropdown(button, dropdown) {
+    const r = button.getBoundingClientRect();
+    dropdown.style.top = `${r.bottom + 6}px`;
+    dropdown.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - dropdown.offsetWidth - 8))}px`;
+}
+
+/** Toggle one toolbar dropdown; outside clicks close everything. */
+function bindDropdownToggle(buttonId, dropdownId) {
+    const button = $(buttonId);
+    const dropdown = $(dropdownId);
+    button.addEventListener('click', () => {
+        closeAllToolbarDropdowns(dropdownId);
+        if (dropdown.classList.toggle('open')) {
+            positionToolbarDropdown(button, dropdown);
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.tool-dropdown-menu')) {
+            $(dropdownId).classList.remove('open');
+        }
+    });
+}
+
+function closeAllToolbarDropdowns(exceptId) {
+    document.querySelectorAll('.tool-dropdown.open, #filtersDropdown.open').forEach((menu) => {
+        if (menu.id !== exceptId) {
+            menu.classList.remove('open');
+        }
+    });
+}
+
+function bindShapeDropdown() {
+    bindDropdownToggle('toolShapeBtn', 'shapeDropdown');
+
+    document.querySelectorAll('#shapeDropdown [data-tool]').forEach((item) => {
+        item.addEventListener('click', () => {
+            setActiveTool(item.dataset.tool);
+            closeAllToolbarDropdowns();
+        });
+    });
+
+    setShapeIcon('rect');   // default face for the Shapes button
+}
+
+function bindAlignDropdown() {
+    bindDropdownToggle('textAlignBtn', 'alignDropdown');
+
+    document.querySelectorAll('#alignDropdown [data-align]').forEach((item) => {
+        item.addEventListener('click', () => {
+            applyToSelection('textAlign', item.dataset.align);
+            setAlignIcon(item.dataset.align);
+            closeAllToolbarDropdowns();
+        });
+    });
+
+    setAlignIcon('left');
+}
+
+function insertObjectAtPointer(opt) {
+   const p = opt.scenePoint;
+    let obj = null;
+
+    switch (editorState.activeTool) {
+        case 'text':
+            obj = new fabric.Textbox('Text', {
+                left: p.x, top: p.y, width: 320,
+                fontSize: 24, fontFamily: 'Inter', fill: '#1a1a1a'
+            });
+            break;
+        case 'rect':
+            obj = new fabric.Rect({
+                left: p.x, top: p.y, width: 160, height: 100,
+                fill: '#fed7aa', rx: 4, ry: 4
+            });
+            break;
+        case 'ellipse':
+            obj = new fabric.Ellipse({ left: p.x, top: p.y, rx: 80, ry: 50, fill: '#fed7aa' });
+            break;
+        case 'triangle':
+            obj = new fabric.Triangle({ left: p.x, top: p.y, width: 120, height: 100, fill: '#fed7aa' });
+            break;
+        case 'line':
+            obj = new fabric.Line([p.x, p.y, p.x + 160, p.y + 90], {
+                stroke: '#1a1a1a', strokeWidth: 2
+            });
+            break;
+    }
+
+    if (!obj) return;
+
+    editorState.canvas.add(obj);
+    editorState.canvas.setActiveObject(obj);
+    setActiveTool('select');
+}
+
+
+function bindImageInsert() {
+    $('imageBtn').addEventListener('click', () => {
+        $('imageFileInput').click();
+    });
+
+    $('imageFileInput').addEventListener('change', () => {
+        const file = $('imageFileInput').files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            fabric.Image.fromURL(e.target.result).then((img) => {
+                const maxWidth = APP_CONFIG.slide.width * 0.8;
+                const maxHeight = APP_CONFIG.slide.height * 0.8;
+
+                if (img.width > maxWidth) {
+                    img.scaleToWidth(maxWidth);
+                }
+                if (img.getScaledHeight() > maxHeight) {
+                    img.scaleToHeight(maxHeight);
+                }
+
+                img.set({
+                    left: (APP_CONFIG.slide.width - img.getScaledWidth()) / 2,
+                    top: (APP_CONFIG.slide.height - img.getScaledHeight()) / 2
+                });
+
+                editorState.canvas.add(img);
+                editorState.canvas.setActiveObject(img);
+            });
+        };
+
+        reader.readAsDataURL(file);
+        $('imageFileInput').value = '';
+    });
+}
+
+
+function toHexOrNull(value) {
+    return typeof value === 'string' && value.startsWith('#') ? value : null;
+}
+
+function setToolGroupDisabled(group, disabled) {
+    group.querySelectorAll('button, input, select').forEach((el) => {
+        el.disabled = disabled;
+    });
+}
+
+function syncToolbarFromSelection() {
+    const activeObjects = editorState.canvas.getActiveObjects();
+    const hasSelection = activeObjects.length > 0;
+
+    setToolGroupDisabled($('fontFamilySelect').closest('.tool-group'), !hasSelection);
+    setToolGroupDisabled($('deleteBtn').closest('.tool-group'), !hasSelection);
+    syncFiltersMenu();
+
+    if (!hasSelection) return;
+
+    const obj = activeObjects[0];
+
+    if (obj.isType('textbox')) {
+        $('fontFamilySelect').value = obj.fontFamily;
+        $('fontSizeInput').value = obj.fontSize;
+        $('charSpacingInput').value = obj.charSpacing || 0;
+        setAlignIcon(obj.textAlign || 'left');
+
+        $('textBoldBtn').classList.toggle('active', obj.fontWeight === 700 || obj.fontWeight === '700');
+        $('textItalicBtn').classList.toggle('active', obj.fontStyle === 'italic');
+        $('textUnderlineBtn').classList.toggle('active', obj.underline === true);
+        $('textStrikeBtn').classList.toggle('active', obj.linethrough === true);
+    }
+
+    $('fillColorInput').value = toHexOrNull(obj.fill) || '#1a1a1a';
+    $('strokeColorInput').value = toHexOrNull(obj.stroke) || '#000000';
+    $('strokeWidthInput').value = obj.strokeWidth || 0;
+    $('opacityInput').value = Math.round((obj.opacity ?? 1) * 100);
+}
+
+/**
+ * Apply a property change to EVERY active object 
+ */
+function applyToSelection(prop, value) {
+    const activeObjects = editorState.canvas.getActiveObjects();
+    if (activeObjects.length === 0) return;
+
+    activeObjects.forEach((obj) => obj.set(prop, value));
+
+    editorState.canvas.requestRenderAll();
+    syncCurrentSlideFromCanvas();
+    renderThumb(editorState.currentSlideIndex);
+    markDirty();
+}
+
+function bindArrangeControls() {
+    // the Arrange dropdown button itself (items below keep their own bindings)
+    bindDropdownToggle('arrangeBtn', 'arrangeDropdown');
+
+    $('bringForwardBtn').addEventListener('click', () => {
+        const obj = editorState.canvas.getActiveObject();
+        if (!obj) return;
+
+        editorState.canvas.bringObjectForward(obj);
+        syncCurrentSlideFromCanvas();
+        renderThumb(editorState.currentSlideIndex);
+        markDirty();
+    });
+
+    $('sendBackwardBtn').addEventListener('click', () => {
+        const obj = editorState.canvas.getActiveObject();
+        if (!obj) return;
+
+        editorState.canvas.sendObjectBackwards(obj);
+        syncCurrentSlideFromCanvas();
+        renderThumb(editorState.currentSlideIndex);
+        markDirty();
+    });
+}
+
+
+/**
+ * Flip every active object along an axis. Per-object toggle (not a fixed
+ * value) so mixed selections stay correct.
+ */
+function flipSelection(prop) {
+    const activeObjects = editorState.canvas.getActiveObjects();
+    if (activeObjects.length === 0) return;
+
+    activeObjects.forEach((obj) => obj.set(prop, !obj[prop]));
+
+    editorState.canvas.requestRenderAll();
+    syncCurrentSlideFromCanvas();
+    renderThumb(editorState.currentSlideIndex);
+    markDirty();
+}
+
+/**
+ * Center the active object (single or multi-select) on the slide.
+ * axis: 'h' | 'v'
+ */
+function centerSelection(axis) {
+    const obj = editorState.canvas.getActiveObject();
+    if (!obj) return;
+
+    if (axis === 'h') {
+        editorState.canvas.centerObjectH(obj);
+    } else {
+        editorState.canvas.centerObjectV(obj);
+    }
+    obj.setCoords();
+
+    editorState.canvas.requestRenderAll();
+    syncCurrentSlideFromCanvas();
+    renderThumb(editorState.currentSlideIndex);
+    markDirty();
+}
+
+function bindTransformControls() {
+    $('flipXBtn').addEventListener('click', () => flipSelection('flipX'));
+    $('flipYBtn').addEventListener('click', () => flipSelection('flipY'));
+    $('centerHBtn').addEventListener('click', () => centerSelection('h'));
+    $('centerVBtn').addEventListener('click', () => centerSelection('v'));
+}
+
+
+function groupSelection() {
+    const activeObject = editorState.canvas.getActiveObject();
+    if (!activeObject || editorState.canvas.getActiveObjects().length < 2) return;
+
+    // take the children out of the multi-select, then group them for real
+    const objects = activeObject.getObjects();
+
+    editorState.canvas.discardActiveObject();
+    objects.forEach((obj) => editorState.canvas.remove(obj));
+
+    const group = new fabric.Group(objects);
+    editorState.canvas.add(group);
+    editorState.canvas.setActiveObject(group);
+}
+
+function ungroupSelection() {
+    const group = editorState.canvas.getActiveObject();
+    if (!group || !group.isType('group')) return;
+
+    const objects = group.removeAll();
+
+    editorState.canvas.remove(group);
+    objects.forEach((obj) => editorState.canvas.add(obj));
+    editorState.canvas.discardActiveObject();
+}
+
+function bindGroupControls() {
+    $('groupBtn').addEventListener('click', groupSelection);
+    $('ungroupBtn').addEventListener('click', ungroupSelection);
+}
+
+function duplicateSelection() {
+    const activeObjects = editorState.canvas.getActiveObjects();
+    if (activeObjects.length === 0) return;
+
+    const activeObject = editorState.canvas.getActiveObject();
+
+    activeObject.clone().then((clone) => {
+        if (activeObjects.length > 1) {
+            const clones = clone.getObjects();
+            clones.forEach((obj) => {
+                obj.set({ left: (obj.left || 0) + 16, top: (obj.top || 0) + 16 });
+                editorState.canvas.add(obj);
+            });
+
+            const group = new fabric.ActiveSelection(clones, { canvas: editorState.canvas });
+            editorState.canvas.setActiveObject(group);
+        } else {
+            clone.set({ left: (clone.left || 0) + 16, top: (clone.top || 0) + 16 });
+            editorState.canvas.add(clone);
+            editorState.canvas.setActiveObject(clone);
+        }
+    });
+}
+
+function deleteSelection() {
+    const activeObjects = editorState.canvas.getActiveObjects();
+    if (activeObjects.length === 0) return;
+
+    editorState.canvas.discardActiveObject();
+
+    activeObjects.forEach((obj) => editorState.canvas.remove(obj));
+}
+
+function bindEditButtons() {
+    $('duplicateBtn').addEventListener('click', duplicateSelection);
+    $('deleteBtn').addEventListener('click', deleteSelection);
+}
+
+// ================================================
+// Image filters (fabric.filters — applies to images only)
+// ================================================
+
+const FILTER_FACTORIES = {
+    Grayscale: () => new fabric.filters.Grayscale(),
+    Sepia: () => new fabric.filters.Sepia(),
+    Invert: () => new fabric.filters.Invert(),
+    Blur: () => new fabric.filters.Blur({ blur: 0.15 }),
+    Pixelate: () => new fabric.filters.Pixelate({ blocksize: 6 })
+};
+
+function getSelectedImages() {
+    return editorState.canvas.getActiveObjects().filter((obj) => obj.isType('image'));
+}
+
+
+function afterFilterChange() {
+    editorState.canvas.requestRenderAll();
+    syncCurrentSlideFromCanvas();
+    recordUndoSnapshot();
+    renderThumb(editorState.currentSlideIndex);
+    markDirty();
+}
+
+/** Toggle one filter on every selected image, then refresh the menu checks. */
+function toggleFilter(name) {
+    const images = getSelectedImages();
+    if (images.length === 0) return;
+
+    images.forEach((img) => {
+        const existing = img.filters.find((f) => f.type === name);
+        if (existing) {
+            img.filters = img.filters.filter((f) => f !== existing);
+        } else {
+            img.filters.push(FILTER_FACTORIES[name]());
+        }
+        img.applyFilters();
+    });
+
+    afterFilterChange();
+    syncFiltersMenu();
+}
+
+function clearFilters() {
+    const images = getSelectedImages();
+    if (images.length === 0) return;
+
+    images.forEach((img) => {
+        img.filters = [];
+        img.applyFilters();
+    });
+
+    afterFilterChange();
+    syncFiltersMenu();
+}
+
+/**
+ * Reflect the selection in the toolbar: enable/disable the whole group and
+ * mark which filters are active. The menu stays open on filter clicks so
+ * filters can be stacked.
+ */
+function syncFiltersMenu() {
+    const images = getSelectedImages();
+    setToolGroupDisabled($('filtersBtn').closest('.tool-group'), images.length === 0);
+
+    if (images.length === 0) {
+        $('filtersDropdown').classList.remove('open');
+        return;
+    }
+
+    document.querySelectorAll('#filtersDropdown [data-filter]').forEach((item) => {
+        const on = images.some((img) => img.filters.some((f) => f.type === item.dataset.filter));
+        item.classList.toggle('active', on);
+    });
+}
+
+function bindFiltersMenu() {
+    $('filtersBtn').addEventListener('click', () => {
+        closeAllToolbarDropdowns('filtersDropdown');
+        if ($('filtersDropdown').classList.toggle('open')) {
+            positionToolbarDropdown($('filtersBtn'), $('filtersDropdown'));
+        }
+    });
+
+    document.querySelectorAll('#filtersDropdown [data-filter]').forEach((item) => {
+        item.addEventListener('click', () => toggleFilter(item.dataset.filter));
+    });
+
+    $('clearFiltersBtn').addEventListener('click', clearFilters);
+
+    // close the menu when clicking anywhere else (same pattern as the export menu)
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.filters-menu')) {
+            $('filtersDropdown').classList.remove('open');
+        }
+    });
+}
+
+// ================================================
+// Zoom
+// ================================================
+
+
+function applyZoom(z) {
+    editorState.zoom = Math.min(3, Math.max(0.25, z));
+
+    editorState.canvas.setDimensions({
+        width: APP_CONFIG.slide.width * editorState.zoom,
+        height: APP_CONFIG.slide.height * editorState.zoom
+    });
+    editorState.canvas.setZoom(editorState.zoom);
+
+    // grow the white "paper" wrapper with the canvas
+    $('slideSurface').style.width = (APP_CONFIG.slide.width * editorState.zoom) + 'px';
+    $('slideSurface').style.height = (APP_CONFIG.slide.height * editorState.zoom) + 'px';
+
+    $('zoomValue').textContent = Math.round(editorState.zoom * 100) + '%';
+}
+
+/** zoomIn/zoomOut: applyZoom(zoom ± 0.1). */
+function bindZoomControls() {
+    $('zoomInBtn').addEventListener('click', () => applyZoom(editorState.zoom + 0.1));
+    $('zoomOutBtn').addEventListener('click', () => applyZoom(editorState.zoom - 0.1));
+    $('zoomFitBtn').addEventListener('click', zoomToFit);
+
+    // create the debounced wrapper ONCE (a fresh one per event would never cancel anything)
+    const onStageResize = debounce(zoomToFit, 200);
+    window.addEventListener('resize', onStageResize);
+}
+
+function zoomToFit() {
+    const stage = document.querySelector('.canvas-stage');
+    const stageStyle = getComputedStyle(stage);
+    const padX = parseFloat(stageStyle.paddingLeft) + parseFloat(stageStyle.paddingRight);
+    const padY = parseFloat(stageStyle.paddingTop) + parseFloat(stageStyle.paddingBottom);
+    const availableWidth = stage.clientWidth - padX;
+    const availableHeight = stage.clientHeight - padY;
+
+    if (availableWidth <= 0 || availableHeight <= 0) return;
+
+    const zoom = Math.min(
+        availableWidth / APP_CONFIG.slide.width,
+        availableHeight / APP_CONFIG.slide.height
+    );
+    applyZoom(zoom);
+}
+
+// ================================================
+// Undo / redo
+// ================================================
+
+
+function recordUndoSnapshot() {
+    if (editorState.isRestoring) return;
+
+    clearTimeout(undoSnapshotTimer);
+    undoSnapshotTimer = setTimeout(() => {
+        const snapshot = JSON.stringify(editorState.canvas.toObject(EXTRA_SERIALIZED_PROPS).objects);
+
+        editorState.undoStack.push(snapshot);
+        if (editorState.undoStack.length > 50) {
+            editorState.undoStack.shift();
+        }
+        editorState.redoStack = [];
+    }, 300);
+}
+
+
+function restoreObjects(json) {
+    editorState.isRestoring = true;
+
+    editorState.canvas.loadFromJSON({ objects: JSON.parse(json) }).then(() => {
+        editorState.canvas.discardActiveObject();
+        editorState.canvas.requestRenderAll();
+
+        editorState.isRestoring = false;
+
+        markDirty();
+        renderThumb(editorState.currentSlideIndex);
+    });
+}
+
+function undo() {
+    if (editorState.isRestoring || editorState.undoStack.length === 0) return;
+
+    const previousState = editorState.undoStack.pop();
+    editorState.redoStack.push(JSON.stringify(editorState.canvas.toObject(EXTRA_SERIALIZED_PROPS).objects));
+
+    restoreObjects(previousState);
+}
+
+function redo() {
+    if (editorState.isRestoring || editorState.redoStack.length === 0) return;
+
+    const nextState = editorState.redoStack.pop();
+    editorState.undoStack.push(JSON.stringify(editorState.canvas.toObject(EXTRA_SERIALIZED_PROPS).objects));
+
+    restoreObjects(nextState);
+}
+
+// ================================================
+// Keyboard shortcuts
+// ================================================
+
+
+/**
+ * Nudge the active object with the arrow keys.
+ * @returns {boolean} false when there was no selection (or the key isn't a
+ *   nudge key) — lets the caller fall back to slide paging.
+ */
+function nudgeSelection(e) {
+    const activeObject = editorState.canvas.getActiveObject();
+    if (!activeObject) return false;
+
+    const moves = {
+        arrowleft: ['left', -1],
+        arrowright: ['left', 1],
+        arrowup: ['top', -1],
+        arrowdown: ['top', 1]
+    };
+    const move = moves[e.key.toLowerCase()];
+    if (!move) return false;
+
+    e.preventDefault();
+
+    const delta = move[1] * (e.shiftKey ? 10 : 1);
+    activeObject.set(move[0], activeObject[move[0]] + delta);
+    activeObject.setCoords();
+    editorState.canvas.requestRenderAll();
+    syncCurrentSlideFromCanvas();
+    markDirty();
+    return true;
+}
+
+function bindKeyboard() {
+    document.addEventListener('keydown', (e) => {
+        // --- present mode has its own navigation keys ---
+        if (!$('presentOverlay').classList.contains('hidden')) {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                presentNext();
+            } else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+                e.preventDefault();
+                presentPrev();
+            } else if (e.key === 'Escape') {
+                exitPresentMode();
+            }
+            return;
+        }
+
+        // --- typing must never trigger shortcuts ---
+        const tagName = (e.target.tagName || '').toLowerCase();
+        const editingText = editorState.canvas.getActiveObject()?.isEditing;
+        if (tagName === 'input' || tagName === 'select' || tagName === 'textarea' || editingText) {
+            return;
+        }
+
+        const key = e.key.toLowerCase();
+        const mod = e.ctrlKey || e.metaKey;
+
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            e.preventDefault();
+            deleteSelection();
+        } else if (mod && key === 'd') {
+            e.preventDefault();
+            duplicateSelection();
+        } else if (mod && key === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) { redo(); } else { undo(); }
+        } else if (mod && key === 'y') {
+            e.preventDefault();
+            redo();
+        } else if (mod && key === 's') {
+            e.preventDefault();
+            if (e.shiftKey) { toggleStrikethrough(); } else { saveDeck(); }
+        } else if (mod && key === 'g') {
+            e.preventDefault();
+            if (e.shiftKey) { ungroupSelection(); } else { groupSelection(); }
+        } else if (mod && key === 'b') {
+            e.preventDefault();
+            toggleBold();
+        } else if (mod && key === 'i') {
+            e.preventDefault();
+            toggleItalic();
+        } else if (mod && key === 'u') {
+            e.preventDefault();
+            toggleUnderline();
+        } else if (!mod && e.key.startsWith('Arrow')) {
+            // arrows nudge the selected object; with nothing selected they
+            // page between slides — same keys as present mode
+            if (!nudgeSelection(e)) {
+                if (e.key === 'ArrowRight') {
+                    goToSlide(editorState.currentSlideIndex + 1);
+                } else if (e.key === 'ArrowLeft') {
+                    goToSlide(editorState.currentSlideIndex - 1);
+                }
+            }
+        } else if (!mod && 'vtrolp'.includes(key)) {
+            const toolFor = { v: 'select', t: 'text', r: 'rect', o: 'ellipse', l: 'line', p: 'draw' };
+            setActiveTool(toolFor[key]);
+        } else if (key === 'escape') {
+            editorState.canvas.discardActiveObject();
+        }
+    });
+}
+
+// ================================================
+// Load / save / autosave
+// ================================================
+
+
+function onBeforeUnload(e) {
+      e.preventDefault();
+      e.returnValue = '';   // legacy flag — Chrome needs this to show the dialog
+  }
+function markDirty() {
+    editorState.isDirty = true;
+    $('saveState').textContent = 'Unsaved changes…';
+    window.addEventListener('beforeunload', onBeforeUnload)
+}
+
+/**
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.explicit=true] - false for auto-save paths
+ * @returns {Promise<boolean>} whether a save actually completed
+ */
+async function saveDeck(options = {}) {
+    const { explicit = true } = options;
+
+    if (explicit && !editorState.renamePromptDismissed && isUntitledDeck()) {
+        openRenamePrompt();
+        return false;
+    }
+
+    if (editorState.isSaving || !editorState.isDirty) return false;
+
+    editorState.isSaving = true;
+    $('saveState').textContent = 'Saving…';
+
+    syncCurrentSlideFromCanvas();
+
+    const ok = await slidesStorage.saveDeck(editorState.deck.id, editorState.deck);
+
+    if (ok) {
+        editorState.isDirty = false;
+
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        $('saveState').textContent = `Saved · ${hh}:${mm}`;
+
+        // safe to close the tab — disarm the beforeunload guard
+        window.removeEventListener('beforeunload', onBeforeUnload);
+    } else {
+        showNotification('Save failed — will retry automatically', true);
+    }
+
+    editorState.isSaving = false;
+    return ok;
+}
+
+/**
+ * True while the deck still carries a default name. Covers the variants
+ * in circulation: the Workdeck API seeds 'Untitled'; the editor's rename
+ * fallback uses 'Untitled deck'.
+ * @returns {boolean} True if the name is empty or a default untitled name
+ */
+function isUntitledDeck() {
+    const currentName = ((editorState.deck && editorState.deck.name) || '').trim().toLowerCase();
+    return !currentName || currentName === 'untitled' || currentName === 'untitled deck';
+}
+
+function startAutoSave() {
+    editorState.autoSaveTimer = setInterval(() => {
+        if (editorState.isDirty) {
+            saveDeck({ explicit: false });
+        }
+    }, APP_CONFIG.autoSave.interval);
+}
+
+// ================================================
+// Swipe navigation (touch)
+// ================================================
+const SWIPE_MIN_DISTANCE = 60;
+const SWIPE_DIRECTION_RATIO = 2;
+const SWIPE_INTENT_DISTANCE = 10;
+
+/** 1 for a left swipe (next), -1 for right (previous), 0 when not a swipe. */
+function horizontalSwipe(dx, dy) {
+    if (Math.abs(dx) < SWIPE_MIN_DISTANCE ||
+        Math.abs(dx) < Math.abs(dy) * SWIPE_DIRECTION_RATIO) {
+        return 0;
+    }
+    return dx < 0 ? 1 : -1;
+}
+
+function bindStageSwipeNav() {
+    const stage = document.querySelector('.canvas-stage');
+    let startX = 0, startY = 0, tracking = false, horizontal = false;
+
+    const stopTracking = () => {
+        tracking = false;
+        horizontal = false;
+        editorState.canvas.selection = true;   // lasso returns for the next gesture
+    };
+
+    stage.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) {
+            stopTracking();
+            return;
+        }
+        const canvas = editorState.canvas;
+        if (!canvas || canvas.isDrawingMode || editorState.activeTool !== 'select') {
+            return;
+        }
+        // an object under the finger means a drag, not a page swipe
+        if (typeof canvas.findTarget !== 'function') return;
+        let target = null;
+        try {
+            target = canvas.findTarget(e);
+        } catch (err) {
+            return;   // API drift — never break the canvas over a swipe
+        }
+        if (target) return;
+
+        const t = e.touches[0];
+        startX = t.clientX;
+        startY = t.clientY;
+        tracking = true;
+        horizontal = false;
+        canvas.selection = false;   // no lasso while this gesture is a swipe
+    }, { capture: true, passive: true });
+
+    stage.addEventListener('touchmove', (e) => {
+        if (!tracking) return;
+        const t = e.touches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        if (!horizontal && Math.max(Math.abs(dx), Math.abs(dy)) > SWIPE_INTENT_DISTANCE) {
+            horizontal = Math.abs(dx) > Math.abs(dy);
+        }
+        // once the gesture is ours, own it: no stage pan while swiping
+        if (horizontal) {
+            e.preventDefault();
+        }
+    }, { capture: true, passive: false });
+
+    stage.addEventListener('touchend', (e) => {
+        if (!tracking) return;
+        const t = e.changedTouches[0];
+        const dir = horizontal ? horizontalSwipe(t.clientX - startX, t.clientY - startY) : 0;
+        stopTracking();
+        if (dir !== 0) {
+            goToSlide(editorState.currentSlideIndex + dir);
+        }
+    }, { capture: true });
+
+    stage.addEventListener('touchcancel', stopTracking, { capture: true });
+}
+
+/** Same gesture over the present overlay, anywhere except the controls. */
+function bindPresentSwipeNav() {
+    const overlay = $('presentOverlay');
+    let startX = 0, startY = 0, tracking = false, horizontal = false;
+
+    overlay.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) {
+            tracking = false;
+            return;
+        }
+        if (e.target.closest('.present-controls')) return;   // real buttons
+        const t = e.touches[0];
+        startX = t.clientX;
+        startY = t.clientY;
+        tracking = true;
+        horizontal = false;
+    }, { passive: true });
+
+    overlay.addEventListener('touchmove', (e) => {
+        if (!tracking) return;
+        const t = e.touches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        if (!horizontal && Math.max(Math.abs(dx), Math.abs(dy)) > SWIPE_INTENT_DISTANCE) {
+            horizontal = Math.abs(dx) > Math.abs(dy);
+        }
+        if (horizontal) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    overlay.addEventListener('touchend', (e) => {
+        if (!tracking) return;
+        tracking = false;
+        if (!horizontal) return;
+        const t = e.changedTouches[0];
+        const dir = horizontalSwipe(t.clientX - startX, t.clientY - startY);
+        if (dir === 1) {
+            presentNext();
+        } else if (dir === -1) {
+            presentPrev();
+        }
+    });
+
+    overlay.addEventListener('touchcancel', () => {
+        tracking = false;
+    });
+}
+
+function bindSwipeNavigation() {
+    bindStageSwipeNav();
+    bindPresentSwipeNav();
+}
+
+// ================================================
+// Present mode
+// ================================================
+
+
+function enterPresentMode() {
+    syncCurrentSlideFromCanvas();
+    editorState.presentIndex = editorState.currentSlideIndex;
+
+    $('presentOverlay').classList.remove('hidden');
+
+    // Skip the Fullscreen API on touch devices
+    const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    if (!isTouch) {
+        const request = $('presentOverlay').requestFullscreen();
+        if (request) {
+            request.catch(() => {});
+        }
+    }
+
+    renderPresentSlide();
+}
+
+function presentNext() {
+    if (editorState.presentIndex < editorState.deck.slides.length - 1) {
+        editorState.presentIndex += 1;
+        renderPresentSlide();
+    }
+}
+
+function presentPrev() {
+    if (editorState.presentIndex > 0) {
+        editorState.presentIndex -= 1;
+        renderPresentSlide();
+    }
+}
+
+function renderPresentSlide() {
+    const slide = editorState.deck.slides[editorState.presentIndex];
+    if (!slide) return;
+
+    const scale = Math.min(
+        window.innerWidth / APP_CONFIG.slide.width,
+        window.innerHeight / APP_CONFIG.slide.height
+    );
+
+    if (!editorState.presentCanvas) {
+        editorState.presentCanvas = new fabric.StaticCanvas('presentCanvas');
+    }
+    const presentCanvas = editorState.presentCanvas;
+
+    presentCanvas.setDimensions({
+        width: APP_CONFIG.slide.width * scale,
+        height: APP_CONFIG.slide.height * scale
+    });
+    presentCanvas.setZoom(scale);
+
+    presentCanvas.loadFromJSON({ objects: slide.objects || [] }).then(() => {
+        presentCanvas.backgroundColor = slide.background || APP_CONFIG.slide.defaultBackground;
+        presentCanvas.renderAll();
+    });
+
+    $('presentCounter').textContent =
+        `${editorState.presentIndex + 1} / ${editorState.deck.slides.length}`;
+}
+
+function exitPresentMode() {
+    $('presentOverlay').classList.add('hidden');
+
+    if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+    }
+    editorState.canvas.requestRenderAll();
+}
+
+function bindPresentControls() {
+    $('presentBtn').addEventListener('click', enterPresentMode);
+    $('presentExitBtn').addEventListener('click', exitPresentMode);
+    $('presentNextBtn').addEventListener('click', presentNext);
+    $('presentPrevBtn').addEventListener('click', presentPrev);
+
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement && !$('presentOverlay').classList.contains('hidden')) {
+            exitPresentMode();
+        }
+    });
+
+    // re-letterbox while presenting when the window changes size
+    window.addEventListener('resize', debounce(() => {
+        if (!$('presentOverlay').classList.contains('hidden')) {
+            renderPresentSlide();
+        }
+    }, 150));
+}
+
+// ================================================
+// Export
+// ================================================
+
+
+function closeMenusOnOutsideClick() {
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.export-menu')) {
+            $('exportDropdown').classList.remove('open');
+        }
+        if (!e.target.closest('.top-nav-settings')) {
+            $('settingsDropdown').classList.remove('open');
+            closeThemeSubmenu();
+        }
+    });
+}
+
+function bindExportMenu() {
+    $('exportBtn').addEventListener('click', () => {
+        $('exportDropdown').classList.toggle('open');
+        $('settingsDropdown').classList.remove('open');
+    });
+
+    $('exportPngBtn').addEventListener('click', () => {
+        $('exportDropdown').classList.remove('open');
+        exportPng();
+    });
+    $('exportPdfBtn').addEventListener('click', () => {
+        $('exportDropdown').classList.remove('open');
+        exportPdf();
+    });
+    $('exportPptxBtn').addEventListener('click', () => {
+        $('exportDropdown').classList.remove('open');
+        exportPptx();
+    });
+}
+
+/**
+ * PNG — current slide at 2x for crispness:
+ */
+function deckFileName() {
+    return editorState.deck.name || 'deck';
+}
+
+
+async function renderSlideToPng(slide, multiplier) {
+    const offscreen = new fabric.StaticCanvas(undefined, {
+        width: APP_CONFIG.slide.width,
+        height: APP_CONFIG.slide.height
+    });
+
+    await offscreen.loadFromJSON({ objects: slide.objects || [] });
+    offscreen.backgroundColor = slide.background || APP_CONFIG.slide.defaultBackground;
+    offscreen.renderAll();
+
+    const dataUrl = offscreen.toDataURL({ format: 'png', multiplier });
+    offscreen.dispose();
+    return dataUrl;
+}
+
+function exportPng() {
+    syncCurrentSlideFromCanvas();
+
+    const dataUrl = editorState.canvas.toDataURL({ format: 'png', multiplier: 2 });
+
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `${deckFileName()} - slide ${editorState.currentSlideIndex + 1}.png`;
+    link.click();
+}
+
+/**
+ * PDF — needs the jsPDF <script> 
+ * For EACH slide: render it offscreen to PNG (reuse the thumbnail technique
+ * at higher multiplier)
+ */
+async function exportPdf() {
+    if (typeof window.jspdf === 'undefined') {
+        showNotification('PDF export needs jsPDF — uncomment it in editor.html', true);
+        return;
+    }
+
+    syncCurrentSlideFromCanvas();
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [APP_CONFIG.slide.width, APP_CONFIG.slide.height]
+    });
+
+    const slides = editorState.deck.slides;
+    for (let i = 0; i < slides.length; i++) {
+        showNotification(`Rendering slide ${i + 1} of ${slides.length}…`);
+        const dataUrl = await renderSlideToPng(slides[i], 2);
+        if (i > 0) {
+            pdf.addPage();
+        }
+        pdf.addImage(dataUrl, 'PNG', 0, 0, APP_CONFIG.slide.width, APP_CONFIG.slide.height);
+    }
+
+    pdf.save(`${deckFileName()}.pdf`);
+}
+
+/**
+ * PPTX — needs the PptxGenJS <script>
+ */
+// pptx colors are hex WITHOUT the '#'; map anything non-hex to a default
+function hexNoHash(value) {
+    const hex = toHexOrNull(value);
+    return hex ? hex.slice(1) : '1a1a1a';
+}
+
+async function exportPptx() {
+    if (typeof window.PptxGenJS === 'undefined') {
+        showNotification('PPTX export needs PptxGenJS — uncomment it in editor.html', true);
+        return;
+    }
+
+    syncCurrentSlideFromCanvas();
+
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'DECK', width: 10, height: 5.625 });
+    pptx.layout = 'DECK';
+
+    const S = 10 / APP_CONFIG.slide.width;
+
+    const DIRECT_TYPES = ['textbox', 'rect', 'ellipse', 'triangle', 'image'];
+
+    for (const slide of editorState.deck.slides) {
+        const objects = slide.objects || [];
+        const pptxSlide = pptx.addSlide();
+        pptxSlide.background = { color: hexNoHash(slide.background || APP_CONFIG.slide.defaultBackground) };
+
+        if (!objects.every((obj) => DIRECT_TYPES.includes(obj.type))) {
+            const dataUrl = await renderSlideToPng(slide, 2);
+            pptxSlide.addImage({ data: dataUrl, x: 0, y: 0, w: 10, h: 5.625 });
+            continue;
+        }
+
+        for (const obj of objects) {
+            const x = (obj.left || 0) * S;
+            const y = (obj.top || 0) * S;
+            const w = (obj.width || 0) * (obj.scaleX || 1) * S;
+            const h = (obj.height || 0) * (obj.scaleY || 1) * S;
+
+            if (obj.type === 'textbox' && obj.text) {
+                pptxSlide.addText(obj.text, {
+                    x, y, w, h,
+                    fontSize: Math.max(8, Math.round((obj.fontSize || 24) * 0.75)),
+                    fontFace: obj.fontFamily || 'Inter',
+                    bold: obj.fontWeight === 700 || obj.fontWeight === '700',
+                    italic: obj.fontStyle === 'italic',
+                    align: obj.textAlign || 'left',
+                    color: hexNoHash(obj.fill)
+                });
+            } else if (obj.type === 'rect') {
+                pptxSlide.addShape(pptx.ShapeType.rect, {
+                    x, y, w, h,
+                    fill: { color: hexNoHash(obj.fill) },
+                    line: obj.stroke ? { color: hexNoHash(obj.stroke), width: obj.strokeWidth || 0 } : undefined
+                });
+            } else if (obj.type === 'ellipse') {
+                pptxSlide.addShape(pptx.ShapeType.ellipse, {
+                    x, y,
+                    w: 2 * (obj.rx || 0) * (obj.scaleX || 1) * S,
+                    h: 2 * (obj.ry || 0) * (obj.scaleY || 1) * S,
+                    fill: { color: hexNoHash(obj.fill) }
+                });
+            } else if (obj.type === 'triangle') {
+                pptxSlide.addShape(pptx.ShapeType.triangle, {
+                    x, y, w, h,
+                    fill: { color: hexNoHash(obj.fill) }
+                });
+            } else if (obj.type === 'image' && obj.src) {
+                pptxSlide.addImage({ data: obj.src, x, y, w, h });
+            }
+        }
+    }
+
+    await pptx.writeFile({ fileName: `${deckFileName()}.pptx` });
+}
+
+// ================================================
+// Top nav: title, save, settings, share
+// ================================================
+
+function bindTopNav() {
+    $('homeBtn').addEventListener('click', () => {
+        saveDeck({ explicit: false });   // best-effort; the reminder must not block navigation
+        window.location.href = '/slides/';
+    });
+
+    $('saveBtn').addEventListener('click', () => saveDeck());
+    $('deckTitle').addEventListener('click', openRenameModal);
+
+    bindExportMenu();
+    bindPresentControls();
+    bindSettingsMenu();
+    closeMenusOnOutsideClick();
+}
+
+function confirmRename() {
+    const name = $('renameInput').value.trim() || 'Untitled deck';
+
+    editorState.deck.name = name;
+    $('deckTitle').textContent = name;
+
+    closeModal($('renameModal'));
+    markDirty();
+    saveDeck();
+}
+
+function openRenameModal() {
+    $('renameInput').value = editorState.deck.name || '';
+    openModal($('renameModal'));
+    $('renameInput').focus();
+    $('renameInput').select();
+}
+
+
+
+/** Wire up rename reminder modal event handlers. */
+function setupRenamePrompt() {
+    const modal = $('renamePromptModal');
+    const input = $('renamePromptInput');
+
+    $('renamePromptConfirm').addEventListener('click', () => closeRenamePrompt(true));
+    $('renamePromptLater').addEventListener('click', () => closeRenamePrompt(false));
+    // the X and the backdrop count as "Later" — the save must still go through
+    $('renamePromptClose').addEventListener('click', () => closeRenamePrompt(false));
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeRenamePrompt(false);
+        }
+    });
+
+    // Enter = Rename, Escape = Later
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            closeRenamePrompt(true);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeRenamePrompt(false);
+        }
+    });
+}
+
+/** Open the rename reminder modal. */
+function openRenamePrompt() {
+    const modal = $('renamePromptModal');
+    if (!modal) {
+        // modal missing (e.g. stale markup) — never block saving
+        editorState.renamePromptDismissed = true;
+        return;
+    }
+
+    const input = $('renamePromptInput');
+    input.value = '';
+    openModal(modal);
+    setTimeout(() => input.focus(), 100);
+}
+
+/**
+ * Close the rename reminder modal and continue the interrupted save.
+ * @param {boolean} renamed - true if the user chose Rename with a name
+ */
+function closeRenamePrompt(renamed) {
+    closeModal($('renamePromptModal'));
+
+    // don't nag again for this deck after either choice
+    editorState.renamePromptDismissed = true;
+
+    const newName = $('renamePromptInput').value.trim();
+
+    const proceed = () => {
+        if (renamed && newName) {
+            // apply the name, then continue the interrupted save
+            editorState.deck.name = newName;
+            $('deckTitle').textContent = newName;
+            markDirty();
+        }
+        saveDeck({ explicit: false });
+    };
+
+    if (renamed && newName) {
+        // input still visible for a frame — close first, then act
+        setTimeout(proceed, 50);
+    } else {
+        proceed();
+    }
+}
+
+
+function syncThemeControls() {
+    $('themeText').textContent = 'Theme: ' + slidesThemeManager.getDisplayLabel();
+    const pref = slidesThemeManager.getPreference();
+    document.querySelectorAll('.theme-option').forEach((option) => {
+        option.classList.toggle('active', option.dataset.theme === pref);
+    });
+}
+
+function closeThemeSubmenu() {
+    $('themeSubmenu').classList.remove('open');
+    const container = $('themeToggleBtn').closest('.theme-dropdown-container');
+    if (container) container.classList.remove('active');
+}
+
+function bindSettingsMenu() {
+    syncThemeControls();
+
+    $('settingsBtn').addEventListener('click', () => {
+        $('settingsDropdown').classList.toggle('open');
+        $('exportDropdown').classList.remove('open');
+    });
+
+    // Theme row expands the submenu inline (docs pattern)
+    $('themeToggleBtn').addEventListener('click', () => {
+        const open = $('themeSubmenu').classList.toggle('open');
+        $('themeToggleBtn').closest('.theme-dropdown-container').classList.toggle('active', open);
+    });
+
+    document.querySelectorAll('.theme-option').forEach((option) => {
+        option.addEventListener('click', () => {
+            slidesThemeManager.setTheme(option.dataset.theme);
+            syncThemeControls();
+            closeThemeSubmenu();
+        });
+    });
+
+    $('shareBtn').addEventListener('click', () => {
+        $('settingsDropdown').classList.remove('open');
+        openShareModal();
+    });
+
+    $('copyLinkBtn').addEventListener('click', () => {
+        $('settingsDropdown').classList.remove('open');
+        copyDeckLink();
+    });
+
+    $('logoutBtn').addEventListener('click', async () => {
+        if (editorState.isSaving) { showNotification('Wait for the save to finish', true); return; }
+        if (editorState.isDirty && !await saveDeck({ explicit: false })) return;
+        await slidesAuth.logout();
+    });
+}
+
+async function openShareModal() {
+    const result = await slidesStorage.shareDeck(editorState.deck.id);
+    if (!result) {
+        showNotification('Could not create share link', true);
+        return;
+    }
+
+    $('shareDeckName').textContent = editorState.deck.name;
+    $('shareUrlInput').value = result.shareUrl;
+    openModal($('shareModal'));
+}
+
+
+function openModal(el) {
+    el.classList.add('open');
+}
+
+function closeModal(el) {
+    el.classList.remove('open');
+}
+
+function bindModals() {
+    setupRenamePrompt();
+
+    // --- rename ---
+    $('renameModalClose').addEventListener('click', () => closeModal($('renameModal')));
+    $('renameCancelBtn').addEventListener('click', () => closeModal($('renameModal')));
+    $('renameConfirmBtn').addEventListener('click', confirmRename);
+    $('renameInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            confirmRename();
+        }
+    });
+
+    // --- share ---
+    $('shareModalClose').addEventListener('click', () => closeModal($('shareModal')));
+    $('shareModalCloseBtn').addEventListener('click', () => closeModal($('shareModal')));
+    $('copyShareUrlBtn').addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText($('shareUrlInput').value);
+            $('copyShareUrlBtn').classList.add('copied');
+            $('copyButtonText').textContent = 'Copied';
+            setTimeout(() => {
+                $('copyShareUrlBtn').classList.remove('copied');
+                $('copyButtonText').textContent = 'Copy';
+            }, 1500);
+        } catch (err) {
+            showNotification('Copy failed', true);
+        }
+    });
+    
+    ['renameModal', 'shareModal'].forEach((id) => {
+        $(id).addEventListener('click', (e) => {
+            if (e.target === $(id)) {
+                closeModal($(id));
+            }
+        });
+    });
+}
+
+// ================================================
+// Utilities
+// ================================================
+
+function $(id) {
+    return document.getElementById(id);
+}
+
+
+function showNotification(message, isError = false) {
+    const el = $('notification');
+    el.textContent = message;
+    el.classList.toggle('error',isError);
+    el.classList.add('show');
+
+    clearTimeout(notificationTimer);
+    notificationTimer = setTimeout(() => {
+        el.classList.remove('show');
+    }, 2500);
+}
+
+/** #loadingOverlay .hidden toggle. */
+function setLoading(isLoading) {
+    $('loadingOverlay').classList.toggle('hidden', !isLoading);
+}
+
+/** Standard debounce for resize/undo-snapshot bursts. */
+function debounce(fn, waitMs) {
+    let timer = null;
+    return function(){
+        clearTimeout(timer);
+        timer = setTimeout(fn,waitMs);
+    }
+}
+
+// ================================================
+// Templates ("new deck" flow)
+// ================================================
+
+
+async function offerTemplatesForNewDeck() {
+    // only fresh decks: exactly one slide, no objects, never renamed
+    const deck = editorState.deck;
+    const isNewDeck = deck.slides.length === 1 &&
+        (deck.slides[0].objects || []).length === 0 &&
+        (deck.name || '').startsWith('Untitled');
+    if (!isNewDeck) return;
+
+    let index;
+    try {
+        const response = await fetch('templates/index.json');
+        index = await response.json();
+    } catch (err) {
+        return;   // templates are optional — the blank deck is fine
+    }
+    if (!index || !Array.isArray(index.templates)) return;
+
+    const cards = $('templateCards');
+    const cardTpl = document.getElementById('templateCardTemplate');
+    cards.replaceChildren(...index.templates.map((t) => {
+        const card = cardTpl.content.firstElementChild.cloneNode(true);
+        card.dataset.templateFile = t.file;
+        card.querySelector('.template-swatch').style.background = t.swatch;
+        card.querySelector('.template-card-name').textContent = t.name;
+        card.querySelector('.template-card-desc').textContent = t.description;
+        return card;
+    }));
+
+    cards.querySelectorAll('.template-card').forEach((card) => {
+        card.addEventListener('click', async () => {
+            const template = index.templates.find((t) => t.file === card.dataset.templateFile);
+            if (!template) return;
+
+            try {
+                const response = await fetch('templates/' + template.file);
+                const tpl = await response.json();
+
+                deck.slides = tpl.slides;
+                deck.width = tpl.width;
+                deck.height = tpl.height;
+
+                closeModal($('templateModal'));
+
+                await loadSlide(0, true);
+                buildThumbs();
+                zoomToFit();
+                markDirty();
+                await saveDeck({ explicit: false });   // never via the rename reminder
+
+                showNotification(`Applied "${template.name}" template`);
+            } catch (err) {
+                showNotification('Could not load template', true);
+            }
+        });
+    });
+
+    $('templateSkipBtn').addEventListener('click', () => closeModal($('templateModal')));
+    $('templateModalClose').addEventListener('click', () => closeModal($('templateModal')));
+
+    openModal($('templateModal'));
+}

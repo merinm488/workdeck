@@ -171,6 +171,12 @@ const WD_APPS = [
         contentSearch: true                 // search matches task text
     },
     {
+        id: 'minutes', name: 'Minutes', label: 'Minutes', accent: 'minutes', icon: 'minutes',
+        route: '/minutes/', editorParam: 'meeting',
+        create: { action: 'createMinutes', payload: {}, pickNewest: function (data) { return data.minutes && data.minutes[0]; } },
+        contentSearch: true
+    },
+    {
         id: 'kanban',
         name: 'Kanban',
         label: 'Board',
@@ -274,7 +280,8 @@ const state = {
     files: [],           // Filebox file metadata
     folders: [],         // Filebox folders
     todo: [],            // Todo task lists
-    kanban: [],          // Kanban boards
+    minutes: [],          // Meeting minutes
+    kanban: [],
     posts: [],           // Blog posts
     calendars: [],       // Calendar app calendars
     events: [],          // Calendar app events
@@ -425,6 +432,12 @@ function getAllFiles() {
         };
     });
 
+    const minutesFiles = (state.minutes || []).map(function (m) {
+        return { id: m.id, app: 'minutes', name: m.title || 'Untitled meeting', updatedAt: m.updatedAt,
+            lastOpened: lastOpened[m.id] || null, tagId: getTag(m.tagId) ? m.tagId : null,
+            content: [m.date, m.series, m.attendees, ...(m.agenda || []).flatMap(s => [s.title, ...(s.points || []).map(p => p.text + ' ' + p.owner)])].join(' '), raw: m };
+    });
+
     const kanbanFiles = (state.kanban || []).map(function (b) {
         return {
             id: b.id,
@@ -513,7 +526,7 @@ function getAllFiles() {
         });
 
     return docs.concat(sheetFiles).concat(formFiles).concat(slideFiles).concat(drawFiles)
-        .concat(todoFiles).concat(kanbanFiles).concat(postFiles).concat(calendarFiles).concat(fileboxFiles).concat(folderCards)
+        .concat(todoFiles).concat(minutesFiles).concat(kanbanFiles).concat(postFiles).concat(calendarFiles).concat(fileboxFiles).concat(folderCards)
         .sort(function (a, b) {
             return recencyMs(b.lastOpened || b.updatedAt) - recencyMs(a.lastOpened || a.updatedAt);
         });
@@ -593,6 +606,7 @@ function applyUserData(data) {
     state.files = data.files || [];
     state.folders = data.folders || [];
     state.todo = data.todo || [];
+    state.minutes = data.minutes || [];
     state.kanban = data.kanban || [];
     state.posts = data.posts || [];
     state.calendars = data.calendars || [];
@@ -1439,6 +1453,8 @@ async function confirmDelete() {
         state.calendars = state.calendars.filter(function (c) { return c.id !== file.id });
     } else if (file.app === 'filebox') {
         state.files = state.files.filter(function (f) { return f.id !== file.id; });
+    } else if (file.app === 'minutes') {
+        state.minutes = state.minutes.filter(function (m) { return m.id !== file.id; });
     } else if (file.app === 'kanban') {
         state.kanban = state.kanban.filter(function (b) { return b.id !== file.id; });
     } else if (file.app === 'blog') {
@@ -1581,6 +1597,7 @@ async function confirmDeleteProject() {
     state.draws = dropTagged(state.draws);
     state.todo = dropTagged(state.todo);
     state.calendars = dropTagged(state.calendars);
+    state.minutes = dropTagged(state.minutes);
     state.kanban = dropTagged(state.kanban);
     state.files = stripTag(state.files);
     state.folders = stripTag(state.folders);

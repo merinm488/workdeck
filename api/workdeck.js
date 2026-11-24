@@ -454,6 +454,14 @@ export default async function handler(req, res) {
           break;
         }
 
+        // Create a Minutes meeting
+        case 'createMinutes': {
+          const now = new Date().toISOString();
+          userData.minutes ||= [];
+          userData.minutes.unshift({ id: generateId(), title: String(data?.title || 'Untitled meeting').slice(0, 200), date: now.slice(0, 10), state: 'draft', revision: 0, agenda: [], createdAt: now, updatedAt: now });
+          break;
+        }
+
         // Create empty task list
         case 'createTodo': {
           const id = data?.id || generateId();
@@ -539,7 +547,8 @@ export default async function handler(req, res) {
             ...taggedIn(userData.todo || []),
             ...taggedIn(userData.calendars || []),
             ...taggedIn(userData.kanban || []),
-            ...taggedIn(userData.posts || [])
+            ...taggedIn(userData.posts || []),
+            ...taggedIn(userData.minutes || [])
           ];
           for (const sheet of taggedIn(userData.sheets)) {
             try {
@@ -574,6 +583,7 @@ export default async function handler(req, res) {
           userData.calendars = (userData.calendars || []).filter(f => !f || f.tagId !== tagId);
           userData.kanban = (userData.kanban || []).filter(f => !f || f.tagId !== tagId);
           userData.posts = (userData.posts || []).filter(f => !f || f.tagId !== tagId);
+          userData.minutes = (userData.minutes || []).filter(f => !f || f.tagId !== tagId);
           (userData.files || []).forEach(f => {
             if (Array.isArray(f.tags)) f.tags = f.tags.filter(id => id !== tagId);
           });
@@ -750,7 +760,8 @@ export default async function handler(req, res) {
           const isTodo = app === 'todo';
           const isCalendar = app === 'calendar';
           const isKanban = app === 'kanban';
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : isKanban ? (userData.kanban || []) : userData.docs;
+          const isMinutes = app === 'minutes';
+          const collection = isMinutes ? (userData.minutes || []) : isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : isKanban ? (userData.kanban || []) : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -790,6 +801,8 @@ export default async function handler(req, res) {
                      (userData.calendars || []).some(c => c.id === fileId))
                   : app === 'kanban'
                   ? (userData.kanban || []).find(b => b.id === fileId)
+                  : app === 'minutes'
+                  ? (userData.minutes || []).find(m => m.id === fileId)
                   : app === 'blog'
                   ? (userData.posts || []).find(p => p.id === fileId)
                   : userData.docs.find(n => n.id === fileId)
@@ -821,7 +834,8 @@ export default async function handler(req, res) {
           const isCalendar = app === "calendar";
           const isKanban = app === "kanban";
           const isPost = app === "blog";
-          const collection = isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : isKanban ? (userData.kanban || []) : isPost ? (userData.posts || []) : userData.docs;
+          const isMinutes = app === "minutes";
+          const collection = isMinutes ? (userData.minutes || []) : isSheet ? userData.sheets : isForm ? userData.forms : isDeck ? userData.slides : isDrawing ? userData.draws : isFileboxFile ? userData.files : isTodo ? (userData.todo || []) : isCalendar ? (userData.calendars || []) : isKanban ? (userData.kanban || []) : isPost ? (userData.posts || []) : userData.docs;
           const target = collection.find(f => f.id === fileId);
           if (!target) {
             return res.status(404).json({ success: false, error: 'File not found' });
@@ -844,6 +858,10 @@ export default async function handler(req, res) {
             target.name = cleanName;
           } else if (isKanban) {
             target.name = cleanName;
+          } else if (isMinutes) {
+            if (target.state === 'final') return res.status(409).json({ success: false, error: 'Reopen the final meeting before renaming it' });
+            target.title = cleanName;
+            target.revision = (target.revision || 0) + 1;
           } else if (isPost) {
             target.title = cleanName;
             // Same slug rule as Blog's updatePost: only never-published
@@ -901,6 +919,8 @@ export default async function handler(req, res) {
             userData.draws = userData.draws.filter(d => d.id !== fileId);
           } else if (app === 'todo') {
             userData.todo = (userData.todo || []).filter(l => l.id !== fileId);
+          } else if (app === 'minutes') {
+            userData.minutes = (userData.minutes || []).filter(m => m.id !== fileId);
           } else if (app === 'kanban') {
             userData.kanban = (userData.kanban || []).filter(b => b.id !== fileId);
           } else if (app === 'blog') {
@@ -970,6 +990,7 @@ export default async function handler(req, res) {
         todo: userData.todo,
         kanban: userData.kanban,
         posts: userData.posts,
+        minutes: userData.minutes,
         calendars: userData.calendars,
         events: userData.events,
         settings: userData.settings

@@ -69,6 +69,7 @@ const { default: fileboxHandler } = await import('../api/filebox.js');
 const { default: todoHandler } = await import('../api/todo.js');
 const { default: calendarHandler } = await import('../api/calendar.js');
 const { default: kanbanHandler } = await import('../api/kanban.js');
+const { default: minutesHandler } = await import('../api/minutes.js');
 const { default: blogHandler } = await import('../api/blog.js');
 const { default: siteHandler } = await import('../api/site.js');
 const { default: mcpHandler } = await import('../api/_lib/mcp-http.js');
@@ -135,6 +136,7 @@ app.all('/api/filebox', (req, res) => fileboxHandler(req, res));
 app.all('/api/todo', (req, res) => todoHandler(req, res));
 app.all('/api/calendar', (req, res) => calendarHandler(req, res));
 app.all('/api/kanban', (req, res) => kanbanHandler(req, res));
+app.all('/api/minutes', (req, res) => minutesHandler(req, res));
 app.all('/api/blog', (req, res) => blogHandler(req, res));
 app.all('/api/site', (req, res) => siteHandler(req, res));
 app.all('/api/mcp', (req, res) => mcpHandler(req, res));
@@ -162,9 +164,10 @@ const WD_PRETTY_PAGES = {
   calendar: '/calendar/index.html',
   kanban: '/kanban/index.html',
   files: '/files/index.html',
+  minutes: '/minutes/index.html',
   blog: '/blog/index.html'
 };
-const WD_PRETTY_PARAMS = { docs: 'doc', todo: 'list', calendar: 'cal', kanban: 'board', blog: 'post' };
+const WD_PRETTY_PARAMS = { docs: 'doc', todo: 'list', calendar: 'cal', kanban: 'board', blog: 'post', minutes: 'meeting' };
 
 Object.keys(WD_PRETTY_PAGES).forEach((prettyApp) => {
   app.get('/' + prettyApp + '/:id', (req, res, next) => {
@@ -197,7 +200,7 @@ app.get(['/apps', '/apps/'], (req, res) => {
 // 'blog' itself is reserved too, so /blog serves the app.
 const RESERVED_SLUGS = new Set([
   'blog', 'sheets', 'forms', 'slides', 'draw', 'files',
-  'todo', 'calendar', 'kanban', 'docs', 'apps', 'api', 'js', 'icons', 'f'
+  'todo', 'calendar', 'kanban', 'minutes', 'docs', 'apps', 'api', 'js', 'icons', 'f'
 ]);
 app.get('/:slug', (req, res, next) => {
   if (RESERVED_SLUGS.has(req.params.slug)) return next();
@@ -258,6 +261,8 @@ app.use('/calendar', express.static(path.join(ROOT_DIR, 'calendar'), { index: 'i
 
 // Kanban (plain static)
 app.use('/kanban', express.static(path.join(ROOT_DIR, 'kanban'), { index: 'index.html' }));
+
+app.use('/minutes', express.static(path.join(ROOT_DIR, 'minutes'), { index: 'index.html' }));
 
 // Blog (plain static)
 app.use('/blog', express.static(path.join(ROOT_DIR, 'blog'), { index: 'index.html' }));

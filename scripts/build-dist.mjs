@@ -39,6 +39,7 @@ cpSync(path.join(ROOT, 'files'), path.join(DIST, 'files'), { recursive: true });
 cpSync(path.join(ROOT, 'todo'), path.join(DIST, 'todo'), { recursive: true });
 cpSync(path.join(ROOT, 'calendar'), path.join(DIST, 'calendar'), { recursive: true });
 cpSync(path.join(ROOT, 'kanban'), path.join(DIST, 'kanban'), { recursive: true });
+cpSync(path.join(ROOT, 'minutes'), path.join(DIST, 'minutes'), { recursive: true });
 cpSync(path.join(ROOT, 'blog'), path.join(DIST, 'blog'), { recursive: true });
 cpSync(path.join(ROOT, 'docs-src', 'dist'), path.join(DIST, 'docs'), { recursive: true });
 

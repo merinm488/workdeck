@@ -1358,9 +1358,9 @@ function renderLinkChips() {
 
 function allLinkableFiles() {
     const files = [];
-    const sections = ['docs', 'sheets', 'forms', 'slides', 'draws', 'todo', 'files', 'folders'];
+    const sections = ['docs', 'sheets', 'forms', 'slides', 'draws', 'todo', 'minutes', 'files', 'folders'];
     const appIdOf = { docs: 'docs', sheets: 'sheets', forms: 'forms', slides: 'slides',
-        draws: 'draw', todo: 'todo', files: 'filebox', folders: 'filebox' };
+        draws: 'draw', todo: 'todo', minutes: 'minutes', files: 'filebox', folders: 'filebox' };
     const nameOf = {
         docs: d => d.title || 'Untitled',
         sheets: s => s.name || 'Untitled Sheet',
@@ -1368,6 +1368,7 @@ function allLinkableFiles() {
         slides: s => s.name || 'Untitled Deck',
         draws: d => d.name || 'Untitled Drawing',
         todo: t => t.name || 'Untitled List',
+        minutes: m => m.title || 'Untitled meeting',
         files: f => f.name || 'Untitled',
         folders: f => f.name || 'Untitled Folder'
     };

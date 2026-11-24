@@ -332,7 +332,9 @@ function openList(id) {
     homeBtn.title = 'Back to My Lists';
     homeBtn.setAttribute('aria-label', 'Back to My Lists');
 
-    history.replaceState(null, '', '/todo/' + encodeURIComponent(id));
+    // Holm serves the app shell at /todo/; path-style list IDs are
+    // canonicalized away by its static router on reload.
+    history.replaceState(null, '', '/todo/?list=' + encodeURIComponent(id));
 
     // The lists search/layout/new controls don't apply inside a list
     topNav.classList.add('list-open');

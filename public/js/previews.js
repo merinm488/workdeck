@@ -826,6 +826,35 @@
         }, 150);
     });
 
+    function renderMinutes(page, file) {
+        var meeting = file.raw || {};
+        var preview = document.createElement('div');
+        preview.style.cssText = 'padding:20px 22px;font-family:Inter,sans-serif;font-size:12px;line-height:1.6;color:#34354b';
+        var heading = document.createElement('strong');
+        heading.style.cssText = 'display:block;font-size:17px;margin-bottom:5px';
+        heading.textContent = meeting.title || 'Untitled meeting';
+        preview.appendChild(heading);
+        var date = document.createElement('div');
+        date.style.cssText = 'color:#74788d;font-size:11px;margin-bottom:16px';
+        date.textContent = [meeting.date, meeting.series].filter(Boolean).join(' · ');
+        preview.appendChild(date);
+        (meeting.agenda || []).slice(0, 3).forEach(function (section, i) {
+            var row = document.createElement('div');
+            row.style.cssText = 'border-top:1px solid #e6e6ee;padding:9px 0';
+            var title = document.createElement('b');
+            title.textContent = (i + 1) + '. ' + (section.title || 'Agenda item');
+            row.appendChild(title);
+            (section.points || []).slice(0, 2).forEach(function (point) {
+                var line = document.createElement('div');
+                line.style.cssText = 'color:#656779;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+                line.textContent = (point.type === 'action' ? '☐ ' : point.type === 'decision' ? '◆ ' : '· ') + (point.text || 'New point');
+                row.appendChild(line);
+            });
+            preview.appendChild(row);
+        });
+        page.replaceChildren(preview);
+    }
+
     // ================================================
     // Public entry point
     // ================================================
@@ -843,6 +872,7 @@
             case 'slides':
             case 'draw': renderFabric(page, file); break;
             case 'todo': renderTodo(page, file); break;
+            case 'minutes': renderMinutes(page, file); break;
             case 'kanban': renderKanban(page, file); break;
             case 'blog': renderBlog(page, file); break;
             case 'calendar': renderCalendar(page, file); break;

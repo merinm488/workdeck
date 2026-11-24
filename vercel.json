@@ -61,6 +61,10 @@
       "destination": "/kanban/index.html?board=:id"
     },
     {
+      "source": "/minutes/:id([a-z0-9_]{14,})",
+      "destination": "/minutes/index.html?meeting=:id"
+    },
+    {
       "source": "/blog/:id([a-z0-9_]{14,})",
       "destination": "/blog/index.html?post=:id"
     },

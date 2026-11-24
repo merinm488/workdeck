@@ -31,10 +31,10 @@
       <p id="accountStatus" role="status" aria-live="polite">Checking your sign-in…</p>
       <div id="accountDetails" class="lp-account-details" hidden>
         <div class="lp-account-identity"><span class="lp-account-avatar" aria-hidden="true">✳</span><div><small>Signed in as</small><strong id="accountEmail"></strong></div></div>
-        <p>You're signed in with a Holm account. Todo is ready to use; the other tools will arrive as we migrate them one by one. No access key or old Workdeck data is carried over.</p>
-        <div class="lp-account-actions"><a class="lp-button lp-button-primary" href="/todo/">Open Todo <span aria-hidden="true">↗</span></a><a class="lp-button lp-button-outline" href="/apps">Explore the apps <span aria-hidden="true">↗</span></a><button type="button" id="accountSignOut" class="lp-account-signout">Sign out</button></div>
+        <p>You're signed in with a Holm account. Todo is ready to use; the other tools will arrive as we migrate them one by one. No access key or old Workdeck data is carried over. To use email, Google and Telegram for the same account, link them in Your sign-ins before switching methods.</p>
+        <div class="lp-account-actions"><a class="lp-button lp-button-primary" href="/home">Open Workdeck <span aria-hidden="true">↗</span></a><a class="lp-button lp-button-outline" id="accountSignIns" href="/auth/account?redirect=%2Faccount">Your sign-ins <span aria-hidden="true">↗</span></a><a href="/todo/">Todo</a><button type="button" id="accountSignOut" class="lp-account-signout">Sign out</button></div>
       </div>
-      <a id="accountSignIn" class="lp-button lp-button-primary" href="/auth/login?redirect=%2Faccount" hidden>Sign in with email <span aria-hidden="true">↗</span></a>
+      <a id="accountSignIn" class="lp-button lp-button-primary" href="/auth/login?redirect=%2Faccount" hidden>Sign in <span aria-hidden="true">↗</span></a>
     </main>
     <footer class="lp-footer"><div class="lp-wrap lp-footer-inner"><a class="lp-brand" href="/" aria-label="Workdeck home"><img src="/icons/icon-192x192.png" width="32" height="32" alt=""><span>workdeck<span class="lp-brand-dot">.</span></span></a><span>A little more room to do great work.</span><a href="/apps">Explore apps ↗</a></div></footer>
   </div>

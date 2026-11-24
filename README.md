@@ -30,6 +30,14 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
 - ✅ **Todo** — task lists: create lists, add tasks with due
   dates and priorities, toggle/complete, edit in place, drag-to-reorder;
   search across lists and tasks, card/row list layouts.
+- 📝 **Minutes** — an inline, single-page meeting notebook: write notes immediately,
+  optionally group them by topic, classify lines as notes/decisions/actions/info/questions,
+  and enter owners/due dates beside actions. Includes note-taker/attendees,
+  linked Calendar events, expandable Quill context, automatic linked Todo tasks,
+  draft/review/final states, search, and a printable/PDF layout. The shared
+  account cannot verify individual approvers; recorded approval names are
+  self-reported. Audio transcription and real-time multi-user editing are not
+  included.
 - 📅 **Calendar** — multiple colored calendars with show/hide, Month /
   Week / Day / Agenda views (FullCalendar), drag-create/move/resize,
   all-day & multi-day events, RRULE recurrence with per-occurrence
@@ -51,6 +59,18 @@ A unified, Google-Drive-style home for your necessary apps. One login, one landi
   slug-pointer scheme the suite uses everywhere (the account key/hash
   never leaves the server).
 - 📱 **Mobile-friendly** — touch devices open files in the same tab.
+
+## AI connector on Holm (new deployment)
+
+The Holm app uses Holm's native OAuth/consent MCP gateway at
+`https://<your-workdeck-app-host>/_holm/mcp`, **not** the legacy Vercel
+`/api/mcp` URL below. Build with `node scripts/build-holm-landing.mjs
+/tmp/workdeck-holm-landing`, validate with `holm app validate --spec-v1
+/tmp/workdeck-holm-landing`, then deploy the package with `--spec-v1`.
+On the Holm dashboard, open **Settings → Connect AI** for client-specific
+instructions. The Holm connector now includes all 29 legacy tool names (Todo,
+Docs, Blog drafts, Calendar, Kanban, Forms, Slides, Draw, Sheets and Files)
+plus two Docs-specific operations. See [Holm migration notes](holm/MIGRATION.md#aimcp-on-holm).
 
 ## AI connector (MCP, Workdeck apps)
 
@@ -158,6 +178,7 @@ workdeck/
 │   ├── todo.js             # Todo API (task list records)
 │   ├── calendar.js         # Calendar API (calendars + event records)
 │   ├── kanban.js           # Kanban API (board records)
+│   ├── minutes.js          # Minutes API (structured records + linked Todo actions)
 │   ├── blog.js             # Blog API (post records + publish/unpublish)
 │   └── site.js             # Public blog API (GET-only, slug -> account)
 ├── docs/                   # Docs build output (from docs-src, base /docs/)
@@ -206,6 +227,7 @@ workdeck/
 │   ├── styles.css          # self-contained, fuchsia accents
 │   ├── config/config.js
 │   └── js/                 # auth/storage/themes/app/board
+├── minutes/                # Agenda-led meetings, Quill notes, review/print views
 ├── blog/                   # Blog app (vanilla + Quill rich-text editor)
 │   ├── index.html          # posts home + post editor (/blog/<id>, ?post=<id>)
 │   ├── styles.css          # self-contained, teal accents
@@ -238,6 +260,7 @@ document per hash in production):
   "kanban": [ ... ],
   "posts": [ { "id": "...", "title": "...", "slug": "...", "path": null, "html": "...",
                "excerpt": "...", "publishedAt": null } ],
+  "minutes": [ { "id": "...", "title": "...", "date": "...", "agenda": [ ... ], "revision": 0 } ],
   "settings": {
     "theme": "dark",
     "viewMode": "grid",

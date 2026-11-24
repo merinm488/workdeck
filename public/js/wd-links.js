@@ -23,7 +23,7 @@
 
     /** Internal link hrefs -> { app, id, query }. Used to detect mentions. */
     var INTERNAL_LINK_RE = new RegExp(
-        '^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|filebox|files)/(' + ID_SOURCE + ')(\\?[^#]*)?(#.*)?$'
+        '^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|minutes|filebox|files)/(' + ID_SOURCE + ')(\\?[^#]*)?(#.*)?$'
     );
 
     /**
@@ -55,6 +55,10 @@
         todo: {
             id: 'todo', name: 'Todo', label: 'Todo',
             page: '/todo/index.html', param: 'list', prefix: '/todo/'
+        },
+        minutes: {
+            id: 'minutes', name: 'Minutes', label: 'Minutes',
+            page: '/minutes/index.html', param: 'meeting', prefix: '/minutes/'
         },
         kanban: {
             id: 'kanban', name: 'Kanban', label: 'Board',
@@ -108,6 +112,10 @@
             ['path', { d: 'M13 6h8' }],
             ['path', { d: 'M13 12h8' }],
             ['path', { d: 'M13 18h8' }]
+        ],
+        minutes: [
+            ['rect', { x: 4, y: 3, width: 16, height: 18, rx: 2 }],
+            ['path', { d: 'M8 8h8M8 12h8m-8 4h5' }]
         ],
         kanban: [
             ['rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }],
@@ -202,7 +210,7 @@
         // Pretty path: /<app>/<id> (the URL segment 'files' maps back to the
         // app's internal id 'filebox')
         var pretty = new RegExp(
-            '^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|filebox|files)/(' + ID_SOURCE + ')/?$'
+            '^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|minutes|filebox|files)/(' + ID_SOURCE + ')/?$'
         ).exec(pathname);
         if (pretty) {
             return {
@@ -219,7 +227,7 @@
         }
 
         // Legacy query form — infer the app from the path prefix.
-        var prefix = new RegExp('^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|filebox|files)(/|$)').exec(pathname);
+        var prefix = new RegExp('^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|minutes|filebox|files)(/|$)').exec(pathname);
         if (prefix) {
             var app = prefix[1] === 'files' ? 'filebox' : prefix[1];
             if (app === 'docs' && params.get('doc') && isValidId(params.get('doc'))) {
@@ -227,6 +235,9 @@
             }
             if (app === 'todo' && params.get('list') && isValidId(params.get('list'))) {
                 return { app: 'todo', id: params.get('list'), query: query };
+            }
+            if (app === 'minutes' && params.get('meeting') && isValidId(params.get('meeting'))) {
+                return { app: 'minutes', id: params.get('meeting'), query: query };
             }
             if (app === 'kanban' && params.get('board') && isValidId(params.get('board'))) {
                 return { app: 'kanban', id: params.get('board'), query: query };
@@ -310,6 +321,12 @@
             if (todoLists[p] && todoLists[p].id === id) {
                 return { app: 'todo', id: id, name: todoLists[p].name || 'Untitled List',
                     kind: 'file', record: todoLists[p], url: url('todo', id) };
+            }
+        }
+        var meetingRecords = userData.minutes || [];
+        for (var q = 0; q < meetingRecords.length; q++) {
+            if (meetingRecords[q] && meetingRecords[q].id === id) {
+                return { app: 'minutes', id: id, name: meetingRecords[q].title || 'Untitled meeting', kind: 'file', record: meetingRecords[q], url: url('minutes', id) };
             }
         }
         var kanbanBoards = userData.kanban || [];

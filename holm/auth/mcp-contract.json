@@ -1,0 +1,44 @@
+{
+  "operations": {
+    "workspace.list": {
+      "summary": "List your Workdeck records (metadata only; use workspace.read for details)", "auth": "user", "risk": "read", "handler": "workspaceList",
+      "input": { "type": "object", "properties": { "app": { "type": "string", "enum": ["docs", "sheets", "forms", "slides", "draws", "files", "folders", "todo", "minutes", "calendars", "events", "kanban", "posts"] }, "limit": { "type": "integer", "minimum": 1, "maximum": 50 }, "offset": { "type": "integer", "minimum": 0, "maximum": 2000 } }, "required": ["app"], "additionalProperties": false },
+      "output": { "type": "object" }
+    },
+    "workspace.read": {
+      "summary": "Read a Workdeck record (64 KB maximum; no binary file or spreadsheet body)", "auth": "user", "risk": "read", "handler": "workspaceRead",
+      "input": { "type": "object", "properties": { "app": { "type": "string", "enum": ["docs", "sheets", "forms", "slides", "draws", "files", "folders", "todo", "minutes", "calendars", "events", "kanban", "posts"] }, "recordId": { "type": "string", "minLength": 1, "maxLength": 128 } }, "required": ["app", "recordId"], "additionalProperties": false },
+      "output": { "type": "object" }
+    },
+    "docs.create": {
+      "summary": "Create a private plain-text Workdeck document", "auth": "user", "risk": "write", "idempotency": "optional", "handler": "docCreate",
+      "input": { "type": "object", "properties": { "title": { "type": "string", "minLength": 1, "maxLength": 100 }, "content": { "type": "string", "maxLength": 16000 } }, "required": ["title"], "additionalProperties": false },
+      "output": { "type": "object" }
+    },
+    "docs.update": {
+      "summary": "Update a private document using its current version; only plain-text content can be changed", "auth": "user", "risk": "write", "idempotency": "optional", "handler": "docUpdate",
+      "input": { "type": "object", "properties": { "recordId": { "type": "string", "minLength": 1, "maxLength": 128 }, "version": { "type": "integer", "minimum": 1 }, "title": { "type": "string", "minLength": 1, "maxLength": 100 }, "content": { "type": "string", "maxLength": 16000 } }, "required": ["recordId", "version"], "additionalProperties": false },
+      "output": { "type": "object" }
+    },
+    "todo.lists": {
+      "summary": "List your Todo lists", "auth": "user", "risk": "read", "handler": "todoLists",
+      "input": { "type": "object", "properties": {}, "additionalProperties": false }, "output": { "type": "array", "items": { "type": "object" } }
+    },
+    "todo.items": {
+      "summary": "Read tasks and version in a Todo list", "auth": "user", "risk": "read", "handler": "todoItems",
+      "input": { "type": "object", "properties": { "listId": { "type": "string", "minLength": 1, "maxLength": 128 }, "offset": { "type": "integer", "minimum": 0 }, "limit": { "type": "integer", "minimum": 1, "maximum": 50 } }, "required": ["listId"], "additionalProperties": false }, "output": { "type": "object" }
+    },
+    "todo.create.list": {
+      "summary": "Create an empty Todo list", "auth": "user", "risk": "write", "idempotency": "optional", "handler": "todoCreateList",
+      "input": { "type": "object", "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 100 } }, "required": ["name"], "additionalProperties": false }, "output": { "type": "object" }
+    },
+    "todo.add.task": {
+      "summary": "Add a task to a Todo list", "auth": "user", "risk": "write", "idempotency": "optional", "handler": "todoAddTask",
+      "input": { "type": "object", "properties": { "listId": { "type": "string", "minLength": 1, "maxLength": 128 }, "title": { "type": "string", "minLength": 1, "maxLength": 200 }, "description": { "type": "string", "maxLength": 2000 }, "priority": { "type": "string", "enum": ["low", "medium", "high"] }, "dueDate": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" } }, "required": ["listId", "title"], "additionalProperties": false }, "output": { "type": "object" }
+    },
+    "todo.update.task": {
+      "summary": "Edit a task using its list's current version", "auth": "user", "risk": "write", "idempotency": "optional", "handler": "todoUpdateTask",
+      "input": { "type": "object", "properties": { "listId": { "type": "string", "minLength": 1, "maxLength": 128 }, "taskId": { "type": "string", "minLength": 1, "maxLength": 128 }, "version": { "type": "integer", "minimum": 1 }, "title": { "type": "string", "minLength": 1, "maxLength": 200 }, "description": { "type": "string", "maxLength": 2000 }, "completed": { "type": "boolean" }, "priority": { "type": "string", "enum": ["low", "medium", "high"] }, "dueDate": { "type": ["string", "null"] } }, "required": ["listId", "taskId"], "additionalProperties": false }, "output": { "type": "object" }
+    }
+  }
+}

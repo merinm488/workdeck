@@ -1,0 +1,432 @@
+/**
+ * ================================================
+ * WORKDECK - Hard Links (WDLinks)
+ * ================================================
+ *
+ * Single source of truth for addressing a Workdeck file by URL. Every file
+ * has a canonical, pasteable address:
+ *
+ *   /docs/<id>   /sheets/<id>   /forms/<id>   /slides/<id>   /draw/<id>
+ *   /todo/<id>   /kanban/<id>   /calendar/<id>   /blog/<id>
+ *   /files/<id>                  (files AND folders — the app tells them apart)
+ *   /f/<id>                      universal resolver -> canonical address
+ *
+ * The Files app's internal id stays 'filebox' (data sections, API slugs,
+ * storage keys); only its URL prefix is /files/. Legacy /filebox/... links
+ * keep parsing everywhere.
+ */
+
+(function () {
+    'use strict';
+    var ID_SOURCE = '[a-zA-Z0-9_-]{8,128}';
+    var ID_RE = new RegExp('^' + ID_SOURCE + '$');
+
+    /** Internal link hrefs -> { app, id, query }. Used to detect mentions. */
+    var INTERNAL_LINK_RE = new RegExp(
+        '^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|minutes|filebox|files)/(' + ID_SOURCE + ')(\\?[^#]*)?(#.*)?$'
+    );
+
+    /**
+     * App registry — mirrors WD_APPS in public/js/workdeck.js. `page` is the
+     * document the server rewrite targets; `param` is the query parameter the
+     * app reads its id from; `prefix` is the pretty path root.
+     */
+    var APPS = {
+        docs: {
+            id: 'docs', name: 'Docs', label: 'Doc',
+            page: '/docs/', param: 'doc', prefix: '/docs/'
+        },
+        sheets: {
+            id: 'sheets', name: 'Sheets', label: 'Sheet',
+            page: '/sheets/editor.html', param: 'id', prefix: '/sheets/'
+        },
+        forms: {
+            id: 'forms', name: 'Forms', label: 'Form',
+            page: '/forms/editor.html', param: 'id', prefix: '/forms/'
+        },
+        slides: {
+            id: 'slides', name: 'Slides', label: 'Slide',
+            page: '/slides/editor.html', param: 'id', prefix: '/slides/'
+        },
+        draw: {
+            id: 'draw', name: 'Draw', label: 'Drawing',
+            page: '/draw/editor.html', param: 'id', prefix: '/draw/'
+        },
+        todo: {
+            id: 'todo', name: 'Todo', label: 'Todo',
+            page: '/todo/index.html', param: 'list', prefix: '/todo/'
+        },
+        minutes: {
+            id: 'minutes', name: 'Minutes', label: 'Minutes',
+            page: '/minutes/index.html', param: 'meeting', prefix: '/minutes/'
+        },
+        kanban: {
+            id: 'kanban', name: 'Kanban', label: 'Board',
+            page: '/kanban/index.html', param: 'board', prefix: '/kanban/'
+        },
+        calendar: {
+            id: 'calendar', name: 'Calendar', label: 'Calendar',
+            page: '/calendar/index.html', param: 'cal', prefix: '/calendar/'
+        },
+        blog: {
+            id: 'blog', name: 'Blog', label: 'Post',
+            page: '/blog/index.html', param: 'post', prefix: '/blog/'
+        },
+        filebox: {
+            id: 'filebox', name: 'Files', label: 'File',
+            page: '/files/', param: 'id', prefix: '/files/'
+        }
+    };
+
+    /** Minimal stroke icons (24px grid) for chips/pickers. Kept independent
+     *  from the launcher's WD_APPS so every page renders the same art.
+     *  Each icon is a [tag, attrs] element list. */
+    var ICONS = {
+        docs: [
+            ['path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }],
+            ['polyline', { points: '14 2 14 8 20 8' }],
+            ['line', { x1: 16, y1: 13, x2: 8, y2: 13 }],
+            ['line', { x1: 16, y1: 17, x2: 8, y2: 17 }]
+        ],
+        sheets: [
+            ['path', { d: 'M3 10h18M3 14h18m-9-4v8m-7-6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2z' }]
+        ],
+        forms: [
+            ['path', { d: 'M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z' }],
+            ['path', { d: 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' }],
+            ['line', { x1: 9, y1: 12, x2: 15, y2: 12 }],
+            ['line', { x1: 9, y1: 16, x2: 13, y2: 16 }]
+        ],
+        slides: [
+            ['rect', { x: 3, y: 4, width: 18, height: 13, rx: 2 }],
+            ['line', { x1: 12, y1: 17, x2: 12, y2: 21 }],
+            ['line', { x1: 8, y1: 21, x2: 16, y2: 21 }]
+        ],
+        draw: [
+            ['path', { d: 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z' }],
+            ['path', { d: 'm15 5 4 4' }]
+        ],
+        todo: [
+            ['path', { d: 'm3 17 2 2 4-4' }],
+            ['path', { d: 'm3 7 2 2 4-4' }],
+            ['path', { d: 'M13 6h8' }],
+            ['path', { d: 'M13 12h8' }],
+            ['path', { d: 'M13 18h8' }]
+        ],
+        minutes: [
+            ['rect', { x: 4, y: 3, width: 16, height: 18, rx: 2 }],
+            ['path', { d: 'M8 8h8M8 12h8m-8 4h5' }]
+        ],
+        kanban: [
+            ['rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }],
+            ['line', { x1: 9, y1: 3, x2: 9, y2: 21 }],
+            ['line', { x1: 15, y1: 3, x2: 15, y2: 21 }]
+        ],
+        calendar: [
+            ['rect', { x: 3, y: 4, width: 18, height: 18, rx: 2 }],
+            ['line', { x1: 16, y1: 2, x2: 16, y2: 6 }],
+            ['line', { x1: 8, y1: 2, x2: 8, y2: 6 }],
+            ['line', { x1: 3, y1: 10, x2: 21, y2: 10 }]
+        ],
+        blog: [
+            ['path', { d: 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z' }],
+            ['path', { d: 'm15 5 4 4' }]
+        ],
+        filebox: [
+            ['path', { d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z' }]
+        ]
+    };
+
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+
+    function iconParts(appId) {
+        return ICONS[appId] || ICONS.filebox;
+    }
+
+    function setIconAttrs(el, attrs) {
+        for (var name in attrs) el.setAttribute(name, attrs[name]);
+    }
+
+    /** Icon as an <svg> element. */
+    function iconNode(appId, size) {
+        var s = size || 16;
+        var svg = document.createElementNS(SVG_NS, 'svg');
+        svg.setAttribute('width', s);
+        svg.setAttribute('height', s);
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.setAttribute('aria-hidden', 'true');
+        iconParts(appId).forEach(function (part) {
+            var el = document.createElementNS(SVG_NS, part[0]);
+            setIconAttrs(el, part[1]);
+            svg.appendChild(el);
+        });
+        return svg;
+    }
+
+    /** Icon as SVG markup. The docs app embeds this string directly. */
+    function icon(appId, size) {
+        return iconNode(appId, size).outerHTML;
+    }
+
+    function isValidId(id) {
+        return typeof id === 'string' && ID_RE.test(id);
+    }
+
+    /**
+     * Canonical URL for a file. Files-app folders share the file form — the
+     * app tells them apart from its data, not from the URL.
+     *   WDLinks.url('sheets', id)                -> '/sheets/<id>'
+     *   WDLinks.url('docs', id, { edit: true })  -> '/docs/<id>?edit=1'
+     *   WDLinks.url('forms', id, { fill: true }) -> '/forms/<id>?fill=1'
+     *   WDLinks.url('filebox', id)               -> '/files/<id>'
+     */
+    function url(appId, id, opts) {
+        opts = opts || {};
+        var app = APPS[appId] || APPS.filebox;
+        var qs = [];
+        if (opts.edit) qs.push('edit=1');
+        if (opts.fill) qs.push('fill=1');
+        if (appId === 'filebox') {
+            return '/files/?id=' + encodeURIComponent(id) + (qs.length ? '&' + qs.join('&') : '');
+        }
+        if (['sheets', 'forms', 'slides', 'draw'].includes(appId)) {
+            return '/' + appId + '/editor.html?id=' + encodeURIComponent(id) +
+                (qs.length ? '&' + qs.join('&') : '');
+        }
+        if (['todo', 'kanban', 'minutes', 'calendar', 'docs', 'blog'].includes(appId)) {
+            // Holm's static web router canonicalizes /app/<id> to /app/.
+            // Query deep links survive reloads and keep the original editor UI.
+            var param = { todo: 'list', kanban: 'board', minutes: 'meeting', calendar: 'cal', docs: 'doc', blog: 'post' }[appId];
+            return app.prefix + '?' + param + '=' + encodeURIComponent(id) +
+                (qs.length ? '&' + qs.join('&') : '');
+        }
+        return app.prefix + encodeURIComponent(id) + (qs.length ? '?' + qs.join('&') : '');
+    }
+
+
+    function parseLocation() {
+        return parsePath(window.location.pathname + window.location.search);
+    }
+
+    /** Parse a path (+ optional query) into { app, id, kind?, query? }. */
+    function parsePath(pathAndQuery) {
+        var path = String(pathAndQuery || '');
+        var qIndex = path.indexOf('?');
+        var query = qIndex === -1 ? '' : path.slice(qIndex + 1);
+        var pathname = qIndex === -1 ? path : path.slice(0, qIndex);
+        var params = new URLSearchParams(query);
+
+        // Pretty path: /<app>/<id> (the URL segment 'files' maps back to the
+        // app's internal id 'filebox')
+        var pretty = new RegExp(
+            '^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|minutes|filebox|files)/(' + ID_SOURCE + ')/?$'
+        ).exec(pathname);
+        if (pretty) {
+            return {
+                app: pretty[1] === 'files' ? 'filebox' : pretty[1],
+                id: pretty[2],
+                query: query
+            };
+        }
+
+        // Universal resolver: /f/<id> (f.html redirects to the canonical app)
+        var resolver = new RegExp('^/f/(' + ID_SOURCE + ')/?$').exec(pathname);
+        if (resolver) {
+            return { app: 'resolver', id: resolver[1], query: query };
+        }
+
+        // Legacy query form — infer the app from the path prefix.
+        var prefix = new RegExp('^/(docs|sheets|forms|slides|draw|todo|kanban|calendar|blog|minutes|filebox|files)(/|$)').exec(pathname);
+        if (prefix) {
+            var app = prefix[1] === 'files' ? 'filebox' : prefix[1];
+            if (app === 'docs' && params.get('doc') && isValidId(params.get('doc'))) {
+                return { app: 'docs', id: params.get('doc'), query: query };
+            }
+            if (app === 'todo' && params.get('list') && isValidId(params.get('list'))) {
+                return { app: 'todo', id: params.get('list'), query: query };
+            }
+            if (app === 'minutes' && params.get('meeting') && isValidId(params.get('meeting'))) {
+                return { app: 'minutes', id: params.get('meeting'), query: query };
+            }
+            if (app === 'kanban' && params.get('board') && isValidId(params.get('board'))) {
+                return { app: 'kanban', id: params.get('board'), query: query };
+            }
+            if (app === 'calendar' && params.get('cal') && isValidId(params.get('cal'))) {
+                return { app: 'calendar', id: params.get('cal'), query: query };
+            }
+            if (app === 'blog' && params.get('post') && isValidId(params.get('post'))) {
+                return { app: 'blog', id: params.get('post'), query: query };
+            }
+            if (app === 'filebox' && params.get('folder') && isValidId(params.get('folder'))) {
+                return { app: 'filebox', id: params.get('folder'), kind: 'folder', query: query };
+            }
+            if (app !== 'docs' && params.get('id') && isValidId(params.get('id'))) {
+                return { app: app, id: params.get('id'), query: query };
+            }
+        }
+        return null;
+    }
+
+    /** Is this href an internal hard link? -> { app, id, query } | null.
+     *  Accepts absolute URLs, site-absolute paths and hash-less relatives. */
+    function parseHref(href) {
+        if (!href) return null;
+        var path = href;
+        try {
+            if (/^(https?:)?\/\//i.test(href) || href.charAt(0) !== '/') {
+                var u = new URL(href, window.location.origin);
+                if (u.origin !== window.location.origin) return null;
+                path = u.pathname + u.search;
+            }
+        } catch (err) {
+            return null;
+        }
+        return parsePath(path);
+    }
+
+    /**
+     * Find a file anywhere in the unified user document.
+     */
+    function resolve(id, userData) {
+        if (!userData || !isValidId(id)) return null;
+
+        var docs = userData.docs || [];
+        for (var i = 0; i < docs.length; i++) {
+            if (docs[i] && docs[i].id === id) {
+                return { app: 'docs', id: id, name: docs[i].title || 'Untitled',
+                    kind: 'file', record: docs[i], url: url('docs', id) };
+            }
+        }
+        var sheets = userData.sheets || [];
+        for (var j = 0; j < sheets.length; j++) {
+            if (sheets[j] && sheets[j].id === id) {
+                return { app: 'sheets', id: id, name: sheets[j].name || 'Untitled Sheet',
+                    kind: 'file', record: sheets[j], url: url('sheets', id) };
+            }
+        }
+        var forms = userData.forms || [];
+        for (var k = 0; k < forms.length; k++) {
+            if (forms[k] && forms[k].id === id) {
+                return { app: 'forms', id: id, name: forms[k].name || 'Untitled Form',
+                    kind: 'file', record: forms[k], url: url('forms', id) };
+            }
+        }
+        var slides = userData.slides || [];
+        for (var l = 0; l < slides.length; l++) {
+            if (slides[l] && slides[l].id === id) {
+                return { app: 'slides', id: id, name: slides[l].name || 'Untitled Deck',
+                    kind: 'file', record: slides[l], url: url('slides', id) };
+            }
+        }
+        var draws = userData.draws || [];
+        for (var m = 0; m < draws.length; m++) {
+            if (draws[m] && draws[m].id === id) {
+                return { app: 'draw', id: id, name: draws[m].name || 'Untitled Drawing',
+                    kind: 'file', record: draws[m], url: url('draw', id) };
+            }
+        }
+        var todoLists = userData.todo || [];
+        for (var p = 0; p < todoLists.length; p++) {
+            if (todoLists[p] && todoLists[p].id === id) {
+                return { app: 'todo', id: id, name: todoLists[p].name || 'Untitled List',
+                    kind: 'file', record: todoLists[p], url: url('todo', id) };
+            }
+        }
+        var meetingRecords = userData.minutes || [];
+        for (var q = 0; q < meetingRecords.length; q++) {
+            if (meetingRecords[q] && meetingRecords[q].id === id) {
+                return { app: 'minutes', id: id, name: meetingRecords[q].title || 'Untitled meeting', kind: 'file', record: meetingRecords[q], url: url('minutes', id) };
+            }
+        }
+        var kanbanBoards = userData.kanban || [];
+        for (var r = 0; r < kanbanBoards.length; r++) {
+            if (kanbanBoards[r] && kanbanBoards[r].id === id) {
+                return { app: 'kanban', id: id, name: kanbanBoards[r].name || 'Untitled Board',
+                    kind: 'file', record: kanbanBoards[r], url: url('kanban', id) };
+            }
+        }
+        var calendars = userData.calendars || [];
+        for (var q = 0; q < calendars.length; q++) {
+            if (calendars[q] && calendars[q].id === id) {
+                return { app: 'calendar', id: id, name: calendars[q].name || 'Untitled Calendar',
+                    kind: 'file', record: calendars[q], url: url('calendar', id) };
+            }
+        }
+        var posts = userData.posts || [];
+        for (var s = 0; s < posts.length; s++) {
+            if (posts[s] && posts[s].id === id) {
+                return { app: 'blog', id: id, name: posts[s].title || 'Untitled',
+                    kind: 'file', record: posts[s], url: url('blog', id) };
+            }
+        }
+        var files = userData.files || [];
+        for (var n = 0; n < files.length; n++) {
+            if (files[n] && files[n].id === id) {
+                return { app: 'filebox', id: id, name: files[n].name || 'Untitled File',
+                    kind: 'file', record: files[n], url: url('filebox', id) };
+            }
+        }
+        var folders = userData.folders || [];
+        for (var o = 0; o < folders.length; o++) {
+            if (folders[o] && folders[o].id === id) {
+                return { app: 'filebox', id: id, name: folders[o].name || 'Folder',
+                    kind: 'folder', record: folders[o], url: url('filebox', id) };
+            }
+        }
+        return null;
+    }
+
+    /** Holm uses the member cookie, never a browser-selected account hash. */
+    function sessionHash() { return 'holm-session'; }
+
+    function recordOpen(appId, fileId) {
+        if (!APPS[appId] || !['todo', 'kanban', 'minutes', 'calendar', 'docs', 'sheets', 'forms', 'slides', 'draw', 'filebox'].includes(appId)) return;
+        try {
+            fetch('/api/workdeck', {
+                method: 'PUT',
+                keepalive: true,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'recordOpen',
+                    data: { fileId: fileId, app: appId }
+                })
+            }).catch(function () { /* recency is optional */ });
+        } catch (err) { /* ignore */ }
+    }
+
+    /**
+     * Navigate to a file. 
+     */
+    function open(appId, fileId, opts) {
+        opts = opts || {};
+        var target = url(appId, fileId, opts);
+        recordOpen(appId, fileId);
+        if (opts.newTab) {
+            window.open(target, '_blank');
+        } else {
+            window.location.assign(target);
+        }
+    }
+
+    window.WDLinks = {
+        ID_SOURCE: ID_SOURCE,
+        ID_RE: ID_RE,
+        INTERNAL_LINK_RE: INTERNAL_LINK_RE,
+        APPS: APPS,
+        icon: icon,
+        iconNode: iconNode,
+        url: url,
+        parseLocation: parseLocation,
+        parsePath: parsePath,
+        parseHref: parseHref,
+        resolve: resolve,
+        sessionHash: sessionHash,
+        recordOpen: recordOpen,
+        open: open
+    };
+})();
