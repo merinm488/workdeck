@@ -1,0 +1,76 @@
+/* Holm-only shared settings and narrow-screen fixes for the migrated apps. */
+.wd-account-trigger, #settingsBtn.wd-account-trigger, #fbSettingsBtn.wd-account-trigger {
+  width:42px!important; height:42px!important; padding:0!important; display:grid!important; place-items:center!important;
+  border:1px solid var(--wd-menu-line)!important; border-radius:50%!important;
+  background:var(--wd-menu-surface)!important; color:var(--wd-menu-ink)!important;
+  box-shadow:none!important; cursor:pointer;
+}
+.wd-account-trigger:hover, #settingsBtn.wd-account-trigger:hover, #fbSettingsBtn.wd-account-trigger:hover,
+.wd-account-trigger[aria-expanded="true"], #settingsBtn.wd-account-trigger[aria-expanded="true"], #fbSettingsBtn.wd-account-trigger[aria-expanded="true"] { background:var(--wd-menu-hover)!important; }
+.wd-account-trigger svg { width:22px; height:22px; }
+body { --wd-menu-surface:#fffefa; --wd-menu-ink:#171d26; --wd-menu-line:#e6e5df; --wd-menu-hover:#e6e5df; --wd-menu-muted:#646b72; }
+html.dark body, body.dark, html[data-theme="dark"] body, body[data-theme="dark"] {
+  --wd-menu-surface:#19212e; --wd-menu-ink:#f5f4ef; --wd-menu-line:#333c49; --wd-menu-hover:#333c49; --wd-menu-muted:#a6afba;
+}
+.wd-account-panel, #settingsDropdown.wd-account-panel, #fbSettingsDropdown.wd-account-panel, #settingsMenu.wd-account-panel {
+  width:250px!important; padding:8px!important; border:1px solid var(--wd-menu-line)!important;
+  border-radius:10px!important; background:var(--wd-menu-surface)!important;
+  color:var(--wd-menu-ink)!important; box-shadow:0 12px 30px rgba(0,0,0,.16)!important;
+  font-family:Inter,system-ui,sans-serif!important;
+}
+.wd-account-panel .wd-account-item, .wd-account-panel .wd-dropdown-item, .wd-account-panel .settings-dropdown-item,
+.wd-account-panel .fb-dropdown-item, .wd-account-panel .blog-menu-item:not(.theme-option) {
+  display:block; box-sizing:border-box; width:100%; padding:12px!important; border:0!important;
+  border-radius:6px!important; background:transparent!important; color:var(--wd-menu-ink)!important;
+  font-family:Inter,system-ui,sans-serif!important; font-size:13px!important; font-weight:600!important;
+  line-height:normal!important; text-align:left!important; text-decoration:none!important; cursor:pointer;
+}
+.wd-account-panel .wd-account-item:hover, .wd-account-panel .wd-dropdown-item:hover,
+.wd-account-panel .settings-dropdown-item:hover, .wd-account-panel .fb-dropdown-item:hover,
+.wd-account-panel .blog-menu-item:not(.theme-option):hover { background:var(--wd-menu-hover)!important; }
+.wd-account-panel .fb-item-icon { display:none!important; }
+.wd-account-panel .wd-account-item svg, .wd-account-panel .wd-dropdown-item svg,
+.wd-account-panel .settings-dropdown-item svg, .wd-account-panel .fb-dropdown-item svg,
+.wd-account-panel .blog-menu-item:not(.theme-option) svg { display:none!important; }
+.wd-account-panel .wd-account-item[hidden], .wd-account-panel .hidden { display:none!important; }
+.wd-account-panel .wd-theme-setting { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px 12px; font-size:13px; font-weight:600; line-height:normal; }
+.wd-account-panel .wd-theme-options { display:flex; gap:3px; padding:3px; border:1px solid var(--wd-menu-line); border-radius:8px; }
+.wd-account-panel .wd-theme-choice { width:32px; height:32px; display:grid; place-items:center; padding:0; border:0; border-radius:5px; background:transparent; color:var(--wd-menu-muted); cursor:pointer; }
+.wd-account-panel .wd-theme-choice:hover, .wd-account-panel .wd-theme-choice[aria-pressed="true"] { color:var(--wd-menu-ink); background:var(--wd-menu-hover); }
+.wd-account-panel .wd-theme-choice svg { display:block; width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.wd-account-panel :is(.wd-account-item,.wd-dropdown-item,.settings-dropdown-item,.fb-dropdown-item,.blog-menu-item,.wd-theme-choice):focus-visible,
+.wd-account-trigger:focus-visible { outline:3px solid #d39a00!important; outline-offset:2px; }
+/* Retain the old theme controls for their app-specific event handlers, not for display. */
+.wd-account-panel .wd-legacy-theme { display:none!important; }
+/* A link should look like its neighboring Close button in the Holm modal. */
+#connectAIManage, #connectAIManage:hover, #connectAIManage:focus-visible { text-decoration:none; }
+/* A card's four action buttons need more than 160px; keep their controls
+   and title inside the card rather than widening the entire home page. */
+@media(max-width:768px) {
+  .wd-files-grid { grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr)); }
+}
+@media(min-width:769px) and (max-width:1023px) {
+  .wd-files-grid { grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
+}
+/* At narrow widths Filebox's toolbar needs its own row; otherwise the
+   account button sits beyond the right edge of a 320px phone. */
+@media(max-width:600px) {
+  .fb-header-content { flex-wrap:wrap; }
+  .fb-header-content .fb-search { order:2; flex:1 1 100%; max-width:none; min-width:0; }
+  .fb-header-content .fb-actions { flex:0 0 auto; margin-left:auto; }
+}
+/* Keep long settings menus usable in landscape and above the mobile keyboard. */
+#settingsDropdown.wd-account-panel:not(.wd-dropdown), #fbSettingsDropdown.wd-account-panel, #settingsMenu.wd-account-panel {
+  bottom:auto!important; height:auto!important;
+  max-height:calc(100dvh - var(--wd-menu-top,60px) - 12px); overflow-y:auto;
+}
+/* Wrapped app navs can put Settings in the middle of the first row. Anchor
+   the panel to the viewport, not to that button's (sometimes offscreen) edge. */
+@media(max-width:360px) {
+  #settingsDropdown.wd-account-panel:not(.wd-dropdown), #fbSettingsDropdown.wd-account-panel {
+    position:fixed!important; top:var(--wd-menu-top,60px)!important;
+    left:auto!important; right:12px!important; width:min(250px,calc(100vw - 24px))!important;
+    max-height:calc(100dvh - var(--wd-menu-top,60px) - 12px); overflow-y:auto;
+  }
+}
+@media(max-width:470px) { .wd-account-trigger, #settingsBtn.wd-account-trigger, #fbSettingsBtn.wd-account-trigger { width:38px!important; height:38px!important; } }

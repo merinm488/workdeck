@@ -172,7 +172,7 @@ test('Holm React Docs build preserves editor/preview and has no access-key login
       URL,
     });
     await new Promise((resolve, reject) => listeners.activate({ waitUntil: promise => promise.then(resolve, reject) }));
-    assert.deepEqual(deleted, ['workdeck-landing-v14']);
+    assert.deepEqual(deleted, ['workdeck-landing-v14', 'workdeck-landing-v15']);
     for (const path of ['/docs/?doc=example', '/docs/assets/index.js', '/sheets/', '/files/']) {
       let intercepted = false;
       listeners.fetch({ request: { url: 'https://workdeck.test' + path, method: 'GET' }, respondWith: () => { intercepted = true; } });

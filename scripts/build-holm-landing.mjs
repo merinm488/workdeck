@@ -26,10 +26,11 @@ const homeView = segment('    <!-- ===== HOME VIEW ===== -->', '    <!-- ===== M
   .replace(segment('                                <button class="wd-dropdown-item" id="viewKeyBtn">', '                                <button class="wd-dropdown-item" id="logoutBtn">'),
     '                                <a class="wd-dropdown-item" href="/account">My account</a>\n                                <button class="wd-dropdown-item" id="connectAIBtn">Connect AI</button>\n');
 const connectAIModal = segment('    <!-- Connect AI modal (MCP) -->', '    <!-- Change key modal -->')
+  .replace('                <button class="wd-modal-close" id="connectAIClose" aria-label="Close">&times;</button>\n', '')
   .replace('Enter your account key only on Workdeck’s authorization page, never in the AI client. Connections expire after 30 days and can be revoked here. Connecting a new client replaces the current connection.',
-    'Sign in with your Holm account in the browser and review the requested tools before allowing access. Never enter a Workdeck key in your AI client. See connected clients and revoke access using Manage connections below.')
+    'Sign in with your Holm account in the browser and review the requested tools before allowing access.')
   .replace('                <p class="wd-modal-text" id="connectAIStatus" role="status">Loading connection…</p>\n                <div class="wd-modal-actions"><button class="wd-danger-btn" id="connectAIRevoke" hidden>Revoke connection</button><button class="wd-secondary-btn" id="connectAICloseBtn">Close</button></div>',
-    '                <p class="wd-modal-text">Your connected AI clients (for example, pi) and their revoke buttons are shown on Holm’s secure connections page.</p>\n                <div class="wd-modal-actions"><a class="wd-secondary-btn" id="connectAIManage" href="/_holm/connect/connections" target="_blank" rel="noopener noreferrer">Manage connections</a><button class="wd-secondary-btn" id="connectAICloseBtn">Close</button></div>');
+    '                <div class="wd-modal-actions"><a class="wd-secondary-btn" id="connectAIManage" href="/_holm/connect/connections" target="_blank" rel="noopener noreferrer">Manage Connections</a><button class="wd-secondary-btn" id="connectAICloseBtn">Close</button></div>');
 const homeMarkup = homeView
   + segment('    <!-- Rename modal -->', '    <!-- Key modal -->')
   + segment('    <!-- Add tag modal', '    <!-- Loading overlay -->')
@@ -122,7 +123,9 @@ const formPage = (filename) => {
     cutPart('    <!-- Key Info Modal -->', '    <!-- Clear Responses Confirmation Modal -->');
     cutPart('    <!-- Authentication Check Script -->', '    <!-- Fatal: form library failed to load');
   }
-  return page;
+  return filename === 'editor.html'
+    ? page.replace('</head>', '<link rel="stylesheet" href="/forms/editor-dark.css"></head>')
+    : page;
 };
 const slidePage = (filename) => {
   let page = readFileSync(join(root, 'slides', filename), 'utf8');
@@ -217,8 +220,8 @@ let landing = source.slice(open, close).trim()
 // to say coming soon until the old app is retired.
 const authURL = '/auth/login?redirect=%2Fhome';
 const accountMenu = `<div class="lp-account-menu">
-                    <button type="button" id="landingMenuToggle" class="lp-account-toggle" aria-label="Account menu" aria-haspopup="true" aria-expanded="false" aria-controls="landingMenu">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5"/></svg>
+                    <button type="button" id="landingMenuToggle" class="lp-account-toggle" aria-label="Settings" aria-haspopup="true" aria-expanded="false" aria-controls="landingMenu">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     </button>
                     <div id="landingMenu" class="lp-account-panel" hidden>
                         <div class="lp-theme-setting" aria-label="Theme">
@@ -298,7 +301,12 @@ for (const [tag, href, title] of [
 ]) {
   const marker = `<span class="lp-app-tag">${tag}</span>`;
   if (!landing.includes(marker)) throw new Error(`Missing ${title} catalogue card.`);
-  landing = landing.replace(marker, marker + `<a class="lp-app-open" href="${href}">Open ${title} ↗</a>`);
+  // Docs must keep /docs/ public for tokenized shared documents. Point the
+  // catalogue's guest link straight at Holm sign-in instead of showing Docs'
+  // intermediate React sign-in screen; landing.js restores /docs/ for members.
+  const openHref = title === 'Docs' ? '/auth/login?redirect=%2Fdocs%2F' : href;
+  const openId = title === 'Docs' ? ' id="lp-docs-open"' : '';
+  landing = landing.replace(marker, marker + `<a class="lp-app-open"${openId} href="${openHref}">Open ${title} ↗</a>`);
 }
 const appsHeading = `<div class="lp-apps-heading"><div><div class="lp-section-index">01 / THE TOOLKIT</div><h2 id="lp-apps-title">Meet your <em>workspace.</em></h2><p>Different tools for different moments. Explore what belongs in your deck.</p></div><span class="lp-apps-count">11 tools · one home</span></div>`;
 const appsToolbar = `<div class="lp-catalog-toolbar">
@@ -386,8 +394,14 @@ writeFileSync(join(output, 'holm.json'), JSON.stringify({
 }, null, 2) + '\n');
 // The legacy account screen is retired. Keep sign-in management in each
 // settings menu and send Holm back to the dashboard afterwards.
-const withSignIns = html => html.replaceAll('href="/account">My account</a>',
-  'href="/auth/account?redirect=%2Fhome">Your sign-ins</a>');
+// Apply the same account controls to every migrated signed-in page, without
+// altering the legacy/Vercel HTML used as build input.
+const withSignIns = html => {
+  const page = html.replaceAll('href="/account">My account</a>',
+    'href="/auth/account?redirect=%2Fhome">Your sign-ins</a>');
+  return page.replace('</head>', '<link rel="stylesheet" href="/settings-menu.css"></head>')
+    .replace('</body>', '<script src="/js/settings-menu.js"></script></body>');
+};
 writeFileSync(join(web, 'index.html'), html());
 writeFileSync(join(web, 'home.html'), withSignIns(homeHTML));
 writeFileSync(join(web, 'kanban/index.html'), withSignIns(kanban));
@@ -483,6 +497,9 @@ writeFileSync(join(web, 'landing.js'), `(() => {
       if (!response.ok) throw new Error('Session check failed');
       const session = await response.json();
       if (session.member) {
+        // The public catalogue needs a direct login link for guests, but a
+        // signed-in member should open Docs rather than revisit Holm login.
+        document.getElementById('lp-docs-open')?.setAttribute('href', '/docs/');
         // Holm serves web/index.html directly before api/main.js, so the
         // signed-in landing must navigate to the dashboard client-side.
         if (location.pathname === '/') { location.replace('/home'); return; }
@@ -531,6 +548,8 @@ for (const [from, to] of [
   ['holm/auth/mentions.js', 'wd-mentions.js'],
   ['holm/auth/dashboard.js', 'workdeck.js'],
 ]) cpSync(join(root, from), join(web, 'js', to));
+cpSync(join(root, 'holm/auth/settings-menu.css'), join(web, 'settings-menu.css'));
+cpSync(join(root, 'holm/auth/settings-menu.js'), join(web, 'js/settings-menu.js'));
 cpSync(join(root, 'holm/auth/landing-nav.css'), join(web, 'landing-nav.css'));
 cpSync(join(root, 'holm/auth/connect-ai.js'), join(web, 'js/connect-ai.js'));
 cpSync(join(root, 'public/icons'), join(web, 'icons'), { recursive: true });
@@ -540,7 +559,8 @@ for (const file of ['account.html', 'account.css', 'account.js']) {
   cpSync(join(root, 'holm/auth', file), join(web, file));
 }
 for (const file of ['index.html', 'styles.css', 'editor.js', 'config.js', 'auth.js', 'storage.js']) {
-  cpSync(join(root, 'holm/todo', file), join(web, 'todo', file));
+  if (file === 'index.html') writeFileSync(join(web, 'todo', file), withSignIns(readFileSync(join(root, 'holm/todo', file), 'utf8')));
+  else cpSync(join(root, 'holm/todo', file), join(web, 'todo', file));
 }
 // Keep Todo's existing light/dark/system theme implementation unchanged.
 cpSync(join(root, 'todo/js/themes.js'), join(web, 'todo/themes.js'));
@@ -573,6 +593,7 @@ cpSync(join(root, 'holm/sheets/vendor-xlsx.js'), join(web, 'sheets/js/vendor-xls
 cpSync(join(root, 'holm/sheets/SHEETJS-LICENSE.txt'), join(web, 'sheets/SHEETJS-LICENSE.txt'));
 cpSync(join(root, 'holm/sheets/service-worker.js'), join(web, 'sheets/service-worker.js'));
 cpSync(join(root, 'forms/styles.css'), join(web, 'forms/styles.css'));
+cpSync(join(root, 'holm/forms/editor-dark.css'), join(web, 'forms/editor-dark.css'));
 for (const file of ['config.js']) cpSync(join(root, 'holm/forms', file), join(web, 'forms/config', file));
 for (const file of ['home.js', 'editor.js', 'auth.js', 'storage.js'])
   cpSync(join(root, 'holm/forms', file), join(web, 'forms/js', file));
@@ -638,6 +659,7 @@ try {
   // upgrade, clients whose Docs cache was erased by the old root worker get
   // a fresh copy of the navigation shell.
   writeFileSync(join(docsBuild, 'index.html'), index.replace('    <link rel="stylesheet" href="/docs/assets/markdown-editor.css" />\n', '')
+    .replace('</head>', '<link rel="stylesheet" href="/settings-menu.css"></head>')
     .replace('  <body>', '  <body>\n    <!-- Holm Docs: refreshed navigation precache -->'));
   execFileSync(join(root, 'docs-src/node_modules/.bin/vite'), ['build'], {
     cwd: docsBuild, timeout: 120_000, maxBuffer: 10_000_000,

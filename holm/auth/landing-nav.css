@@ -8,7 +8,7 @@
 .lp-account-toggle:focus-visible,.lp-menu-item:focus-visible { outline:3px solid #d39a00; outline-offset:3px; }
 .lp-account-panel { position:absolute; top:calc(100% + 10px); right:0; width:250px; padding:8px; border:1px solid var(--lp-line); border-radius:10px; background:var(--lp-surface); box-shadow:0 12px 30px rgba(0,0,0,.16); }
 .lp-account-panel[hidden],.lp-account-panel [hidden] { display:none; }
-.lp-theme-setting { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 6px 12px; font-size:13px; font-weight:600; }
+.lp-theme-setting { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px 12px; font-size:13px; font-weight:600; line-height:normal; }
 .lp-theme-options { display:flex; gap:3px; padding:3px; border:1px solid var(--lp-line); border-radius:8px; }
 .lp-theme-option { width:32px; height:32px; display:grid; place-items:center; border:0; border-radius:5px; background:transparent; color:var(--lp-muted); cursor:pointer; }
 .lp-theme-option:hover { color:var(--lp-ink); background:var(--lp-line); }
@@ -64,4 +64,14 @@
 @media(max-width:750px) { .lp--apps .lp-app-grid[data-view="grid"] { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:560px) { .lp--apps .lp-apps { padding-top:32px; } .lp--apps .lp-apps .lp-wrap { width:calc(100% - 36px); } .lp-catalog-toolbar { flex-wrap:wrap; } .lp-catalog-controls { width:100%; } .lp-catalog-search { width:auto; flex:1; } .lp--apps .lp-app-grid[data-view="grid"] { grid-template-columns:repeat(2,minmax(0,1fr)); } .lp--apps .lp-app-grid[data-view="grid"] .lp-app-card { min-height:180px; } .lp--apps .lp-app-grid[data-view="grid"] .lp-app-icon { width:70px; height:70px; } .lp--apps .lp-app-grid[data-view="list"] .lp-app-card { grid-template-columns:50px minmax(0,1fr) auto; gap:3px 10px; padding:12px; } .lp--apps .lp-app-grid[data-view="list"] .lp-app-icon { width:45px; height:45px; } .lp--apps .lp-app-grid[data-view="list"] .lp-app-open { padding:8px; font-size:11px; } }
 @media(max-width:750px) { .lp-nav { gap:12px; } .lp-nav-links { display:flex; margin-left:auto; } .lp-hero { padding-block:55px 30px; } }
+@media(max-width:750px) {
+  /* Keep the illustration captions in their own rows instead of floating over
+     the rotated mockup on phones and narrow tablets. */
+  .lp-hero-art { height:auto; min-height:0; display:flex; flex-direction:column; align-items:stretch; gap:32px; }
+  .lp-hero-art::before, .lp-hero-art .lp-art-orbit { display:none; }
+  .lp-art-label { position:static; align-self:flex-start; }
+  .lp-art-label-top { align-self:flex-end; }
+  .lp-art-window { flex:none; align-self:center; max-width:100%; }
+  .lp-art-sticker { bottom:40px; }
+}
 @media(max-width:470px) { .lp-account-toggle { width:38px; height:38px; } .lp-nav-links { font-size:11px; } }

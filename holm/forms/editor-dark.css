@@ -1,0 +1,12 @@
+/* Holm Forms editor: form-js's CodeMirror properties inputs retain a
+   hard-coded dark text color even when the rest of the panel is dark. */
+[data-theme="dark"] #builder .fjs-editor-properties-container .cm-editor,
+[data-theme="dark"] #builder .fjs-editor-properties-container .cm-content {
+    color: var(--text-primary);
+}
+[data-theme="dark"] #builder .fjs-editor-properties-container .cm-placeholder {
+    color: #a3a3a3;
+}
+[data-theme="dark"] #builder .fjs-editor-properties-container .cm-cursor {
+    border-left-color: var(--text-primary);
+}

@@ -212,13 +212,18 @@ test('Holm Forms preserves form-js builder/viewer, responses UI and removes acce
       { timeout: 150_000, maxBuffer: 500_000 });
     for (const page of ['index.html', 'editor.html', 'shared.html']) {
       const html = readFileSync(join(dir, 'web/forms', page), 'utf8');
-      if (page === 'editor.html') for (const marker of ['form-editor.umd.js', 'chart.umd.min.js',
-        'tabulator.min.js', 'id="tabResponses"', 'id="responsesTable"', 'id="shareModal"']) assert.ok(html.includes(marker));
+      if (page === 'editor.html') {
+        assert.match(html, /href="\/forms\/editor-dark\.css"/);
+        for (const marker of ['form-editor.umd.js', 'chart.umd.min.js',
+          'tabulator.min.js', 'id="tabResponses"', 'id="responsesTable"', 'id="shareModal"']) assert.ok(html.includes(marker));
+      }
       if (page === 'shared.html') assert.match(html, /form-viewer\.umd\.js/);
       if (page !== 'shared.html') assert.doesNotMatch(html, /Your Access Key|View My Key|Delete Account|forms_user_hash|sessionStorage/);
     }
     assert.equal(readFileSync(join(dir, 'web/forms/styles.css'), 'utf8'),
       readFileSync(new URL('../forms/styles.css', import.meta.url), 'utf8'));
+    assert.match(readFileSync(join(dir, 'web/forms/editor-dark.css'), 'utf8'),
+      /\[data-theme="dark"\] #builder \.fjs-editor-properties-container \.cm-content \{\s*color: var\(--text-primary\)/);
     const ownerStorage = readFileSync(join(dir, 'web/forms/js/storage.js'), 'utf8');
     assert.doesNotMatch(ownerStorage, /sessionStorage|hash:|userHash|userKey/);
     assert.ok(readFileSync(join(dir, 'web/js/workdeck.js'), 'utf8').includes("['todo', 'kanban', 'minutes', 'calendar', 'docs', 'sheets', 'forms', 'slides', 'draw', 'filebox', 'blog']"));

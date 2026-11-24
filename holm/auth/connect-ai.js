@@ -18,7 +18,6 @@
       modal.classList.add('active');
     });
     select.addEventListener('change', update);
-    $('connectAIClose').addEventListener('click', close);
     $('connectAICloseBtn').addEventListener('click', close);
     modal.addEventListener('click', event => { if (event.target === modal) close(); });
     $('connectAICopy').addEventListener('click', async () => {
