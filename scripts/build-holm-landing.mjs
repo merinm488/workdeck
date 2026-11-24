@@ -215,17 +215,57 @@ let landing = source.slice(open, close).trim()
   .replace('class="lp hidden"', 'class="lp"');
 // Only the Holm build advertises sign-in. The legacy/Vercel landing continues
 // to say coming soon until the old app is retired.
-const authURL = '/auth/login?redirect=%2Faccount';
+const authURL = '/auth/login?redirect=%2Fhome';
+const accountMenu = `<div class="lp-account-menu">
+                    <button type="button" id="landingMenuToggle" class="lp-account-toggle" aria-label="Account menu" aria-haspopup="true" aria-expanded="false" aria-controls="landingMenu">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5"/></svg>
+                    </button>
+                    <div id="landingMenu" class="lp-account-panel" hidden>
+                        <div class="lp-theme-setting" aria-label="Theme">
+                            <span>Theme</span>
+                            <div class="lp-theme-options" role="group" aria-label="Theme preference">
+                                <button type="button" class="lp-theme-option" data-theme-choice="light" aria-label="Light theme" aria-pressed="false" title="Light theme"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></button>
+                                <button type="button" class="lp-theme-option" data-theme-choice="dark" aria-label="Dark theme" aria-pressed="false" title="Dark theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 15.5A9 9 0 0 1 8.5 3.5a9 9 0 1 0 12 12Z"/></svg></button>
+                                <button type="button" class="lp-theme-option" data-theme-choice="system" aria-label="System theme" aria-pressed="false" title="System theme"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8m-4-3v3"/></svg></button>
+                            </div>
+                        </div>
+                        <a id="landingAccountLink" class="lp-menu-item" href="${authURL}">Sign in</a>
+                        <button type="button" id="landingSignOut" class="lp-menu-item" hidden>Sign out</button>
+                    </div>
+                </div>`;
 const replacements = [
-  ['<span class="lp-nav-status"><span class="lp-status-dot"></span> Email sign-in coming soon</span>', '<div class="lp-auth-nav"><a id="landingAccountLink" class="lp-nav-status lp-signin" href="/account">Account</a><button type="button" id="landingSignOut" class="lp-nav-status lp-signout" hidden>Sign out</button></div>'],
-  ['<span class="lp-hero-note">Email sign-in is on its way</span>', `<a id="landingHeroSignIn" class="lp-button lp-button-outline" href="${authURL}">Sign in <span aria-hidden="true">↗</span></a>`],
-  ["We're preparing a new way to get in. Email sign-in will be available as the apps make their way to their new home.", 'Sign in to create your Workdeck account. All the Workdeck apps, including Blog, are available on Holm now.'],
-  ['<span class="lp-coming-soon" aria-label="Email sign-in coming soon">Email sign-in <span>coming soon ↗</span></span>', `<a id="landingOutroSignIn" class="lp-button lp-button-primary" href="${authURL}">Sign in <span aria-hidden="true">↗</span></a>`],
+  ['<a href="/apps">Explore apps</a>', '<a href="/apps">Apps</a>'],
+  ['<a href="/#about">The idea</a>', ''],
+  ['<button type="button" id="landingThemeToggle" class="lp-theme-toggle" aria-label="Switch colour theme" title="Switch colour theme">◐</button>\n                <span class="lp-nav-status"><span class="lp-status-dot"></span> Email sign-in coming soon</span>', accountMenu],
+  ['<p class="lp-hero-lead">The ideas you write down. The plans you put in motion. The everyday details that keep things moving. Workdeck brings them together, without getting in your way.</p>', ''],
+  ['<div class="lp-hero-actions">\n                        <a class="lp-button lp-button-primary" href="/apps">Explore the apps <span aria-hidden="true">↗</span></a>\n                        <span class="lp-hero-note">Email sign-in is on its way</span>\n                    </div>', ''],
+  ['<small>App migration will happen one by one.</small>', ''],
+  ['<i>✳</i><span>One workspace</span></div></div>', '</div></div>'],
+  ['02 / THE TOOLKIT', '01 / THE TOOLKIT'],
+  ['<footer class="lp-footer"><div class="lp-wrap lp-footer-inner"><a class="lp-brand" href="/" aria-label="Workdeck home"><img src="/icons/icon-192x192.png" width="32" height="32" alt=""><span>workdeck<span class="lp-brand-dot">.</span></span></a><span>A little more room to do great work.</span><a href="#lp-main">Back to top ↑</a></div></footer>', ''],
 ];
 for (const [before, after] of replacements) {
   if (!landing.includes(before)) throw new Error(`Missing landing sign-in marker: ${before}`);
   landing = landing.replace(before, after);
 }
+for (const [start, end] of [
+  ['            <section id="about"', '            <section id="apps"'],
+  ['            <section class="lp-outro lp-wrap"', '        </main>'],
+]) {
+  const from = landing.indexOf(start);
+  const to = landing.indexOf(end, from);
+  if (from < 0 || to < 0) throw new Error(`Missing landing section: ${start}`);
+  landing = landing.slice(0, from) + landing.slice(to);
+}
+// The home ribbon occupies the old footer slot, after the main content.
+const ribbon = landing.match(/^            <div class="lp-marquee"[^\n]+/m)?.[0];
+if (!ribbon) throw new Error('Missing landing ribbon.');
+landing = landing.replace(ribbon, '').replace('        </main>', `        </main>\n${ribbon}`);
+const pwaIcons = {
+  docs: '/docs/icon-192.png',
+  sheets: '/sheets/icons/icon-192x192.png',
+  filebox: '/files/icons/icon-192x192.png',
+};
 const icons = [...landing.matchAll(/<span class="lp-app-icon" data-icon="([a-z]+)">[^<]*<\/span>/g)];
 if (icons.length !== 11) throw new Error(`Expected 11 app cards; found ${icons.length}.`);
 for (const match of icons) {
@@ -236,7 +276,11 @@ for (const match of icons) {
     ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8m-8 4h5"/></svg>'
     : null;
   if (!template && !fallback) throw new Error(`Missing icon for ${match[1]}`);
-  landing = landing.replace(match[0], `<span class="lp-app-icon" data-icon="${match[1]}">${template ? template[1].trim() : fallback}</span>`);
+  const pwaIcon = pwaIcons[match[1]];
+  const icon = pwaIcon
+    ? `<span class="lp-app-icon lp-app-icon--pwa" data-icon="${match[1]}"><img src="${pwaIcon}" width="192" height="192" alt="" loading="lazy" decoding="async"></span>`
+    : `<span class="lp-app-icon" data-icon="${match[1]}">${template ? template[1].trim() : fallback}</span>`;
+  landing = landing.replace(match[0], icon);
 }
 // Only migrated apps link to an editor. Other showcase cards stay informational.
 for (const [tag, href, title] of [
@@ -256,6 +300,29 @@ for (const [tag, href, title] of [
   if (!landing.includes(marker)) throw new Error(`Missing ${title} catalogue card.`);
   landing = landing.replace(marker, marker + `<a class="lp-app-open" href="${href}">Open ${title} ↗</a>`);
 }
+const appsHeading = `<div class="lp-apps-heading"><div><div class="lp-section-index">01 / THE TOOLKIT</div><h2 id="lp-apps-title">Meet your <em>workspace.</em></h2><p>Different tools for different moments. Explore what belongs in your deck.</p></div><span class="lp-apps-count">11 tools · one home</span></div>`;
+const appsToolbar = `<div class="lp-catalog-toolbar">
+                        <h1 id="lp-apps-title">All apps <span id="lp-apps-count">11</span></h1>
+                        <div class="lp-catalog-controls">
+                            <label class="lp-catalog-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><span class="lp-sr-only">Search apps</span><input id="lp-app-search" type="search" placeholder="Search apps" autocomplete="off"></label>
+                            <div class="lp-view-switch" role="group" aria-label="App display">
+                                <button type="button" data-app-view="grid" aria-label="Grid view" aria-pressed="true" title="Grid view"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+                                <button type="button" data-app-view="list" aria-label="List view" aria-pressed="false" title="List view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h12M9 12h12M9 19h12M3 5h2M3 12h2M3 19h2"/></svg></button>
+                            </div>
+                        </div>
+                    </div>`;
+if (!landing.includes(appsHeading)) throw new Error('Missing app catalogue heading.');
+const appsLanding = landing.replace('class="lp"', 'class="lp lp--apps"')
+  .replace(appsHeading, appsToolbar)
+  .replace('<div class="lp-app-grid">', '<div class="lp-app-grid" id="lp-app-grid" data-view="grid">')
+  .replace(/\s*<div class="lp-app-end">[^\n]*<\/div>/, '')
+  .replace('                    </div>\n                </div>\n            </section>', '                    </div>\n                    <p id="lp-app-empty" class="lp-app-empty" hidden>No apps match your search.</p>\n                </div>\n            </section>');
+const homeLanding = (() => {
+  const start = landing.indexOf('            <section id="apps"');
+  const end = landing.indexOf('        </main>', start);
+  if (start < 0 || end < 0) throw new Error('Missing home toolkit section.');
+  return landing.slice(0, start) + landing.slice(end);
+})();
 const html = (apps = false) => `<!doctype html>
 <html lang="en">
 <head>
@@ -284,7 +351,7 @@ const html = (apps = false) => `<!doctype html>
   <style>body{margin:0}html{scroll-behavior:smooth}</style>
 </head>
 <body>
-${apps ? landing.replace('class="lp"', 'class="lp lp--apps"') : landing}
+${apps ? appsLanding : homeLanding}
 </body>
 </html>
 `;
@@ -317,36 +384,95 @@ writeFileSync(join(output, 'holm.json'), JSON.stringify({
   web: { spa: false },
   surfaces: { web: { renderer: 'off' } },
 }, null, 2) + '\n');
+// The legacy account screen is retired. Keep sign-in management in each
+// settings menu and send Holm back to the dashboard afterwards.
+const withSignIns = html => html.replaceAll('href="/account">My account</a>',
+  'href="/auth/account?redirect=%2Fhome">Your sign-ins</a>');
 writeFileSync(join(web, 'index.html'), html());
-writeFileSync(join(web, 'home.html'), homeHTML);
-writeFileSync(join(web, 'kanban/index.html'), kanban);
-writeFileSync(join(web, 'calendar/index.html'), calendar);
-writeFileSync(join(web, 'sheets/index.html'), sheetPage('index.html'));
-writeFileSync(join(web, 'sheets/editor.html'), sheetPage('editor.html'));
+writeFileSync(join(web, 'home.html'), withSignIns(homeHTML));
+writeFileSync(join(web, 'kanban/index.html'), withSignIns(kanban));
+writeFileSync(join(web, 'calendar/index.html'), withSignIns(calendar));
+writeFileSync(join(web, 'sheets/index.html'), withSignIns(sheetPage('index.html')));
+writeFileSync(join(web, 'sheets/editor.html'), withSignIns(sheetPage('editor.html')));
 writeFileSync(join(web, 'sheets/shared.html'), sheetPage('shared.html'));
 for (const file of ['index.html', 'editor.html', 'shared.html'])
-  writeFileSync(join(web, 'forms', file), formPage(file));
+  writeFileSync(join(web, 'forms', file), withSignIns(formPage(file)));
 for (const file of ['index.html', 'editor.html', 'shared.html'])
-  writeFileSync(join(web, 'slides', file), slidePage(file));
+  writeFileSync(join(web, 'slides', file), withSignIns(slidePage(file)));
 for (const file of ['index.html', 'editor.html', 'shared.html'])
-  writeFileSync(join(web, 'draw', file), drawPage(file));
-writeFileSync(join(web, 'files/index.html'), filePage);
-writeFileSync(join(web, 'blog/index.html'), blogPage);
+  writeFileSync(join(web, 'draw', file), withSignIns(drawPage(file)));
+writeFileSync(join(web, 'files/index.html'), withSignIns(filePage));
+writeFileSync(join(web, 'blog/index.html'), withSignIns(blogPage));
 cpSync(join(root, 'holm/blog/public.html'), join(web, 'blog-public.html'));
 cpSync(join(root, 'public/blog.css'), join(web, 'blog.css'));
 writeFileSync(join(web, 'apps.html'), html(true));
 writeFileSync(join(web, 'landing.js'), `(() => {
+  let themePreference = 'dark';
+  const systemTheme = () => matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const applyTheme = () => document.documentElement.setAttribute('data-theme', themePreference === 'system' ? systemTheme() : themePreference);
   try {
     const pref = localStorage.getItem('workdeck_theme');
-    const theme = pref === 'light' || pref === 'dark' ? pref : pref === 'system'
-      ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : 'dark';
-    document.documentElement.setAttribute('data-theme', theme);
-  } catch (_) { document.documentElement.setAttribute('data-theme', 'dark'); }
+    themePreference = ['light', 'dark', 'system'].includes(pref) ? pref : 'dark';
+  } catch (_) {}
+  applyTheme();
   addEventListener('DOMContentLoaded', async () => {
+    const grid = document.getElementById('lp-app-grid');
+    if (grid) {
+      const cards = [...grid.querySelectorAll('.lp-app-card')];
+      const search = document.getElementById('lp-app-search');
+      const count = document.getElementById('lp-apps-count');
+      const empty = document.getElementById('lp-app-empty');
+      const viewButtons = document.querySelectorAll('[data-app-view]');
+      let savedView;
+      try { savedView = localStorage.getItem('workdeck_apps_view'); } catch (_) {}
+      const setView = view => {
+        grid.dataset.view = view;
+        viewButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.appView === view)));
+        try { localStorage.setItem('workdeck_apps_view', view); } catch (_) {}
+      };
+      setView(savedView === 'list' ? 'list' : 'grid');
+      viewButtons.forEach(button => button.addEventListener('click', () => setView(button.dataset.appView)));
+      search.addEventListener('input', () => {
+        const query = search.value.trim().toLocaleLowerCase();
+        let visible = 0;
+        cards.forEach(card => {
+          card.hidden = !card.textContent.toLocaleLowerCase().includes(query);
+          if (!card.hidden) visible++;
+        });
+        count.textContent = String(visible);
+        empty.hidden = visible !== 0;
+      });
+    }
+    const menuToggle = document.getElementById('landingMenuToggle');
+    const menu = document.getElementById('landingMenu');
+    const closeMenu = () => { menu.hidden = true; menuToggle.setAttribute('aria-expanded', 'false'); };
+    menuToggle?.addEventListener('click', () => {
+      menu.hidden = !menu.hidden;
+      menuToggle.setAttribute('aria-expanded', String(!menu.hidden));
+    });
+    document.addEventListener('click', event => {
+      if (menuToggle && !menuToggle.parentElement.contains(event.target)) closeMenu();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && menu && !menu.hidden) { closeMenu(); menuToggle.focus(); }
+    });
+    const themeOptions = document.querySelectorAll('[data-theme-choice]');
+    const syncThemeOptions = () => themeOptions.forEach(option => option.setAttribute('aria-pressed', String(option.dataset.themeChoice === themePreference)));
+    syncThemeOptions();
+    themeOptions.forEach(option => option.addEventListener('click', () => {
+      themePreference = option.dataset.themeChoice;
+      applyTheme();
+      syncThemeOptions();
+      try { localStorage.setItem('workdeck_theme', themePreference); } catch (_) {}
+    }));
+    // The separate account page still uses the original standalone toggle.
     document.getElementById('landingThemeToggle')?.addEventListener('click', () => {
-      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      try { localStorage.setItem('workdeck_theme', next); } catch (_) {}
+      themePreference = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      applyTheme();
+      try { localStorage.setItem('workdeck_theme', themePreference); } catch (_) {}
+    });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (themePreference === 'system') applyTheme();
     });
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
     const link = document.getElementById('landingAccountLink');
@@ -360,13 +486,10 @@ writeFileSync(join(web, 'landing.js'), `(() => {
         // Holm serves web/index.html directly before api/main.js, so the
         // signed-in landing must navigate to the dashboard client-side.
         if (location.pathname === '/') { location.replace('/home'); return; }
-        link.textContent = 'My account';
-        link.href = '/account';
+        link.textContent = 'Your sign-ins';
+        link.href = session.accountURL;
         signOut.hidden = false;
-        for (const id of ['landingHeroSignIn', 'landingOutroSignIn']) {
-          const action = document.getElementById(id);
-          if (action) { action.href = '/home'; action.firstChild.textContent = 'Open Workdeck '; }
-        }
+        // The public /apps page keeps the account link in the menu.
         signOut.addEventListener('click', async () => {
           signOut.disabled = true;
           try {
@@ -381,16 +504,12 @@ writeFileSync(join(web, 'landing.js'), `(() => {
       } else {
         link.textContent = 'Sign in';
         link.href = session.loginURL;
-        for (const id of ['landingHeroSignIn', 'landingOutroSignIn']) {
-          const action = document.getElementById(id);
-          if (action) action.href = session.loginURL;
-        }
       }
-    } catch (_) { /* Account link remains available if the session check fails. */ }
+    } catch (_) { /* The sign-in link remains available if the session check fails. */ }
   });
 })();\n`);
-writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v15';
-const FILES = ['/', '/apps', '/account', '/todo/', '/todo/editor.js', '/todo/storage.js', '/todo/auth.js', '/todo/config.js', '/todo/themes.js', '/todo/styles.css', '/landing.css', '/landing-nav.css', '/landing.js', '/account.css', '/account.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
+writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v24';
+const FILES = ['/', '/apps', '/todo/', '/todo/editor.js', '/todo/storage.js', '/todo/auth.js', '/todo/config.js', '/todo/themes.js', '/todo/styles.css', '/landing.css', '/landing-nav.css', '/landing.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('workdeck-landing-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {

@@ -49,15 +49,18 @@ export default {
           email: member.email || '',
           theme: env.holm.app.member.kv.get('workdeck_settings')?.theme || 'dark',
         } : null,
-        loginURL: env.holm.auth.getLoginURL('/account'),
+        loginURL: env.holm.auth.getLoginURL('/home'),
         logoutURL: env.holm.auth.getLogoutURL(),
-        accountURL: env.holm.auth.getAccountURL('/account'),
+        accountURL: env.holm.auth.getAccountURL('/home'),
       }, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (pathname.startsWith('/api/')) {
       return Response.json({ error: 'Not found.' }, { status: 404 });
     }
     if (pathname === '/' && env.holm.auth.getMember()) {
+      return Response.redirect(new URL('/home', request.url), 302);
+    }
+    if (pathname === '/account') {
       return Response.redirect(new URL('/home', request.url), 302);
     }
     if (pathname === '/home') {
