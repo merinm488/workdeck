@@ -6,8 +6,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-export function UserDisplay({ userHash, onLogout, onDeleteAccount, onShowKey }) {
+export function UserDisplay({ onLogout, onDeleteAccount, onShowKey, theme, onSetTheme }) {
   const [showMenu, setShowMenu] = useState(false);
+  const [showThemeOptions, setShowThemeOptions] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const menuRef = useRef(null);
@@ -17,6 +18,7 @@ export function UserDisplay({ userHash, onLogout, onDeleteAccount, onShowKey }) 
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setShowMenu(false);
+        setShowThemeOptions(false);
       }
     };
 
@@ -48,7 +50,12 @@ export function UserDisplay({ userHash, onLogout, onDeleteAccount, onShowKey }) 
     <>
       <div className="relative" ref={menuRef}>
         <button
-          onClick={() => setShowMenu(!showMenu)}
+          onClick={() => {
+            setShowMenu(!showMenu);
+            setShowThemeOptions(false);
+          }}
+          aria-label="Settings"
+          aria-expanded={showMenu}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="Settings"
         >
@@ -73,7 +80,37 @@ export function UserDisplay({ userHash, onLogout, onDeleteAccount, onShowKey }) 
 
         {/* Dropdown menu */}
         {showMenu && (
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 z-50">
+          <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 z-50">
+            <button
+              onClick={() => setShowThemeOptions(!showThemeOptions)}
+              aria-expanded={showThemeOptions}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="5" strokeWidth="2" />
+                <path strokeWidth="2" strokeLinecap="round" d="M12 1v2m0 18v2M1 12h2m18 0h2M4.2 4.2l1.4 1.4m12.8 12.8 1.4 1.4M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
+              </svg>
+              Theme: {theme === 'system' ? 'System' : theme === 'dark' ? 'Dark' : 'Light'}
+              <span className="ml-auto">{showThemeOptions ? '▾' : '›'}</span>
+            </button>
+            {showThemeOptions && (
+              <div className="border-b border-gray-200 dark:border-gray-700 pb-1 mb-1">
+                {['dark', 'light', 'system'].map(option => (
+                  <button
+                    key={option}
+                    onClick={() => {
+                      onSetTheme(option);
+                      setShowMenu(false);
+                      setShowThemeOptions(false);
+                    }}
+                    className="w-full pl-9 pr-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 flex items-center justify-between"
+                  >
+                    <span className="capitalize">{option}</span>
+                    {theme === option && <span aria-label="Selected" className="text-blue-500">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
             {/* Show Key button */}
             <button
               onClick={handleShowKey}

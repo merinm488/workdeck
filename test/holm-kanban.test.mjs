@@ -121,6 +121,27 @@ test('Holm hard links for Todo and Kanban survive the static router on reload', 
   assert.ok(editor.includes("'/todo/?list=' + encodeURIComponent(id)"));
 });
 
+test('Holm Kanban home renders no Create board tile; the header New Board button remains', () => {
+  const source = readFileSync(new URL('../holm/kanban/app.js', import.meta.url), 'utf8');
+  const render = source.slice(source.indexOf('function renderBoards()'), source.indexOf('function openBoard('));
+  const grid = { children: [], innerHTML: '', appendChild(card) { this.children.push(card); } };
+  const elements = {
+    boardsGrid: grid, boardsNoResults: { classList: { toggle() {} } },
+    boardsEmpty: { classList: { toggle() {} } }, kanbanFooterStats: {},
+  };
+  const state = { searchQuery: '', boards: [], settings: {} };
+  const { renderBoards } = vm.runInNewContext(`${render}; ({ renderBoards })`, {
+    state, document: { getElementById(id) {
+      assert.notEqual(id, 'kbBoardCreateTemplate', 'Create board tile must not be rendered');
+      return elements[id];
+    } },
+  });
+  renderBoards();
+  assert.equal(grid.children.length, 0);
+  assert.equal(elements.kanbanFooterStats.textContent, '0 boards · 0 cards');
+  assert.match(readFileSync(new URL('../kanban/index.html', import.meta.url), 'utf8'), /id="newBoardBtn"/);
+});
+
 test('Holm Kanban keeps the original board UI but never ships access-key login', () => {
   const dir = mkdtempSync(join(tmpdir(), 'wd-kanban-'));
   try {
@@ -128,6 +149,12 @@ test('Holm Kanban keeps the original board UI but never ships access-key login',
     const original = readFileSync(new URL('../kanban/index.html', import.meta.url), 'utf8');
     const html = readFileSync(join(dir, 'web/kanban/index.html'), 'utf8');
     const css = readFileSync(join(dir, 'web/kanban/styles.css'), 'utf8');
+    const sidebarCSS = readFileSync(join(dir, 'web/app-sidebar.css'), 'utf8');
+    assert.match(sidebarCSS, /#boardsView #boardsGrid\.as-list,[\s\S]*?max-width:760px/);
+    assert.match(sidebarCSS, /#boardsSearchToggle \{ display:none; \}/);
+    assert.match(sidebarCSS, /@media\(max-width:700px\) \{ #boardsSearchToggle:not\(\.hidden\) \{ display:inline-flex; \} \}/);
+    assert.match(html, /id="listsSearchInput"/);
+    assert.match(html, /id="newBoardBtn"/);
     assert.equal(css, readFileSync(new URL('../kanban/styles.css', import.meta.url), 'utf8'));
     for (const marker of ['sortablejs@1.15.6', 'id="boardView"', 'id="boardRoot"',
       'id="cardModal"', 'id="kbTodoList"', 'id="checklistModal"', 'id="wipLimitModal"']) {

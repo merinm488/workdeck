@@ -35,16 +35,13 @@
     <!-- Top Navigation Bar -->
     <nav class="top-nav">
         <div class="top-nav-left">
+            <button id="sidebarToggleBtn" class="top-nav-btn cal-sidebar-toggle" aria-label="Close sidebar" aria-controls="calSidebar" aria-expanded="true" title="Close sidebar">
+                <svg class="top-nav-icon cal-icon-collapse" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 6-6 6 6 6m8-12-6 6 6 6"/></svg>
+                <svg class="top-nav-icon cal-icon-expand" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 6 6 6-6 6m8-12 6 6-6 6"/></svg>
+            </button>
             <button id="homeBtn" class="top-nav-btn" aria-label="Back" title="Back">
                 <svg class="top-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="15 18 9 12 15 6"></polyline>
-                </svg>
-            </button>
-            <button id="sidebarToggleBtn" class="top-nav-btn cal-sidebar-toggle" aria-label="Events and options" aria-expanded="false" title="Events and options">
-                <svg class="top-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
             <h1 id="pageTitle" class="page-title">Calendar</h1>
@@ -182,6 +179,7 @@
     <main class="cal-main">
         <!-- Sidebar: calendars -->
         <aside class="cal-sidebar" id="calSidebar">
+            <div class="cal-sidebar-head"><strong>Calendar</strong><button id="calSidebarClose" class="cal-sidebar-close" type="button" aria-label="Close sidebar" title="Close sidebar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div>
             <button id="newEventBtn" class="btn btn-primary cal-new-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                     <line x1="12" y1="5" x2="12" y2="19"></line>

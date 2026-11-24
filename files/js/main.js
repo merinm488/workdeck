@@ -447,11 +447,19 @@ function revealApp() {
 // Navigation
 // ================================================
 
-/** Mobile drawer open/close (desktop ignores this — the sidebar is pinned). */
+/** On small screens the sidebar is a drawer; on desktop it can be collapsed. */
+function syncSidebarToggle() {
+    const expanded = window.innerWidth >= 1024
+        ? !document.body.classList.contains('fb-sidebar-collapsed')
+        : document.body.classList.contains('fb-sidebar-open');
+    const toggle = $('fbSidebarToggle');
+    toggle?.setAttribute('aria-expanded', String(expanded));
+    toggle?.setAttribute('aria-label', expanded ? 'Close sidebar' : 'Open sidebar');
+    if (toggle) toggle.title = expanded ? 'Close sidebar' : 'Open sidebar';
+}
 function applySidebarDrawer(open) {
     document.body.classList.toggle('fb-sidebar-open', open);
-    const toggle = $('fbSidebarToggle');
-    if (toggle) toggle.setAttribute('aria-expanded', String(open));
+    syncSidebarToggle();
 }
 
 function openFolder(folderId) {
@@ -700,14 +708,19 @@ function renderContent() {
     grid.innerHTML = '';
     list.innerHTML = '';
 
-    document.querySelectorAll('.fb-view-btn').forEach(function (btn) {
-        btn.classList.toggle('active', btn.dataset.view === state.view);
-    });
+    const viewToggle = $('fbViewToggle');
+    const asList = state.view === 'list';
+    viewToggle.setAttribute('aria-pressed', String(asList));
+    viewToggle.querySelector('.fb-view-icon-list').classList.toggle('hidden', asList);
+    viewToggle.querySelector('.fb-view-icon-cards').classList.toggle('hidden', !asList);
+    const viewLabel = asList ? 'Switch to card view' : 'Switch to list view';
+    viewToggle.setAttribute('aria-label', viewLabel);
+    viewToggle.title = viewLabel;
 
     const total = folders.length + files.length;
+    grid.classList.toggle('hidden', !total || asList);
+    list.classList.toggle('hidden', !total || !asList);
     if (!total) {
-        grid.classList.add('hidden');
-        list.classList.add('hidden');
         empty.classList.remove('hidden');
         $('fbEmptyTitle').textContent = state.searchQuery.trim()
             ? 'No matches found'
@@ -730,12 +743,10 @@ function renderContent() {
         : folders.concat(files);
 
     if (state.view === 'list') {
-        list.classList.remove('hidden');
         ordered.forEach(function (record) {
             list.appendChild(folderIds.has(record.id) ? buildFolderRow(record) : buildFileRow(record));
         });
     } else {
-        grid.classList.remove('hidden');
         ordered.forEach(function (record) {
             grid.appendChild(folderIds.has(record.id) ? buildFolderCard(record) : buildFileCard(record));
         });
@@ -845,7 +856,8 @@ function buildFolderRow(folder) {
 
     row.querySelector('.fb-row-icon').style.color = folder.color || '#FACC15';
     row.querySelector('.fb-row-title').textContent = folder.name;
-    row.querySelector('.fb-row-main').append(tagChipsFragment(folder));
+    row.querySelector('.fb-row-main').prepend(row.querySelector('.fb-row-icon'));
+    row.querySelector('.fb-row-tags').append(tagChipsFragment(folder));
     row.querySelector('.fb-row-count').textContent = childCount + (childCount === 1 ? ' item' : ' items');
     row.querySelector('.fb-row-date').textContent = formatRelativeDate(folder.updatedAt);
 
@@ -888,7 +900,8 @@ function buildFileRow(file) {
         iconSpan.textContent = fileExt(file.name);
     }
     row.querySelector('.fb-row-title').textContent = file.name;
-    row.querySelector('.fb-row-main').append(tagChipsFragment(file));
+    row.querySelector('.fb-row-main').prepend(row.querySelector('.fb-row-icon'));
+    row.querySelector('.fb-row-tags').append(tagChipsFragment(file));
     row.querySelector('.fb-row-size').textContent = formatBytes(file.size);
     row.querySelector('.fb-row-date').textContent = formatRelativeDate(file.updatedAt);
 
@@ -974,6 +987,8 @@ function openItemMenu(anchor, record, kind) {
     menu.replaceChildren(...actions.map(function (a) {
         const btn = document.createElement('button');
         btn.dataset.action = a.action;
+        btn.title = a.label;
+        btn.setAttribute('aria-label', a.label);
         if (a.danger) btn.className = 'danger';
         btn.append(fbIcon(a.icon));
         const label = document.createElement('span');
@@ -988,13 +1003,10 @@ function openItemMenu(anchor, record, kind) {
     const rect = anchor.getBoundingClientRect();
     menu.classList.add('open');
     const menuRect = menu.getBoundingClientRect();
-    let top = rect.bottom + 6;
-    if (top + menuRect.height > window.innerHeight - 8) {
-        top = Math.max(8, rect.top - menuRect.height - 6);
-    }
-    let left = Math.min(rect.left, window.innerWidth - menuRect.width - 8);
-    menu.style.top = top + 'px';
-    menu.style.left = Math.max(8, left) + 'px';
+    // Keep the icon strip beside the ⋮ button, preferably opening left.
+    const left = rect.left - menuRect.width - 6, right = rect.right + 6;
+    menu.style.left = (left >= 8 ? left : right + menuRect.width <= innerWidth - 8 ? right : Math.max(8, innerWidth - menuRect.width - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(rect.top + (rect.height - menuRect.height) / 2, innerHeight - menuRect.height - 8)) + 'px';
 }
 
 function handleItemMenuAction(action) {
@@ -1697,11 +1709,23 @@ function setupEventListeners() {
     // ----- Mobile sidebar drawer -----
     $('fbSidebarToggle').addEventListener('click', function (e) {
         e.stopPropagation();
-        applySidebarDrawer(!document.body.classList.contains('fb-sidebar-open'));
+        if (window.innerWidth >= 1024) {
+            document.body.classList.toggle('fb-sidebar-collapsed');
+            syncSidebarToggle();
+        } else {
+            applySidebarDrawer(!document.body.classList.contains('fb-sidebar-open'));
+        }
     });
     $('fbSidebarClose').addEventListener('click', function () {
-        applySidebarDrawer(false);
+        if (window.innerWidth >= 1024) {
+            document.body.classList.add('fb-sidebar-collapsed');
+            syncSidebarToggle();
+        } else {
+            applySidebarDrawer(false);
+        }
     });
+    window.matchMedia('(min-width: 1024px)').addEventListener('change', () => applySidebarDrawer(false));
+    syncSidebarToggle();
     $('fbSidebarScrim').addEventListener('click', function () {
         applySidebarDrawer(false);
     });
@@ -1745,12 +1769,10 @@ function setupEventListeners() {
         renderContent();
     });
 
-    document.querySelectorAll('.fb-view-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            state.view = btn.dataset.view;
-            localStorage.setItem(FB_VIEW_KEY, state.view);
-            renderContent();
-        });
+    $('fbViewToggle').addEventListener('click', function () {
+        state.view = state.view === 'list' ? 'grid' : 'list';
+        localStorage.setItem(FB_VIEW_KEY, state.view);
+        renderContent();
     });
 
     // ----- Header: settings -----

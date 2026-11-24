@@ -43,7 +43,7 @@ const thumbOK = value => typeof value === 'string' && value.length <= 60_000 &&
 function tagIds(ids, tx) {
   if (!Array.isArray(ids)) return [];
   const found = [];
-  for (const id of ids.slice(0, 100)) if (validId(id) && tx.findOne(TAGS, id) && !found.includes(id)) found.push(id);
+  for (const id of ids.slice(0, 1)) if (validId(id) && tx.findOne(TAGS, id)) found.push(id);
   return found;
 }
 function folderTree(tx, rootId) {
@@ -218,6 +218,7 @@ export async function handleWorkspace(request, env) {
     kv.set(SETTINGS, prefs);
   } else if (action === 'createFolder') {
     if (!fileName(data.name) || data.color != null && !folderColor(data.color) ||
+        data.tags != null && (!Array.isArray(data.tags) || data.tags.length > 1) ||
         data.parentId != null && (!validId(data.parentId) || !ds.findOne(FOLDERS, data.parentId)))
       return fail('Invalid folder or parent.', 400);
     const created = ds.transaction(tx => {
@@ -306,7 +307,7 @@ export async function handleWorkspace(request, env) {
     });
     if (!result) return fail('File not found.', 404);
   } else if (action === 'setFileTags' || action === 'setFolderTags') {
-    if (!Array.isArray(data.tagIds) || data.tagIds.length > 100) return fail('Invalid tags.', 400);
+    if (!Array.isArray(data.tagIds) || data.tagIds.length > 1) return fail('Choose at most one tag.', 400);
     const collection = action === 'setFileTags' ? FILES : FOLDERS;
     const id = action === 'setFileTags' ? data.fileId : data.folderId;
     if (!validId(id)) return fail('Invalid item ID.', 400);

@@ -80,8 +80,8 @@ body {
 .blog-home-link {
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     transition: color 0.15s ease, background 0.15s ease;
@@ -91,6 +91,10 @@ body {
     color: var(--text-primary);
     background: var(--bg-tertiary);
 }
+
+/* Match the Docs home header; the editor retains its back link and title. */
+body:has(#postsView:not(.hidden)) .blog-home-link,
+body:has(#postsView:not(.hidden)) .blog-brand { display: none; }
 
 .blog-brand {
     display: flex;
@@ -219,8 +223,8 @@ body {
 .blog-icon-btn {
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: var(--radius-sm);
     border: none;
     background: transparent;
@@ -232,6 +236,14 @@ body {
 .blog-icon-btn:hover {
     color: var(--text-primary);
     background: var(--bg-tertiary);
+}
+
+.blog-search-toggle { display: none; }
+
+@media (max-width: 640px) {
+    .blog-search-toggle { display: grid; }
+    .blog-search-wrap { display: none; }
+    .blog-topbar.search-open .blog-search-wrap:not(.hidden) { display: block; }
 }
 
 .blog-input {

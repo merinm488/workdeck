@@ -1310,6 +1310,10 @@ body.home-page {
     overflow: auto;   /* the editor manages its own scroll; the home scrolls */
 }
 
+/* The home header uses the Docs-style sidebar toggle, not a back/title pair. */
+.home-page #homeBtn,
+.home-page #pageTitle { display: none; }
+
 .home-page .drawing-title {
     cursor: default;
 }

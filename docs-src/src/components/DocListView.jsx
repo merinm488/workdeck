@@ -5,7 +5,7 @@
  */
 import { DocActions } from './DocActions';
 
-export function DocListView({ docs, onClick, onPin, onDelete, onRename, onArchive, onShare, isArchivedView, tags, currentTagId, isSearchResult }) {
+export function DocListView({ docs, onClick, onPin, onDelete, onRename, onShare, tags, currentTagId, isSearchResult }) {
   const formatDate = (dateString) => {
     const now = new Date();
     const date = new Date(dateString);
@@ -22,62 +22,15 @@ export function DocListView({ docs, onClick, onPin, onDelete, onRename, onArchiv
     return date.toLocaleDateString();
   };
 
-  const getPreview = (content, contentType = 'plain-text') => {
-    if (!content) return 'No content';
-
-    if (contentType === 'markdown') {
-      // Strip markdown syntax for preview (legacy support)
-      let stripped = content
-        .replace(/^#{1,6}\s+/gm, '') // Headers
-        .replace(/\*\*\*([^*]+)\*\*\*/g, '$1') // Bold + Italic
-        .replace(/\*\*([^*]+)\*\*/g, '$1') // Bold
-        .replace(/\*([^*]+)\*/g, '$1') // Italic
-        .replace(/~~([^~]+)~~/g, '$1') // Strikethrough
-        .replace(/`([^`]+)`/g, '$1') // Inline code
-        .replace(/```[\s\S]*?```/g, '[code]') // Code blocks
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Links
-        .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1') // Images
-        .replace(/^>\s+/gm, '') // Blockquotes
-        .replace(/^\s*[-*+]\s+/gm, '') // Bulleted lists
-        .replace(/^\s*\d+\.\s+/gm, '') // Numbered lists
-        .replace(/^\s*-\s*\[\s*\]\s+/gm, '') // Task lists
-        .replace(/^---$/gm, '') // Horizontal rules
-        .replace(/\|.*\|/g, '') // Tables
-        .replace(/\n/g, ' ') // Newlines to spaces
-        .trim();
-
-      return stripped.length > 80 ? stripped.substring(0, 80) + '...' : stripped;
-    }
-
-    if (contentType === 'richtext') {
-      // Strip HTML tags for rich text content
-      let stripped = content
-        .replace(/<[^>]+>/g, '') // Remove HTML tags
-        .replace(/&nbsp;/g, ' ') // Replace non-breaking spaces
-        .replace(/&amp;/g, '&') // Replace HTML entities
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/\s+/g, ' ') // Collapse multiple spaces
-        .trim();
-
-      return stripped.length > 80 ? stripped.substring(0, 80) + '...' : stripped;
-    }
-
-    // Original plain text handling
-    const stripped = content.replace(/[#*`\-\[\]]/g, '').trim();
-    return stripped.length > 80 ? stripped.substring(0, 80) + '...' : stripped;
-  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Table header */}
-      <div className="grid grid-cols-12 gap-3 px-4 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
-        <div className="col-span-5 sm:col-span-4">Title</div>
-        <div className="col-span-3 hidden sm:block">Preview</div>
-        <div className="col-span-2 hidden sm:block">Tag</div>
-        <div className="col-span-3 sm:col-span-2">Updated</div>
-        <div className="col-span-4 sm:col-span-1 text-right">Actions</div>
+      <div className="docs-list-grid px-4 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
+        <div>Title</div>
+        <div className="docs-list-tag">Tag</div>
+        <div>Updated</div>
+        <div className="text-right">Actions</div>
       </div>
 
       {/* Table rows */}
@@ -85,10 +38,10 @@ export function DocListView({ docs, onClick, onPin, onDelete, onRename, onArchiv
         <div
           key={doc.id}
           onClick={() => onClick(doc)}
-          className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors items-center"
+          className="docs-list-grid px-4 py-3 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
         >
           {/* Pin icon + Title */}
-          <div className="col-span-5 sm:col-span-4 flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -110,15 +63,8 @@ export function DocListView({ docs, onClick, onPin, onDelete, onRename, onArchiv
             </span>
           </div>
 
-          {/* Preview - hidden on mobile */}
-          <div className="col-span-3 hidden sm:block">
-            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-              {getPreview(doc.content, doc.contentType)}
-            </p>
-          </div>
-
           {/* Tag badge */}
-          <div className="col-span-2 hidden sm:block">
+          <div className="docs-list-tag min-w-0">
             {doc.tagId ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs" style={{
                 backgroundColor: tags.find(t => t.id === doc.tagId)?.color + '20' || '#f3f4f6',
@@ -135,20 +81,18 @@ export function DocListView({ docs, onClick, onPin, onDelete, onRename, onArchiv
           </div>
 
           {/* Date */}
-          <div className="col-span-3 sm:col-span-2 text-xs text-gray-500 dark:text-gray-400">
+          <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
             {formatDate(doc.updatedAt)}
           </div>
 
           {/* Actions */}
-          <div className="col-span-4 sm:col-span-1 text-right">
+          <div className="text-right">
             <DocActions
               doc={doc}
               onPin={onPin}
               onDelete={onDelete}
               onRename={onRename}
-              onArchive={onArchive}
               onShare={onShare}
-              isArchivedView={isArchivedView}
             />
           </div>
         </div>

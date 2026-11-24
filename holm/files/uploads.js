@@ -49,15 +49,20 @@ class FileboxJsonUploader extends Uppy.BasePlugin {
         super(uppy, opts);
         this.id = 'FileboxJsonUploader';
         this.type = 'uploader';
+        this.uploadIds = new Map();
         this._uploadFn = this.upload.bind(this);
+        this._onRemoved = file => this.uploadIds.delete(file.id);
     }
 
     install() {
         this.uppy.addUploader(this._uploadFn);
+        this.uppy.on('file-removed', this._onRemoved);
     }
 
     uninstall() {
         this.uppy.removeUploader(this._uploadFn);
+        this.uppy.off('file-removed', this._onRemoved);
+        this.uploadIds.clear();
     }
 
     async upload(fileIDs) {
@@ -77,6 +82,9 @@ class FileboxJsonUploader extends Uppy.BasePlugin {
             bytesTotal: file.size || 0
         });
 
+        const uploadId = this.uploadIds.get(fileID) || crypto.randomUUID();
+        this.uploadIds.set(fileID, uploadId);
+        let response, result;
         try {
             const thumb = await makeThumbnail(file);
             const base64 = await blobToBase64(file.data, false);
@@ -84,7 +92,7 @@ class FileboxJsonUploader extends Uppy.BasePlugin {
             // (same idea as currentFolderId). The server drops tag ids it
             // doesn't recognize, so a just-deleted tag can't break this.
             const tagId = this.opts.activeTagId ? this.opts.activeTagId() : null;
-            const response = await fetch(this.opts.endpoint, {
+            response = await fetch(this.opts.endpoint, {
                 method: 'PUT', credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -93,6 +101,7 @@ class FileboxJsonUploader extends Uppy.BasePlugin {
                         name: file.name,
                         mime: file.type || 'application/octet-stream',
                         base64: base64,
+                        uploadId: uploadId,
                         folderId: this.opts.currentFolderId() || null,
                         tags: tagId ? [tagId] : [],
                         thumbnail: thumb ? thumb.url : null,
@@ -101,23 +110,48 @@ class FileboxJsonUploader extends Uppy.BasePlugin {
                     }
                 })
             });
-            const result = await response.json().catch(function () { return {}; });
+            result = await response.json().catch(function () { return {}; });
             if (response.status === 401) {
                 location.assign('/auth/login?redirect=' + encodeURIComponent(location.pathname + location.search));
                 throw new Error('Sign in to continue');
             }
 
             const overCap = response.status === 413 || result.error === 'FILE_TOO_LARGE';
-            if (!response.ok || !result.success) {
+            if (!response.ok || !result.success || !result.file) {
                 throw new Error(overCap
                     ? (result.message || 'Over the ' + Math.round(effectiveMaxFileSize() / 1024) + ' KB limit')
                     : result.error || 'Upload failed (' + response.status + ')');
             }
-
-            this.uppy.emit('upload-success', file, { status: response.status, body: result });
-            if (this.opts.onFileUploaded) this.opts.onFileUploaded(result.file);
         } catch (err) {
-            this.uppy.emit('upload-error', file, err);
+            // A network/5xx error can happen after the server commits. Check
+            // this member's upload ID before asking Uppy to retry (and create
+            // another file). A definite 4xx rejection needs no reconciliation.
+            if (!response || response.ok || response.status >= 500) {
+                try {
+                    const check = await fetch(this.opts.endpoint + '?uploadId=' + encodeURIComponent(uploadId), {
+                        credentials: 'same-origin', cache: 'no-store'
+                    });
+                    const saved = await check.json();
+                    if (check.ok && saved.success && saved.file) {
+                        response = check;
+                        result = saved;
+                    }
+                } catch (_) { /* server still unavailable; leave the file retryable */ }
+            }
+            if (!result || !result.success || !result.file) {
+                this.uppy.emit('upload-error', file, err);
+                return;
+            }
+        }
+
+        this.uploadIds.delete(fileID);
+        this.uppy.emit('upload-success', file, { status: response.status, body: result });
+        // Rendering is a separate UI step. A broken refresh must never turn
+        // an already-persisted upload into a retryable failure in Uppy.
+        try {
+            if (this.opts.onFileUploaded) this.opts.onFileUploaded(result.file);
+        } catch (error) {
+            console.error('[FILES] Upload saved, but immediate refresh failed:', error);
         }
     }
 }

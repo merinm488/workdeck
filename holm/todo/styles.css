@@ -380,6 +380,10 @@ body {
 
 /* Top-bar controls: search toggle (phones), card/list toggle, New button.
    Hidden while a task list is open — they only apply to the lists home. */
+/* Only the open list needs a back button and editable title. */
+.top-nav:not(.list-open) #homeBtn,
+.top-nav:not(.list-open) #pageTitle { display: none; }
+
 .top-nav.list-open .lists-nav-control {
     display: none !important;
 }

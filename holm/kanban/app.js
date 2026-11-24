@@ -96,21 +96,6 @@ function renderBoards() {
 
     const lastOpened = (state.settings && state.settings.lastOpened) || {};
 
-    if (!q) {
-        const create = document.getElementById('kbBoardCreateTemplate')
-            .content.firstElementChild.cloneNode(true);
-        create.addEventListener('click', () => {
-            openNameModal('New Board', '', (name) => createBoard(name));
-        });
-        create.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                openNameModal('New Board', '', (name) => createBoard(name));
-            }
-        });
-        grid.appendChild(create);
-    }
-
     visible.forEach(board => {
         const card = document.getElementById('kbBoardCardTemplate')
             .content.firstElementChild.cloneNode(true);

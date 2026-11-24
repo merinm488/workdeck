@@ -1,0 +1,138 @@
+/* Suite-wide Holm tag sidebar for app home pages. */
+body.wd-app-side-available { --wd-side-bg:#fff; --wd-side-fg:#1f2937; --wd-side-muted:#6b7280; --wd-side-line:#e5e7eb; --wd-side-hover:#f3f4f6; }
+body.wd-app-side-available.dark, body.wd-app-side-available[data-theme="dark"],
+[data-theme="dark"] body.wd-app-side-available { --wd-side-bg:#1f2937; --wd-side-fg:#f3f4f6; --wd-side-muted:#9ca3af; --wd-side-line:#374151; --wd-side-hover:#374151; }
+.wd-app-side-toggle { order:-1; flex:none; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:0; border-radius:8px; background:transparent; color:inherit; cursor:pointer; }
+.wd-app-side-toggle:hover { background:var(--wd-side-hover,#eee); }
+.wd-app-side-toggle[aria-expanded="true"] .wd-app-side-expand, .wd-app-side-toggle[aria-expanded="false"] .wd-app-side-collapse { display:none; }
+body:not(.wd-app-side-available) .wd-app-side-toggle { display:none; }
+.wd-app-sidebar { position:fixed; z-index:110; inset:0 auto 0 0; box-sizing:border-box; width:280px; max-width:85vw; overflow-y:auto; background:var(--wd-side-bg); color:var(--wd-side-fg); border-right:1px solid var(--wd-side-line); transform:translateX(-101%); transition:transform .2s ease; font:14px/1.4 system-ui,sans-serif; box-shadow:2px 0 12px #0001; }
+body.wd-app-side-open .wd-app-sidebar { transform:translateX(0); }
+.wd-app-side-brand { min-height:64px; box-sizing:border-box; padding:16px; border-bottom:1px solid var(--wd-side-line); display:flex; align-items:center; justify-content:space-between; font-size:18px; }
+.wd-app-side-brand .wd-app-side-toggle { order:0; }
+.wd-app-sidebar nav { padding:16px; }
+.wd-app-sidebar button { font-family:inherit; cursor:pointer; color:inherit; }
+.wd-app-side-all,.wd-app-side-tag-name { display:flex; align-items:center; gap:10px; width:100%; padding:9px 10px; border:0; border-radius:8px; text-align:left; background:transparent; font-size:14px; }
+.wd-app-side-all:hover,.wd-app-side-tag-name:hover,.wd-app-side-more:hover,.wd-app-side-all.active,.wd-app-side-tag-name.active { background:var(--wd-side-hover); }
+.wd-app-side-all.active,.wd-app-side-tag-name.active { font-weight:700; }
+.wd-app-side-heading { display:flex; align-items:center; justify-content:space-between; color:var(--wd-side-muted); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; margin:24px 2px 8px 10px; }
+.wd-app-side-add,.wd-app-side-more { border:0; border-radius:6px; padding:3px 6px; background:transparent; font-size:17px; }
+.wd-app-side-add { display:grid; place-items:center; width:30px; height:30px; padding:0; }
+.wd-app-side-tag { display:flex; align-items:center; }
+.wd-app-side-tag-name { min-width:0; }
+.wd-app-side-dot { flex:none; width:10px; height:10px; border-radius:50%; }
+.wd-app-side-count { margin-left:auto; color:var(--wd-side-muted); font-size:12px; }
+.wd-app-side-more { font-size:16px; color:var(--wd-side-muted)!important; }
+.wd-app-side-form { display:flex; flex-direction:column; gap:10px; margin:6px 0 10px; padding:10px; border:1px solid var(--wd-side-line); border-radius:8px; background:var(--wd-side-hover); }
+.wd-app-side-form[hidden] { display:none; }
+.wd-app-side-form input[type=text] { box-sizing:border-box; width:100%; min-width:0; padding:8px 10px; border:1px solid var(--wd-side-line); border-radius:7px; background:var(--wd-side-bg); color:var(--wd-side-fg); font:13px/1.4 system-ui,sans-serif; }
+.wd-app-side-form input[type=text]:focus-visible { outline:2px solid #3b82f6; outline-offset:1px; }
+.wd-app-side-colors { display:flex; flex-wrap:wrap; gap:7px; }
+.wd-app-sidebar .wd-app-side-swatch { flex:none; width:22px; height:22px; padding:0; border:0; border-radius:50%; transition:transform .15s ease,box-shadow .15s ease; }
+.wd-app-side-swatch:hover { transform:scale(1.15); }
+.wd-app-side-swatch[aria-pressed="true"] { box-shadow:0 0 0 2px var(--wd-side-hover),0 0 0 4px var(--wd-side-fg); }
+.wd-app-side-swatch:focus-visible { outline:2px solid var(--wd-side-fg); outline-offset:3px; }
+.wd-app-side-form-actions { display:flex; gap:8px; }
+.wd-app-sidebar .wd-app-side-form-actions button { flex:1; padding:7px 10px; border:1px solid var(--wd-side-line); border-radius:7px; font-size:12.5px; }
+.wd-app-sidebar .wd-app-side-submit { background:#3b82f6; border-color:#3b82f6; color:#fff; font-weight:600; }
+.wd-app-sidebar .wd-app-side-submit:hover { background:#2563eb; }
+.wd-app-sidebar .wd-app-side-cancel { background:var(--wd-side-bg); color:var(--wd-side-fg); }
+.wd-app-sidebar .wd-app-side-cancel:hover { background:var(--wd-side-line); }
+.wd-app-sidebar .wd-app-side-delete { align-self:flex-start; border:0; background:transparent; color:#dc2626; font-size:12px; padding:2px 0; }
+.wd-app-side-delete[hidden],.wd-app-side-error[hidden] { display:none; }
+.wd-app-side-error { margin:0; color:#dc2626; font-size:12px; }
+.wd-app-side-form button:disabled { opacity:.6; cursor:wait; }
+.wd-app-side-no-results { padding:12px; color:var(--wd-side-muted); }
+.wd-app-side-scrim { display:none; }
+.wd-app-tag-hidden { display:none!important; }
+.wd-app-card-tag { position:relative; z-index:1; display:inline-flex; align-items:center; justify-content:center; flex:none; box-sizing:border-box; width:30px; height:30px; padding:0; border:0; border-radius:6px; background:var(--wd-side-bg,#fff); color:var(--wd-side-muted,#666); cursor:pointer; }
+.wd-app-card-tag:hover { background:var(--wd-side-hover,#eee); color:var(--wd-side-fg,#333); }
+/* A tagged card shows its tag color at the bottom, independent of hover or
+   whether the actions are open. Leave room in existing metadata footers. */
+body.wd-app-side-available .wd-app-items:not(.as-list) > .wd-app-card-tagged { position:relative; }
+body.wd-app-side-available .wd-app-items:not(.as-list) .wd-app-card-dot { position:absolute; right:12px; bottom:12px; z-index:1; width:9px; height:9px; border-radius:50%; box-shadow:0 0 0 1px #0002; pointer-events:none; }
+body.wd-app-side-available .wd-app-items:not(.as-list) .wd-app-card-tagged :is(.home-card-meta,.td-list-meta,.spreadsheet-card-info,.kb-board-foot,.blog-post-row-main) { padding-right:28px; }
+body.wd-app-side-available .wd-app-items:not(.as-list) .wd-app-card-tagged.meeting-card { padding-right:32px; }
+body.wd-app-side-available .wd-app-items.as-list .wd-app-card-dot { display:none; }
+/* Docs-style list view for app home pages. The original cards and handlers stay
+   intact; only their list presentation and the actions entry point change. */
+/* Blog cards use the same compact icon/title, metadata and hover actions
+   layout as Forms; list mode stays on the shared four-column table. */
+body.wd-app-side-available .blog-posts:not(.as-list) { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; border:0; border-radius:0; background:transparent; overflow:visible; }
+body.wd-app-side-available .blog-posts:not(.as-list) .blog-post-row { position:relative; display:flex; flex-direction:column; align-items:stretch; gap:8px; min-width:0; margin:0; padding:14px; border:1px solid var(--border-color); border-radius:var(--radius); background:var(--bg-secondary); transition:border-color .15s,box-shadow .15s,transform .15s; }
+body.wd-app-side-available .blog-posts:not(.as-list) .blog-post-row:hover { border-color:var(--accent-color); box-shadow:0 4px 14px #0002; transform:translateY(-1px); }
+body.wd-app-side-available .blog-post-row-head { display:flex; align-items:center; min-width:0; }
+body.wd-app-side-available .blog-post-row-icon { display:inline-flex; align-items:center; justify-content:center; flex:none; width:34px; height:34px; border-radius:6px; background:var(--accent-light); color:var(--accent-color); }
+body.wd-app-side-available .blog-post-row-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body.wd-app-side-available .blog-posts:not(.as-list) .blog-post-row-excerpt, body.wd-app-side-available .blog-post-row-chevron { display:none; }
+body.wd-app-side-available .blog-posts:not(.as-list) .blog-post-row-date { margin-top:6px; padding-right:74px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12.5px; color:var(--wd-side-muted); }
+body.wd-app-side-available .blog-post-row-actions { display:none; position:absolute; top:8px; right:8px; gap:2px; }
+body.wd-app-side-available .blog-posts:not(.as-list) .blog-post-row:is(:hover,:focus-within) .blog-post-row-actions { display:inline-flex; }
+body.wd-app-side-available .blog-post-row-actions button { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border:0; border-radius:6px; background:var(--wd-side-bg); color:var(--wd-side-muted); cursor:pointer; }
+body.wd-app-side-available .blog-post-row-actions button:hover { background:var(--wd-side-hover); color:var(--wd-side-fg); }
+body.wd-app-side-available .blog-post-row-actions button:last-child:hover { color:#dc2626; }
+body.wd-app-side-available .blog-posts:not(.as-list) .blog-post-row-public { position:absolute; bottom:10px; right:30px; }
+body.wd-app-side-available .blog-posts:not(.as-list) .blog-post-row-main { padding-right:0; }
+body.wd-app-side-available .blog-post-row:focus-visible { outline:2px solid var(--accent-color); outline-offset:2px; }
+body.wd-app-side-available .blog-posts.as-list .blog-post-row-actions { display:none!important; }
+
+/* Match Forms' 760px list table instead of stretching Kanban's 1160px grid.
+   Leave the Kanban card grid at its original width. */
+body.wd-app-side-available #boardsView .wd-app-table-head:has(+ #boardsGrid.as-list),
+body.wd-app-side-available #boardsView #boardsGrid.as-list,
+body.wd-app-side-available #boardsView:has(#boardsGrid.as-list) .lists-toolbar { max-width:760px; }
+/* The search field is already visible on desktop; on narrow screens the
+   search button still reveals it in the header's second row. */
+#boardsSearchToggle { display:none; }
+@media(max-width:700px) { #boardsSearchToggle:not(.hidden) { display:inline-flex; } }
+
+.wd-app-table-head { display:none; }
+body.wd-app-side-available .wd-app-table-head:has(+ .wd-app-items.as-list:not(.hidden)) { display:grid; }
+.wd-app-table-head,
+body.wd-app-side-available .wd-app-items.as-list > [data-id] {
+  grid-template-columns:minmax(0,6fr) minmax(80px,2fr) minmax(95px,2fr) 64px;
+  gap:12px; align-items:center; box-sizing:border-box; width:100%;
+}
+.wd-app-table-head { max-width:1160px; margin:0 auto; padding:10px 16px; border:1px solid var(--wd-side-line); border-radius:12px 12px 0 0; background:var(--wd-side-hover); color:var(--wd-side-muted); font:500 12px/1.4 system-ui,sans-serif; }
+.wd-app-table-head span:last-child { text-align:right; }
+body.wd-app-side-available .wd-app-items.as-list { box-sizing:border-box; display:flex; flex-direction:column; gap:0; width:100%; max-width:1160px; margin:0 auto; padding:0; border:1px solid var(--wd-side-line); border-top:0; border-radius:0 0 12px 12px; background:var(--wd-side-bg); }
+body.wd-app-side-available .wd-app-items.as-list > [data-id] { display:grid; min-height:55px; margin:0; padding:10px 16px; border:0; border-bottom:1px solid var(--wd-side-line); border-radius:0; box-shadow:none; background:var(--wd-side-bg); transform:none; overflow:visible; color:var(--wd-side-fg); }
+body.wd-app-side-available .wd-app-items.as-list > [data-id]:last-child { border-bottom:0; }
+body.wd-app-side-available .wd-app-items.as-list > [data-id]:hover { background:var(--wd-side-hover); transform:none; box-shadow:none; }
+body.wd-app-side-available .wd-app-items.as-list > [data-id] > :first-child { grid-column:1; min-width:0; margin:0; }
+body.wd-app-side-available .wd-app-items.as-list .home-card-head,
+body.wd-app-side-available .wd-app-items.as-list .td-list-card-head,
+body.wd-app-side-available .wd-app-items.as-list .spreadsheet-card-header { display:flex; align-items:center; min-width:0; }
+body.wd-app-side-available .wd-app-items.as-list :is(.home-card-name,.td-list-name,.spreadsheet-title,.kb-board-name,.blog-post-row-title,.card-body strong) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
+body.wd-app-side-available .wd-app-items.as-list :is(.home-card-meta,.td-list-meta,.spreadsheet-card-info,.kb-board-foot,.blog-post-row-date,.blog-post-row-excerpt,.blog-post-row-chevron,.meeting-card .date-tile,.meeting-card .state-chip,.meeting-card .card-body small) { display:none; }
+body.wd-app-side-available .wd-app-items.as-list .kb-board-cover { height:auto; padding:0; align-items:center; background:transparent!important; color:var(--wd-side-fg)!important; }
+body.wd-app-side-available .wd-app-items.as-list .kb-board-cover::after, body.wd-app-side-available .wd-app-items.as-list .spreadsheet-card::before { display:none; }
+body.wd-app-side-available .wd-app-items.as-list .kb-board-name { display:block; text-shadow:none; }
+body.wd-app-side-available .wd-app-items.as-list .meeting-card .card-body { grid-column:1; min-width:0; }
+body.wd-app-side-available .wd-app-items.as-list .blog-post-row-main { grid-column:1; min-width:0; }
+body.wd-app-side-available .wd-app-items.as-list .blog-post-row-head { min-width:0; }
+body.wd-app-side-available .wd-app-items.as-list :is(.home-card-actions,.td-list-card-actions,.kb-board-card-actions,.spreadsheet-card-actions,.wd-app-card-tag,.delete-meeting) { display:none!important; }
+body.wd-app-side-available .wd-app-items.as-list .wd-app-row-tag { grid-column:2; display:inline-flex; align-items:center; gap:6px; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--wd-side-muted); font:12px/1.4 system-ui,sans-serif; }
+body.wd-app-side-available .wd-app-items.as-list .wd-app-row-tag .wd-app-side-dot { width:8px; height:8px; }
+body.wd-app-side-available .wd-app-items.as-list .wd-app-row-date { grid-column:3; display:block; min-width:0; color:var(--wd-side-muted); font:12px/1.4 system-ui,sans-serif; white-space:normal; }
+.wd-app-row-tag, .wd-app-row-date, .wd-app-list-more { display:none; }
+body.wd-app-side-available .wd-app-items.as-list .wd-app-list-more { grid-column:4; display:grid; place-items:center; justify-self:end; flex:none; width:36px; height:36px; padding:0; border:0; border-radius:7px; background:transparent; color:var(--wd-side-muted); cursor:pointer; }
+body.wd-app-side-available .wd-app-items.as-list .wd-app-list-more:hover, body.wd-app-side-available .wd-app-items.as-list .wd-app-list-more[aria-expanded=true] { background:var(--wd-side-hover); color:var(--wd-side-fg); }
+.wd-app-action-strip { position:fixed; z-index:500; display:flex; align-items:center; gap:3px; padding:4px; border:1px solid var(--wd-side-line,#ddd); border-radius:8px; background:var(--wd-side-bg,#fff); box-shadow:0 8px 24px #0003; }
+.wd-app-action-strip button { display:grid; place-items:center; flex:none; width:34px; height:34px; padding:0; border:0; border-radius:5px; background:transparent; color:var(--wd-side-fg,#333); cursor:pointer; }
+.wd-app-action-strip button:hover { background:var(--wd-side-hover,#eee); }
+.wd-app-action-strip button.danger { color:#dc2626; }
+.wd-app-action-strip svg { width:18px; height:18px; }
+.wd-app-view-toggle { display:none; flex:none; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:0; border-radius:8px; background:transparent; color:inherit; cursor:pointer; }
+body.wd-app-side-available .wd-app-view-toggle { display:inline-flex; padding:0; border:0; }
+.wd-app-view-toggle:hover { background:var(--wd-side-hover,#eee); }
+@media(max-width:640px) {
+  .wd-app-table-head, body.wd-app-side-available .wd-app-items.as-list > [data-id] { grid-template-columns:minmax(0,1fr) minmax(65px,auto) 40px; gap:8px; padding-left:10px; padding-right:10px; }
+  .wd-app-table-head span:nth-child(2), body.wd-app-side-available .wd-app-items.as-list .wd-app-row-tag { display:none; }
+  .wd-app-table-head span:nth-child(3), body.wd-app-side-available .wd-app-items.as-list .wd-app-row-date { grid-column:2; }
+  .wd-app-table-head span:nth-child(4), body.wd-app-side-available .wd-app-items.as-list .wd-app-list-more { grid-column:3; }
+  body.wd-app-side-available .wd-app-items.as-list :is(.home-card-icon,.td-list-icon,.spreadsheet-icon,.blog-post-row-public) { display:none; }
+}
+@media(min-width:1024px) { body.wd-app-side-open { box-sizing:border-box; padding-left:280px; } }
+@media(max-width:1023px) { body.wd-app-side-open { overflow:hidden; } body.wd-app-side-open .wd-app-side-scrim { display:block; position:fixed; inset:0; z-index:109; background:#0008; } }
+@media(prefers-reduced-motion:reduce) { .wd-app-sidebar { transition:none; } }

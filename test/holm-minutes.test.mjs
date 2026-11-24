@@ -131,7 +131,10 @@ test('Holm package preserves Minutes UI but removes legacy hash auth and uses re
     execFileSync(process.execPath, [new URL('../scripts/build-holm-landing.mjs', import.meta.url).pathname, dir]);
     const original = readFileSync(new URL('../minutes/index.html', import.meta.url), 'utf8');
     const html = readFileSync(join(dir, 'web/minutes/index.html'), 'utf8');
-    assert.equal(html, original);
+    assert.match(html, /<link rel="stylesheet" href="\/app-sidebar\.css">/);
+    assert.match(html, /<script src="\/js\/app-sidebar\.js" data-app="minutes"><\/script>/);
+    assert.equal(html.replace('<link rel="stylesheet" href="/app-sidebar.css">', '')
+      .replace('<script src="/js/app-sidebar.js" data-app="minutes"></script>', ''), original);
     assert.equal(readFileSync(join(dir, 'web/minutes/styles.css'), 'utf8'),
       readFileSync(new URL('../minutes/styles.css', import.meta.url), 'utf8'));
     const script = readFileSync(join(dir, 'web/minutes/app.js'), 'utf8');

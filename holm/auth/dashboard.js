@@ -294,8 +294,7 @@ const state = {
     fileToRename: null,
     fileToDelete: null,
     fileToMove: null,
-    moveTarget: null,
-    moveChecked: null,   // Set of tag ids while the multi-tag modal is open
+    moveTarget: null,    // selected tag id (or null for no tag)
     projectToDelete: null
 };
 
@@ -652,12 +651,24 @@ function placeDropdownSheet(dd) {
 function openDropdown(dd, trigger) {
     dd._wdTrigger = trigger;
     dd.classList.add('active');
+    if (trigger.hasAttribute('aria-expanded')) trigger.setAttribute('aria-expanded', 'true');
     placeDropdownSheet(dd);
 }
 
 function closeDropdown(dd) {
     dd.classList.remove('active');
+    if (dd._wdTrigger && dd._wdTrigger.hasAttribute('aria-expanded')) {
+        dd._wdTrigger.setAttribute('aria-expanded', 'false');
+    }
     dd._wdTrigger = null;
+    if (dd.id === 'newDropdown' || dd.id === 'emptyNewDropdown') {
+        dd.closest('.wd-new-container').classList.remove('active');
+    } else if (dd.id === 'filterDropdown') {
+        $('filterChooser').classList.remove('active');
+    } else if (dd.id === 'settingsDropdown') {
+        $('themeSubmenu').classList.remove('active');
+        $('themeToggleBtn').closest('.wd-theme-container').classList.remove('active');
+    }
 }
 
 function toggleDropdown(dd, trigger) {
@@ -665,6 +676,12 @@ function toggleDropdown(dd, trigger) {
         closeDropdown(dd);
         return false;
     }
+    // Only one top-level menu can be open at a time, even when its trigger
+    // stops the click from reaching the document's outside-click handler.
+    ['newDropdown', 'emptyNewDropdown', 'filterDropdown', 'settingsDropdown'].forEach(function (id) {
+        const other = $(id);
+        if (other !== dd && other.classList.contains('active')) closeDropdown(other);
+    });
     openDropdown(dd, trigger);
     return true;
 }
@@ -707,7 +724,11 @@ function showHome() { $('homeView').classList.remove('hidden'); }
 function applySidebar() {
     document.body.classList.toggle('wd-sidebar-open', state.sidebarOpen);
     const toggle = $('sidebarToggle');
-    if (toggle) toggle.setAttribute('aria-expanded', String(state.sidebarOpen));
+    if (toggle) {
+        toggle.setAttribute('aria-expanded', String(state.sidebarOpen));
+        toggle.setAttribute('aria-label', state.sidebarOpen ? 'Close sidebar' : 'Open sidebar');
+        toggle.title = state.sidebarOpen ? 'Close sidebar' : 'Open sidebar';
+    }
 }
 
 function initSidebar() {
@@ -949,6 +970,7 @@ function renderFiles() {
     const searchHint = $('searchHint');
 
     gridView.innerHTML = '';
+    closeListActions();
     listView.innerHTML = '';
 
     // Title + count
@@ -1101,6 +1123,52 @@ function buildFolderCard(folder) {
     return card;
 }
 
+let wdListStrip = null, wdListTrigger = null;
+function closeListActions() {
+    wdListStrip?.remove(); wdListStrip = null;
+    wdListTrigger?.setAttribute('aria-expanded', 'false'); wdListTrigger = null;
+}
+function wireListRowActions(row) {
+    const more = document.createElement('button');
+    more.type = 'button'; more.className = 'wd-file-list-more';
+    more.setAttribute('aria-label', 'More actions'); more.title = 'More actions';
+    more.setAttribute('aria-haspopup', 'true'); more.setAttribute('aria-expanded', 'false');
+    more.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+    more.onclick = function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (wdListTrigger === more) { closeListActions(); return; }
+        closeListActions(); wdListTrigger = more;
+        more.setAttribute('aria-expanded', 'true');
+        const strip = document.createElement('div'); strip.className = 'wd-file-action-strip';
+        strip.setAttribute('role', 'group'); strip.setAttribute('aria-label', 'File actions');
+        row.querySelectorAll('.wd-file-actions button').forEach(function (original) {
+            const button = document.createElement('button');
+            button.type = 'button'; button.title = original.title;
+            button.setAttribute('aria-label', original.title);
+            button.classList.toggle('danger', original.classList.contains('danger'));
+            button.innerHTML = original.innerHTML;
+            button.onclick = function (event) { event.stopPropagation(); closeListActions(); original.click(); };
+            strip.append(button);
+        });
+        document.body.append(strip);
+        const rect = more.getBoundingClientRect(), width = strip.offsetWidth, height = strip.offsetHeight;
+        const left = rect.left - width - 6, right = rect.right + 6;
+        strip.style.left = (left >= 8 ? left : right + width <= innerWidth - 8 ? right : Math.max(8, innerWidth - width - 8)) + 'px';
+        strip.style.top = Math.max(8, Math.min(rect.top + (rect.height - height) / 2, innerHeight - height - 8)) + 'px';
+        wdListStrip = strip;
+    };
+    more.onkeydown = function (e) { e.stopPropagation(); };
+    row.append(more);
+}
+document.addEventListener('pointerdown', function (e) {
+    if (wdListStrip && !wdListStrip.contains(e.target) && !wdListTrigger?.contains(e.target)) closeListActions();
+});
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && wdListStrip) { const trigger = wdListTrigger; closeListActions(); trigger?.focus(); }
+});
+window.addEventListener('scroll', closeListActions, true);
+window.addEventListener('resize', closeListActions);
+
 function buildListRow(file) {
     if (file.kind === 'folder') return buildFolderRow(file);
 
@@ -1109,16 +1177,18 @@ function buildListRow(file) {
     row.dataset.app = file.app;
 
     const app = getApp(file.app);
-    const when = file.lastOpened || file.updatedAt;
+    const when = file.updatedAt || file.lastOpened;
 
     const icon = row.querySelector('.wd-file-icon');
     icon.classList.add('wd-file-icon-' + app.accent);
     icon.append(wdIcon(app.icon));
     row.querySelector('.wd-file-row-title').textContent = file.name;
-    row.querySelector('.wd-file-row-main').append(projectChipFragment(file, 'wd-file-row-project'));
+    row.querySelector('.wd-file-row-main').prepend(icon);
+    row.querySelector('.wd-file-row-tag').append(projectChipFragment(file, 'wd-file-row-project'));
     const badge = row.querySelector('.wd-file-app-badge');
     badge.classList.add(app.accent);
     badge.textContent = app.label;
+    row.querySelector('.wd-file-row-main').append(badge);
     row.querySelector('.wd-file-row-meta').textContent = formatRelativeDate(when);
 
     row.addEventListener('click', function (e) {
@@ -1133,6 +1203,7 @@ function buildListRow(file) {
             e.stopPropagation();
             copyFileLink(file);
         });
+        wireListRowActions(row);
         return row;
     }
     row.querySelector('.move').addEventListener('click', function (e) {
@@ -1152,7 +1223,7 @@ function buildListRow(file) {
         showDeleteModal(file);
     });
     makeDraggable(row, file);
-
+    wireListRowActions(row);
     return row;
 }
 
@@ -1162,11 +1233,13 @@ function buildFolderRow(folder) {
     row.dataset.id = folder.id;
     row.dataset.app = 'filebox';
 
-    const when = folder.lastOpened || folder.updatedAt;
+    const when = folder.updatedAt || folder.lastOpened;
     const color = (folder.raw && folder.raw.color) || '#FACC15';
 
     row.querySelector('.wd-file-row-title').textContent = folder.name;
-    row.querySelector('.wd-file-row-main').append(projectChipFragment(folder, 'wd-file-row-project'));
+    row.querySelector('.wd-file-row-main').prepend(row.querySelector('.wd-file-icon'));
+    row.querySelector('.wd-file-row-main').append(row.querySelector('.wd-file-app-badge'));
+    row.querySelector('.wd-file-row-tag').append(projectChipFragment(folder, 'wd-file-row-project'));
     const count = row.querySelector('.wd-folder-row-count');
     count.style.color = color;
     count.textContent = folder.childCount + (folder.childCount === 1 ? ' item' : ' items');
@@ -1192,7 +1265,7 @@ function buildFolderRow(folder) {
         showDeleteModal(folder);
     });
     makeDraggable(row, folder);
-
+    wireListRowActions(row);
     return row;
 }
 
@@ -1607,18 +1680,11 @@ async function confirmDeleteProject() {
 function showMoveModal(file) {
     state.fileToMove = file;
     $('moveFileName').textContent = file.name;
-    if (isMultiTagItem(file)) {
-        // Filebox files/folders: checkbox list over the tag pool.
-        state.moveChecked = new Set(file.tags || []);
-        state.moveTarget = null;
-        $('moveSelect').classList.add('wd-move-multi');
-        renderMoveChecks();
-    } else {
-        state.moveChecked = null;
-        state.moveTarget = file.tagId || null;
-        $('moveSelect').classList.remove('wd-move-multi');
-        renderMoveOptions();
-    }
+    // Filebox stores tags as an array, but the home page assigns one tag
+    // per item, just like the other apps.
+    state.moveTarget = isMultiTagItem(file) ? (file.tags || [])[0] || null : file.tagId || null;
+    $('moveSelect').classList.remove('wd-move-multi');
+    renderMoveOptions();
     closeMoveDropdown();
     $('moveModal').classList.add('active');
 }
@@ -1669,6 +1735,7 @@ function moveOptionRow(selected) {
 
 function renderMoveOptions() {
     const dd = $('moveDropdown');
+    dd.replaceChildren();
 
     if (state.tags.length === 0) {
         dd.replaceChildren(moveEmptyDiv());
@@ -1697,59 +1764,15 @@ function renderMoveOptions() {
     setMoveTriggerValue(options.find(function (option) { return (state.moveTarget || null) === option.id; }));
 }
 
-/** Multi-tag checkbox list (Filebox items). The single-select trigger stays
- *  hidden; the menu renders inline. */
-function renderMoveChecks() {
-    const dd = $('moveDropdown');
-    const checked = state.moveChecked || new Set();
-
-    if (state.tags.length === 0) {
-        dd.replaceChildren(moveEmptyDiv());
-        return;
-    }
-
-    state.tags.forEach(function (tag) {
-        const selected = checked.has(tag.id);
-        const row = moveOptionRow(selected);
-        const name = document.createElement('span');
-        name.className = 'wd-move-option-name';
-        name.textContent = tag.name;
-        row.append(wdDot(tag.color), name, wdIcon('check'));
-        row.addEventListener('click', function () {
-            if (checked.has(tag.id)) {
-                checked.delete(tag.id);
-            } else {
-                checked.add(tag.id);
-            }
-            renderMoveChecks();
-        });
-        dd.appendChild(row);
-    });
-
-    if (checked.size === 0) {
-        const none = document.createElement('div');
-        none.className = 'wd-move-empty';
-        none.textContent = 'No tags selected';
-        dd.appendChild(none);
-    }
-}
-
 async function confirmMove() {
     const file = state.fileToMove;
     if (!file) return;
-    if (isMultiTagItem(file)) {
-        const tagIds = Array.from(state.moveChecked || []);
-        hideMoveModal();
-        applyFileTags(file, tagIds);
-        return;
-    }
     const target = state.moveTarget || null;
     hideMoveModal();
     applyFileMove(file, target);
 }
 
-// Optimistic tag write for multi-tag items, shared by the modal confirm and
-// drag-and-drop (full-array replace = one call adds AND removes).
+// Optimistic tag write for Filebox items, shared by the modal and drag-and-drop.
 async function applyFileTags(file, tagIds) {
     const original = Array.isArray(file.tags) ? file.tags.slice() : [];
     const unchanged = original.length === tagIds.length && original.every(function (id) {
@@ -1777,10 +1800,8 @@ async function applyFileTags(file, tagIds) {
 // Optimistic move shared by the modal confirm and sidebar drag-and-drop.
 async function applyFileMove(file, target) {
     if (isMultiTagItem(file)) {
-        // Dropping on a tag row union-adds; dropping on "All files" clears.
-        const current = Array.isArray(file.tags) ? file.tags : [];
-        const next = target && !current.includes(target) ? current.concat([target]) : current;
-        applyFileTags(file, next);
+        // A drop replaces the previous tag; dropping on All files clears it.
+        applyFileTags(file, target ? [target] : []);
         return;
     }
 
@@ -1953,8 +1974,8 @@ function setupEventListeners() {
     // ----- + New dropdowns (header + empty state) -----
     $('newBtn').addEventListener('click', function (e) {
         e.stopPropagation();
-        toggleDropdown($('newDropdown'), $('newBtn'));
-        $('newBtn').closest('.wd-new-container').classList.toggle('active');
+        const open = toggleDropdown($('newDropdown'), $('newBtn'));
+        $('newBtn').closest('.wd-new-container').classList.toggle('active', open);
     });
 
     // Empty-state "+ New": inside a filtered app section the app is implied,
@@ -1965,8 +1986,8 @@ function setupEventListeners() {
             createFile(state.filter);
             return;
         }
-        toggleDropdown($('emptyNewDropdown'), $('emptyNewBtn'));
-        $('emptyNewBtn').closest('.wd-new-container').classList.toggle('active');
+        const open = toggleDropdown($('emptyNewDropdown'), $('emptyNewBtn'));
+        $('emptyNewBtn').closest('.wd-new-container').classList.toggle('active', open);
     });
 
     // App items in both "+ New" menus 

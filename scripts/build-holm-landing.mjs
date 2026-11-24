@@ -192,6 +192,9 @@ filePage = filePage.replace('                                <div class="fb-drop
 cutFiles('    <!-- Access key -->', '    <!-- Entry guard —');
 cutFiles('    <!-- Entry guard —', '    <!-- ===== TEMPLATES');
 filePage = filePage
+  .replace('<!-- Edit tags (multi-select over the shared suite tag pool) -->', '<!-- Edit one tag from the shared suite tag pool -->')
+  .replace('<h3>Edit tags</h3>', '<h3>Edit tag</h3>')
+  .replace('Tags for "<span id="fbTagsItemName"', 'Tag for "<span id="fbTagsItemName"')
   .replaceAll('https://releases.transloadit.com/uppy/v4.18.3/uppy.min.css', '/files/vendor-uppy.min.css')
   .replaceAll('https://releases.transloadit.com/uppy/v4.18.3/uppy.min.js', '/files/js/vendor-uppy.min.js')
   .replaceAll('[a-z0-9]{14,}', '[A-Za-z0-9_-]{8,128}');
@@ -402,21 +405,24 @@ const withSignIns = html => {
   return page.replace('</head>', '<link rel="stylesheet" href="/settings-menu.css"></head>')
     .replace('</body>', '<script src="/js/settings-menu.js"></script></body>');
 };
+const withSidebar = (html, app) => html
+  .replace('</head>', '<link rel="stylesheet" href="/app-sidebar.css"></head>')
+  .replace('</body>', `<script src="/js/app-sidebar.js" data-app="${app}"></script></body>`);
 writeFileSync(join(web, 'index.html'), html());
 writeFileSync(join(web, 'home.html'), withSignIns(homeHTML));
-writeFileSync(join(web, 'kanban/index.html'), withSignIns(kanban));
+writeFileSync(join(web, 'kanban/index.html'), withSidebar(withSignIns(kanban), 'kanban'));
 writeFileSync(join(web, 'calendar/index.html'), withSignIns(calendar));
-writeFileSync(join(web, 'sheets/index.html'), withSignIns(sheetPage('index.html')));
+writeFileSync(join(web, 'sheets/index.html'), withSidebar(withSignIns(sheetPage('index.html')), 'sheets'));
 writeFileSync(join(web, 'sheets/editor.html'), withSignIns(sheetPage('editor.html')));
 writeFileSync(join(web, 'sheets/shared.html'), sheetPage('shared.html'));
 for (const file of ['index.html', 'editor.html', 'shared.html'])
-  writeFileSync(join(web, 'forms', file), withSignIns(formPage(file)));
+  writeFileSync(join(web, 'forms', file), file === 'index.html' ? withSidebar(withSignIns(formPage(file)), 'forms') : withSignIns(formPage(file)));
 for (const file of ['index.html', 'editor.html', 'shared.html'])
-  writeFileSync(join(web, 'slides', file), withSignIns(slidePage(file)));
+  writeFileSync(join(web, 'slides', file), file === 'index.html' ? withSidebar(withSignIns(slidePage(file)), 'slides') : withSignIns(slidePage(file)));
 for (const file of ['index.html', 'editor.html', 'shared.html'])
-  writeFileSync(join(web, 'draw', file), withSignIns(drawPage(file)));
+  writeFileSync(join(web, 'draw', file), file === 'index.html' ? withSidebar(withSignIns(drawPage(file)), 'draw') : withSignIns(drawPage(file)));
 writeFileSync(join(web, 'files/index.html'), withSignIns(filePage));
-writeFileSync(join(web, 'blog/index.html'), withSignIns(blogPage));
+writeFileSync(join(web, 'blog/index.html'), withSidebar(withSignIns(blogPage), 'blog'));
 cpSync(join(root, 'holm/blog/public.html'), join(web, 'blog-public.html'));
 cpSync(join(root, 'public/blog.css'), join(web, 'blog.css'));
 writeFileSync(join(web, 'apps.html'), html(true));
@@ -550,6 +556,8 @@ for (const [from, to] of [
 ]) cpSync(join(root, from), join(web, 'js', to));
 cpSync(join(root, 'holm/auth/settings-menu.css'), join(web, 'settings-menu.css'));
 cpSync(join(root, 'holm/auth/settings-menu.js'), join(web, 'js/settings-menu.js'));
+cpSync(join(root, 'holm/auth/app-sidebar.css'), join(web, 'app-sidebar.css'));
+cpSync(join(root, 'holm/auth/app-sidebar.js'), join(web, 'js/app-sidebar.js'));
 cpSync(join(root, 'holm/auth/landing-nav.css'), join(web, 'landing-nav.css'));
 cpSync(join(root, 'holm/auth/connect-ai.js'), join(web, 'js/connect-ai.js'));
 cpSync(join(root, 'public/icons'), join(web, 'icons'), { recursive: true });
@@ -559,7 +567,7 @@ for (const file of ['account.html', 'account.css', 'account.js']) {
   cpSync(join(root, 'holm/auth', file), join(web, file));
 }
 for (const file of ['index.html', 'styles.css', 'editor.js', 'config.js', 'auth.js', 'storage.js']) {
-  if (file === 'index.html') writeFileSync(join(web, 'todo', file), withSignIns(readFileSync(join(root, 'holm/todo', file), 'utf8')));
+  if (file === 'index.html') writeFileSync(join(web, 'todo', file), withSidebar(withSignIns(readFileSync(join(root, 'holm/todo', file), 'utf8')), 'todo'));
   else cpSync(join(root, 'holm/todo', file), join(web, 'todo', file));
 }
 // Keep Todo's existing light/dark/system theme implementation unchanged.
@@ -570,7 +578,7 @@ for (const file of ['auth.js', 'storage.js', 'app.js', 'board.js']) {
 cpSync(join(root, 'kanban/js/themes.js'), join(web, 'kanban/js/themes.js'));
 cpSync(join(root, 'kanban/styles.css'), join(web, 'kanban/styles.css'));
 cpSync(join(root, 'holm/kanban/config.js'), join(web, 'kanban/config/config.js'));
-cpSync(join(root, 'minutes/index.html'), join(web, 'minutes/index.html'));
+writeFileSync(join(web, 'minutes/index.html'), withSidebar(readFileSync(join(root, 'minutes/index.html'), 'utf8'), 'minutes'));
 cpSync(join(root, 'minutes/styles.css'), join(web, 'minutes/styles.css'));
 cpSync(join(root, 'holm/minutes/app.js'), join(web, 'minutes/app.js'));
 for (const file of ['auth.js', 'storage.js', 'config.js', 'editor.js']) {

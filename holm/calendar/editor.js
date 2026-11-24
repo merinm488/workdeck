@@ -1293,37 +1293,58 @@ function initTodoToggle() {
 }
 
 // ================================================
-// Sidebar drawer (mobile)
+// Sidebar — collapsible on desktop, drawer on mobile
 // ================================================
 
 function sidebarDrawerOpen() {
     return $('calSidebar').classList.contains('open');
 }
 
+function syncSidebarToggle() {
+    const expanded = window.innerWidth > 700
+        ? !document.body.classList.contains('cal-sidebar-collapsed')
+        : sidebarDrawerOpen();
+    const toggle = $('sidebarToggleBtn');
+    toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.setAttribute('aria-label', expanded ? 'Close sidebar' : 'Open sidebar');
+    toggle.title = expanded ? 'Close sidebar' : 'Open sidebar';
+}
+
 function openSidebarDrawer() {
     $('calSidebar').classList.add('open');
     $('sidebarScrim').classList.add('show');
-    $('sidebarToggleBtn').setAttribute('aria-expanded', 'true');
+    syncSidebarToggle();
 }
 
 function closeSidebarDrawer() {
     $('calSidebar').classList.remove('open');
     $('sidebarScrim').classList.remove('show');
-    $('sidebarToggleBtn').setAttribute('aria-expanded', 'false');
+    syncSidebarToggle();
 }
 
 function initSidebarDrawer() {
-    $('sidebarToggleBtn').addEventListener('click', () =>
-        sidebarDrawerOpen() ? closeSidebarDrawer() : openSidebarDrawer());
+    $('sidebarToggleBtn').addEventListener('click', () => {
+        if (window.innerWidth > 700) {
+            document.body.classList.toggle('cal-sidebar-collapsed');
+            syncSidebarToggle();
+        } else {
+            sidebarDrawerOpen() ? closeSidebarDrawer() : openSidebarDrawer();
+        }
+    });
+    $('calSidebarClose').addEventListener('click', () => {
+        if (window.innerWidth > 700) {
+            document.body.classList.add('cal-sidebar-collapsed');
+            syncSidebarToggle();
+        } else closeSidebarDrawer();
+    });
     $('sidebarScrim').addEventListener('click', closeSidebarDrawer);
     $('newEventBtn').addEventListener('click', closeSidebarDrawer);
     document.addEventListener('click', (e) => {
         if (sidebarDrawerOpen() && e.target.closest('.cal-event-row')) closeSidebarDrawer();
     });
     const desktop = window.matchMedia('(min-width: 701px)');
-    desktop.addEventListener('change', (e) => {
-        if (e.matches) closeSidebarDrawer();
-    });
+    desktop.addEventListener('change', () => { closeSidebarDrawer(); syncSidebarToggle(); });
+    syncSidebarToggle();
 }
 
 // ================================================

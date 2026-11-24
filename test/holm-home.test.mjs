@@ -18,6 +18,12 @@ test('Holm serves the original signed-in dashboard markup without legacy access 
       'wdFileCardTemplate', 'wdFileRowTemplate', 'newDropdown', 'settingsDropdown']) {
       assert.match(html, new RegExp(`id="${id}"`));
     }
+    for (const id of ['wdFileCardTemplate', 'wdFolderCardTemplate', 'wdFileRowTemplate', 'wdFolderRowTemplate']) {
+      const template = html.split(`<template id="${id}">`)[1]?.split('</template>')[0];
+      assert.ok(template, `Missing ${id}`);
+      assert.match(template, /class="wd-file-action-btn move"[\s\S]*?<path d="M20 12 12 20 2 10V2h8l10 10Z"\/><circle cx="7" cy="7" r="1"\/>/, id);
+    }
+    assert.match(readFileSync(join(dir, 'web/js/app-sidebar.js'), 'utf8'), /<path d="M20 12 12 20 2 10V2h8l10 10Z"\/><circle cx="7" cy="7" r="1"\/>/);
     assert.doesNotMatch(html, /Access Key|View My Key|Change My Key|Delete Account|loginForm/);
     assert.match(html, /href="\/auth\/account\?redirect=%2Fhome">Your sign-ins<\/a>/);
     assert.doesNotMatch(html, /href="\/account"|My account/);

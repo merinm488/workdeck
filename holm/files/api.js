@@ -59,6 +59,12 @@ export async function handleFilebox(request, env) {
   if (!env.holm.auth.getMember()) return fail('Sign in to continue.', 401);
   const ds = env.holm.app.member.ds;
   if (request.method === 'GET') {
+    const uploadId = url.searchParams.get('uploadId');
+    if (uploadId !== null) {
+      if (!validId(uploadId)) return fail('Invalid upload ID.', 400);
+      const file = ds.find(FILES, { uploadId }, { limit: 1 })[0];
+      return file ? json({ success: true, file }) : fail('File not found', 404);
+    }
     const fileId = url.searchParams.get('fileId');
     if (!fileId) return fail('File ID required.', 400);
     const meta = validId(fileId) && ds.findOne(FILES, fileId);
@@ -100,6 +106,9 @@ export async function handleFilebox(request, env) {
   if (size === null) return fail('base64 content is required', 400);
   if (size > max) return json({ success: false, error: 'FILE_TOO_LARGE',
     message: `File exceeds the ${Math.floor(max / 1024)} KB limit` }, 413);
+  if (data.tags != null && (!Array.isArray(data.tags) || data.tags.length > 1))
+    return fail('Choose at most one tag.', 400);
+  if (data.uploadId !== undefined && !validId(data.uploadId)) return fail('Invalid upload ID.', 400);
   if (data.folderId != null && (!validId(data.folderId) || !ds.findOne(FOLDERS, data.folderId)))
     return fail('Folder not found', 404);
   const thumb = typeof data.thumbnail === 'string' && data.thumbnail.length <= 60_000 && IMAGE.test(data.thumbnail)
@@ -107,20 +116,29 @@ export async function handleFilebox(request, env) {
   // Verify the payload really decodes before creating any metadata.
   if (!decode(data.base64, size)) return fail('Invalid base64 content.', 400);
   const record = ds.transaction(tx => {
+    // A retry after a lost HTTP response must not create a second file.
+    if (data.uploadId) {
+      const existing = tx.find(FILES, { uploadId: data.uploadId }, { limit: 1 })[0];
+      if (existing) return existing.name === name && existing.size === size
+        ? { file: existing, created: false } : 'conflict';
+    }
     if (tx.count(FILES, {}) >= 2000) return null;
     if (data.folderId && !tx.findOne(FOLDERS, data.folderId)) return null;
     const tags = [];
-    for (const tag of Array.isArray(data.tags) ? data.tags.slice(0, 100) : [])
-      if (validId(tag) && tx.findOne(TAGS, tag) && !tags.includes(tag)) tags.push(tag);
+    for (const tag of Array.isArray(data.tags) ? data.tags : [])
+      if (validId(tag) && tx.findOne(TAGS, tag)) tags.push(tag);
     const stamp = now();
     const fields = { name, mime, size, folderId: data.folderId || null, tags,
+      ...(data.uploadId ? { uploadId: data.uploadId } : {}),
       thumbnailCover: thumb ? data.thumbnailCover === true : false,
       thumbVer: thumb && Number.isSafeInteger(data.thumbVer) && data.thumbVer > 0 ? data.thumbVer : 0,
       thumbRef: thumb ? 1 : 0, createdAt: stamp, updatedAt: stamp };
     const id = tx.insert(FILES, fields);
     tx.insert(BYTES, { fileId: id, base64: data.base64 });
     if (thumb) tx.insert(THUMBS, { fileId: id, image: thumb });
-    return { id, storageKey: `file_${id}`, ...fields };
+    return { file: { id, storageKey: `file_${id}`, ...fields }, created: true };
   });
-  return record ? json({ success: true, file: record }, 201) : fail('File limit or folder unavailable.', 409);
+  if (record === 'conflict') return fail('Upload ID already belongs to another file.', 409);
+  return record ? json({ success: true, file: record.file }, record.created ? 201 : 200)
+    : fail('File limit or folder unavailable.', 409);
 }

@@ -260,15 +260,10 @@
             <!-- Header -->
             <header class="wd-header">
                 <div class="wd-header-content">
-                    <!-- Sidebar toggle: hamburger (drawer) below 1024px, panel toggle on desktop -->
-                    <button id="sidebarToggle" class="wd-icon-btn wd-sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="false" title="Toggle sidebar">
-                        <svg class="wd-icon-panel" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <path d="M9 3v18"></path>
-                        </svg>
-                        <svg class="wd-icon-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
+                    <!-- Sidebar toggle -->
+                    <button id="sidebarToggle" class="wd-icon-btn wd-sidebar-toggle" aria-label="Open sidebar" aria-expanded="false" title="Open sidebar">
+                        <svg class="wd-icon-collapse" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 6-6 6 6 6m8-12-6 6 6 6"/></svg>
+                        <svg class="wd-icon-expand" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 6 6 6-6 6m8-12 6 6-6 6"/></svg>
                     </button>
 
                     <!-- Search -->
@@ -296,7 +291,7 @@
                     <div class="wd-actions">
                         <!-- + New with dropdown -->
                         <div class="wd-new-container">
-                            <button id="newBtn" class="wd-new-btn">
+                            <button id="newBtn" class="wd-new-btn" aria-haspopup="true" aria-expanded="false" aria-controls="newDropdown" aria-label="New — choose an app">
                                 <svg class="wd-new-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                                 </svg>
@@ -305,14 +300,14 @@
                                     <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
                             </button>
-                            <div id="newDropdown" class="wd-dropdown wd-dropdown-right">
+                            <div id="newDropdown" class="wd-dropdown wd-dropdown-right wd-app-launcher" aria-label="Create with an app">
                                 <!-- Items rendered by JS from WD_APPS -->
                             </div>
                         </div>
 
                         <!-- Settings -->
                         <div class="wd-settings-container">
-                            <button id="settingsBtn" class="wd-icon-btn" aria-label="Settings">
+                            <button id="settingsBtn" class="wd-icon-btn" aria-label="Settings" aria-haspopup="true" aria-expanded="false" aria-controls="settingsDropdown">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <circle cx="12" cy="12" r="3"></circle>
                                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -436,6 +431,7 @@
 
             <!-- Files -->
             <div id="filesGrid" class="wd-files-grid"></div>
+            <div class="wd-file-list-head" aria-hidden="true"><span>Title</span><span>Tag</span><span>Updated</span><span>Actions</span></div>
             <div id="filesList" class="wd-files-list hidden"></div>
 
             <!-- Empty State -->
@@ -449,7 +445,7 @@
                 <p class="wd-empty-description">Create a doc, sheet or form to get started</p>
                 <div class="wd-empty-actions">
                     <div class="wd-new-container wd-empty-new">
-                        <button id="emptyNewBtn" class="wd-primary-btn wd-empty-new-btn">
+                        <button id="emptyNewBtn" class="wd-primary-btn wd-empty-new-btn" aria-haspopup="true" aria-expanded="false" aria-controls="emptyNewDropdown">
                             <svg class="wd-new-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                             </svg>
@@ -458,7 +454,7 @@
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
                         </button>
-                        <div id="emptyNewDropdown" class="wd-dropdown wd-dropdown-up">
+                        <div id="emptyNewDropdown" class="wd-dropdown wd-dropdown-up wd-app-launcher" aria-label="Create with an app">
                             <!-- Items rendered by JS from WD_APPS -->
                         </div>
                     </div>
@@ -625,8 +621,7 @@
         </div>
     </div>
 
-    <!-- Add tag modal (single-tag for docs/sheets/etc, multi-tag checkboxes
-         for Filebox items — workdeck.js picks the variant) -->
+    <!-- Add tag modal (one tag per item, including Filebox items) -->
     <div id="moveModal" class="wd-modal">
         <div class="wd-modal-content">
             <div class="wd-modal-header">
@@ -634,7 +629,7 @@
                 <button class="wd-modal-close" id="moveModalClose">&times;</button>
             </div>
             <div class="wd-modal-body">
-                <p class="wd-modal-text">Choose tags for "<span id="moveFileName" class="wd-strong"></span>".</p>
+                <p class="wd-modal-text">Choose a tag for "<span id="moveFileName" class="wd-strong"></span>".</p>
                 <div id="moveSelect" class="wd-move-select">
                     <span id="moveSelectLabel" class="wd-move-label">Tag</span>
                     <button type="button" id="moveSelectBtn" class="wd-move-select-trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="moveSelectLabel moveSelectValue">
@@ -760,7 +755,7 @@
                 <div class="wd-file-title"></div>
                 <div class="wd-file-actions">
                     <button class="wd-file-action-btn move" title="Add tag">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12 12 20 2 10V2h8l10 10Z"/><circle cx="7" cy="7" r="1"/></svg>
                     </button>
                     <button class="wd-file-action-btn copylink" title="Copy link">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
@@ -791,7 +786,7 @@
                 <div class="wd-file-title"></div>
                 <div class="wd-file-actions">
                     <button class="wd-file-action-btn move" title="Add tag">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12 12 20 2 10V2h8l10 10Z"/><circle cx="7" cy="7" r="1"/></svg>
                     </button>
                     <button class="wd-file-action-btn copylink" title="Copy link">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
@@ -822,11 +817,12 @@
             <div class="wd-file-row-main">
                 <div class="wd-file-row-title"></div>
             </div>
+            <span class="wd-file-row-tag"></span>
             <span class="wd-file-app-badge"></span>
             <div class="wd-file-row-meta"></div>
             <div class="wd-file-actions">
                 <button class="wd-file-action-btn move" title="Add tag">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12 12 20 2 10V2h8l10 10Z"/><circle cx="7" cy="7" r="1"/></svg>
                 </button>
                 <button class="wd-file-action-btn copylink" title="Copy link">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
@@ -848,12 +844,13 @@
             <div class="wd-file-row-main">
                 <div class="wd-file-row-title"></div>
             </div>
+            <span class="wd-file-row-tag"></span>
             <span class="wd-file-app-badge filebox">Folder</span>
             <span class="wd-folder-row-count"></span>
             <div class="wd-file-row-meta"></div>
             <div class="wd-file-actions">
                 <button class="wd-file-action-btn move" title="Add tag">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12 12 20 2 10V2h8l10 10Z"/><circle cx="7" cy="7" r="1"/></svg>
                 </button>
                 <button class="wd-file-action-btn copylink" title="Copy link">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>

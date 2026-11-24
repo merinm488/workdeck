@@ -12,7 +12,7 @@
 import { DocActions } from './DocActions';
 import { memo } from 'react';
 
-function DocCard({ doc, onClick, onPin, isPinned, onDelete, onRename, onArchive, onShare, isArchivedView = false, tags = [], currentTagId = null, isSearchResult = false }) {
+function DocCard({ doc, onClick, onPin, isPinned, onDelete, onRename, onShare, tags = [] }) {
   // Format date for display
   const formatDate = (dateString) => {
     const now = new Date();
@@ -119,9 +119,7 @@ function DocCard({ doc, onClick, onPin, isPinned, onDelete, onRename, onArchive,
             onPin={onPin}
             onDelete={onDelete}
             onRename={onRename}
-            onArchive={onArchive}
             onShare={onShare}
-            isArchivedView={isArchivedView}
           />
         </div>
       </div>
@@ -131,26 +129,25 @@ function DocCard({ doc, onClick, onPin, isPinned, onDelete, onRename, onArchive,
         {getPreview(doc.content, doc.contentType)}
       </p>
 
-      {/* Footer - fixed at bottom */}
+      {/* Footer - fixed at bottom; always show the assigned tag color */}
       <div className="mt-auto">
-        {/* Tag badge - show when doc has a tag and in archived view, search, or when doc is from different tag */}
-        {doc.tagId && (isArchivedView || isSearchResult || (currentTagId && doc.tagId !== currentTagId)) && (
-          <div className="mb-2">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" style={{
-              backgroundColor: tags.find(t => t.id === doc.tagId)?.color + '20' || '#f3f4f6',
-              color: tags.find(t => t.id === doc.tagId)?.color || '#6b7280'
-            }}>
-              <div className="w-2 h-2 rounded-full" style={{
+        <div className="flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <span className="flex-shrink-0">{formatDate(doc.updatedAt)}</span>
+          {doc.tagId && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium min-w-0 max-w-[60%]"
+              title={tags.find(t => t.id === doc.tagId)?.name || 'Unknown Tag'}
+              style={{
+                backgroundColor: (tags.find(t => t.id === doc.tagId)?.color || '#9ca3af') + '20',
+                color: tags.find(t => t.id === doc.tagId)?.color || '#6b7280'
+              }}
+            >
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{
                 backgroundColor: tags.find(t => t.id === doc.tagId)?.color || '#9ca3af'
               }} />
-              {tags.find(t => t.id === doc.tagId)?.name || 'Unknown Tag'}
+              <span className="truncate">{tags.find(t => t.id === doc.tagId)?.name || 'Unknown Tag'}</span>
             </span>
-          </div>
-        )}
-
-        {/* Date - always at bottom */}
-        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-          <span>{formatDate(doc.updatedAt)}</span>
+          )}
         </div>
       </div>
     </div>

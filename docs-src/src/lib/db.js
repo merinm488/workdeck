@@ -144,25 +144,6 @@ export async function toggleDocPin(hash, docId) {
   return response.data.docs.find(n => n.id === docId) || null;
 }
 
-/**
- * Toggle doc archive status
- * @param {string} hash - User's hash
- * @param {string} docId - Doc ID
- * @returns {Promise<Object|null>} - Updated doc or null
- */
-export async function toggleDocArchive(hash, docId) {
-  const response = await apiRequest('', {
-    method: 'PUT',
-    body: JSON.stringify({
-      hash,
-      action: 'toggleArchive',
-      data: { docId }
-    })
-  });
-
-  return response.data.docs.find(n => n.id === docId) || null;
-}
-
 // ===== TAG OPERATIONS =====
 
 /**

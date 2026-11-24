@@ -5,6 +5,7 @@ import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import { handleBlog, handleSite, publicArticle } from '../holm/blog/api.js';
 import { handleWorkspace } from '../holm/auth/workspace.js';
 
@@ -143,6 +144,74 @@ test('Blog integrates with workspace, title/setting changes, tag cascade, and re
   assert.equal((await put(handleWorkspace, bob, 'deleteFile', { app: 'blog', fileId: next.id })).status, 404);
   assert.equal((await put(handleWorkspace, alice, 'deleteFile', { app: 'blog', fileId: next.id })).status, 200);
   assert.equal((await site(anon, 'second-thoughts')).status, 404);
+});
+
+test('Blog header back link returns from the editor to Blog without losing a pending save', () => {
+  const source = readFileSync(new URL('../holm/blog/app.js', import.meta.url), 'utf8');
+  const views = source.slice(source.indexOf('function setBackLink('), source.indexOf('// ================================================\n// Posts home'));
+  const back = source.slice(source.indexOf('function handleHomeLinkClick('), source.indexOf('function wireChrome()'));
+  const elements = new Map();
+  const node = () => ({ classList: { add() {}, remove() {} }, setAttribute(key, value) { this[key] = value; } });
+  const $ = id => { if (!elements.has(id)) elements.set(id, node()); return elements.get(id); };
+  const link = node(), state = { editingId: 'post-1' }, history = { replaceState(_data, _unused, url) { this.url = url; } };
+  let closed = 0;
+  const ui = runInNewContext(`${views}\n${back}\n({ showPostsView, showEditorView, handleHomeLinkClick })`, {
+    state, $, document: { querySelector: selector => selector === '.blog-home-link' ? link : node() },
+    history, renderPosts() {}, refreshPublishMenu() {},
+    BlogEditor: { close() { closed++; state.editingId = null; ui.showPostsView(); } },
+  });
+  ui.showEditorView();
+  assert.equal(link.href, '/blog/');
+  assert.equal(link['aria-label'], 'Back to Blog');
+  const click = { button: 0, preventDefault() { this.prevented = true; } };
+  ui.handleHomeLinkClick(click);
+  assert.equal(click.prevented, true);
+  assert.equal(closed, 1);
+  assert.equal(link.href, '/'); // Posts home still returns to Workdeck
+  assert.equal(history.url, '/blog/');
+  ui.showEditorView();
+  ui.handleHomeLinkClick({ button: 0, metaKey: true, preventDefault() { throw new Error('Modified click intercepted'); } });
+  assert.equal(closed, 1);
+});
+
+test('Blog cards expose rename and delete to the shared list actions menu', async () => {
+  const source = readFileSync(new URL('../holm/blog/app.js', import.meta.url), 'utf8');
+  const render = source.slice(source.indexOf('function renderPosts()'), source.indexOf('async function createPost()'));
+  const node = () => ({ children: [], dataset: {}, classList: { toggle() {} },
+    append(...items) { this.children.push(...items); }, appendChild(item) { this.children.push(item); },
+    prepend(item) { this.children.unshift(item); }, setAttribute(key, value) { this[key] = value; },
+    addEventListener(event, fn) { this[event] = fn; }, remove() {} });
+  const row = node(), title = node(), publicBadge = node(), excerpt = node(), date = node(), head = node();
+  row.querySelector = selector => ({ '.blog-post-row-title': title, '.blog-post-row-public': publicBadge,
+    '.blog-post-row-excerpt': excerpt, '.blog-post-row-date': date, '.blog-post-row-head': head })[selector];
+  const list = node(), template = { content: { firstElementChild: { cloneNode: () => row } } };
+  const elements = { postsList: list, blogPostRowTemplate: template, postsEmpty: node(), postsEmptySearch: node(), kanbanFooterStats: node() };
+  const state = { posts: [{ id: 'post-1', title: 'First', excerpt: 'An excerpt', createdAt: '2026-01-01' }], searchQuery: '', settings: {} };
+  let updated, deleted, reloads = 0;
+  const ui = runInNewContext(`${render}; ({ renderPosts, renamePost, deletePostFromHome })`, {
+    state, $: id => elements[id], document: { createElement: node }, window: { location: { reload() { reloads++; } } },
+    prompt: () => 'Renamed', confirm: () => true, blogStorage: {
+      request: async (action, data) => { updated = { action, data }; return { success: true }; },
+      deletePost: async id => { deleted = id; return { posts: [] }; },
+    }, showToast() {}, openPost() {},
+  });
+  ui.renderPosts();
+  assert.equal(list.children.length, 1);
+  assert.equal(title.textContent, 'First');
+  assert.equal(head.children[0].className, 'blog-post-row-icon');
+  const actions = row.children.find(item => item.className === 'blog-post-row-actions');
+  assert.equal(actions.children.length, 2);
+  assert.equal(actions.children[0].getAttribute?.('aria-label') || actions.children[0]['aria-label'], 'Rename');
+  assert.equal(actions.children[1]['aria-label'], 'Delete');
+  await ui.renamePost(state.posts[0]);
+  assert.equal(updated.action, 'updatePost');
+  assert.deepEqual({ ...updated.data }, { id: 'post-1', title: 'Renamed' });
+  await ui.deletePostFromHome(state.posts[0]);
+  assert.equal(deleted, 'post-1');
+  assert.equal(reloads, 2);
+  const sidebar = readFileSync(new URL('../holm/auth/app-sidebar.js', import.meta.url), 'utf8');
+  assert.match(sidebar, /blog: \{[^\n]+actions: '\.blog-post-row-actions'/);
+  assert.match(readFileSync(new URL('../holm/auth/app-sidebar.css', import.meta.url), 'utf8'), /blog-posts:not\(\.as-list\).*display:grid/);
 });
 
 test('Blog package keeps manager/reader UI with local Quill and no access-key controls', async () => {

@@ -69,6 +69,7 @@ function showPostsView() {
     $('editorView').classList.add('hidden');
     $('newPostBtn').classList.remove('hidden');
     $('postsSearchWrap').classList.remove('hidden');
+    $('postsSearchToggle').classList.remove('hidden');
     $('pageTitle').textContent = 'Blog';
     // Drop the post id — the posts home is always plain /blog/.
     history.replaceState({}, '', '/blog/');
@@ -81,6 +82,9 @@ function showEditorView() {
     $('editorView').classList.remove('hidden');
     $('newPostBtn').classList.add('hidden');
     $('postsSearchWrap').classList.add('hidden');
+    $('postsSearchToggle').classList.add('hidden');
+    document.querySelector('.blog-topbar').classList.remove('search-open');
+    $('postsSearchToggle').setAttribute('aria-expanded', 'false');
     $('pageTitle').textContent = 'Edit Post';
 }
 
@@ -267,6 +271,12 @@ function closeSettingsMenu() {
 function wireChrome() {
     $('newPostBtn').addEventListener('click', createPost);
     $('emptyNewPostBtn').addEventListener('click', createPost);
+    $('postsSearchToggle').addEventListener('click', () => {
+        const nav = document.querySelector('.blog-topbar');
+        const open = nav.classList.toggle('search-open');
+        $('postsSearchToggle').setAttribute('aria-expanded', String(open));
+        if (open) $('postsSearch').focus();
+    });
     $('postsSearch').addEventListener('input', (e) => {
         state.searchQuery = e.target.value;
         renderPosts();

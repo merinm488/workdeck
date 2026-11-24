@@ -494,3 +494,21 @@
 .wd-mention-toolbar-btn:hover {
   background: rgba(128, 128, 128, 0.12);
 }
+
+/* Docs list shares the same fixed Actions width as the other app tables.
+   On phones the tag column goes away so titles and dates still fit. */
+.docs-list-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(80px, 2fr) minmax(95px, 2fr) 64px;
+  gap: 12px;
+  align-items: center;
+}
+@media (max-width: 639px) {
+  .docs-list-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(65px, auto) 40px;
+    gap: 8px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .docs-list-grid .docs-list-tag { display: none; }
+}

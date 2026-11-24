@@ -2019,6 +2019,10 @@ body.home-page {
     flex-direction: column;
 }
 
+/* The home header uses the Docs-style sidebar toggle, not a back/title pair. */
+.home-page #homeBtn,
+.home-page #pageTitle { display: none; }
+
 .home-page .form-title {
     cursor: default;
 }

@@ -990,6 +990,10 @@ body:has(#boardView:not(.hidden)) .app-footer {
     z-index: 50;
 }
 
+/* Hide the back/title pair on the boards home; keep it for an open board. */
+body:has(#boardsView:not(.hidden)) .top-nav-left #homeBtn,
+body:has(#boardsView:not(.hidden)) .top-nav-left #pageTitle { display: none; }
+
 .top-nav-left {
     display: flex;
     align-items: center;

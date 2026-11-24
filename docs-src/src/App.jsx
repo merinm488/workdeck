@@ -50,18 +50,15 @@ function App() {
     tags,
     activeTag,
     searchQuery,
-    showArchived,
     filteredDocs,
     isLoading,
     hasLoaded,
     setActiveTag,
     setSearchQuery,
-    setShowArchived,
     createDoc,
     updateDoc,
     deleteDoc,
     togglePin,
-    toggleArchive,
     createTag,
     updateTag,
     deleteTag,
@@ -109,7 +106,7 @@ function App() {
   // View mode state with persistence
   const [viewMode, setViewMode] = useState(() => {
     // Load from localStorage on initial render (legacy key fallback for existing users)
-    return localStorage.getItem('docs_view_mode') || localStorage.getItem('docs_view_mode') || 'card';
+    return localStorage.getItem('docs_view_mode') === 'list' ? 'list' : 'card';
   });
 
   // Save view mode to localStorage whenever it changes
@@ -117,19 +114,14 @@ function App() {
     localStorage.setItem('docs_view_mode', viewMode);
   }, [viewMode]);
 
-  // Handle window resize - only auto-show sidebar on large screens
+  // Keep the user's collapsed state during desktop resizes; reset only when
+  // crossing between a desktop sidebar and a mobile drawer.
   useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      // Only auto-show sidebar on large screens (don't auto-hide)
-      if (width >= 1024 && !showSidebar) {
-        setShowSidebar(true);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [showSidebar]);
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const onBreakpointChange = event => setShowSidebar(event.matches);
+    desktop.addEventListener('change', onBreakpointChange);
+    return () => desktop.removeEventListener('change', onBreakpointChange);
+  }, []);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -278,18 +270,15 @@ function App() {
   }, []);
 
   /**
-   * Handle tag selection - switch to active view if in archived mode
+   * Handle tag selection
    */
   const handleTagSelect = useCallback((tagId) => {
     setActiveTag(tagId);
-    if (showArchived) {
-      setShowArchived(false);
-    }
     // Close sidebar on mobile after selecting a tag
     if (window.innerWidth < 1024) {
       setShowSidebar(false);
     }
-  }, [showArchived, setActiveTag, setShowArchived]);
+  }, [setActiveTag]);
 
   /**
    * Generate unique ID for new docs
@@ -398,7 +387,8 @@ function App() {
       <div className="relative min-h-screen flex">
         {/* ===== SIDEBAR ===== */}
         <aside
-          className={`fixed inset-y-0 left-0 z-30 w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out ${
+          id="docsSidebar"
+          className={`fixed inset-y-0 left-0 z-30 w-[280px] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out ${
             showSidebar ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -418,15 +408,17 @@ function App() {
                 </div>
                 <span className="font-bold text-lg">Docs</span>
               </div>
-              {/* Close sidebar - mobile and desktop */}
+              {/* On mobile the header toggle is covered by the drawer; keep its close action here. */}
               <button
                 onClick={() => setShowSidebar(false)}
-                className="p-1 rounded hover:bg-gray-100 dark:bg-gray-700 transition-colors"
+                className="lg:hidden w-[38px] h-[38px] flex items-center justify-center rounded-lg hover:bg-gray-100 dark:bg-gray-700 transition-colors"
                 aria-label="Close sidebar"
+                aria-controls="docsSidebar"
+                aria-expanded={showSidebar}
                 title="Close sidebar"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m11 6-6 6 6 6m8-12-6 6 6 6" />
                 </svg>
               </button>
             </div>
@@ -443,14 +435,14 @@ function App() {
               />
 
               {/* Docs in Sidebar */}
-              {(activeTag !== null || showArchived) && (
+              {activeTag !== null && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
                     Docs
                   </h3>
                   <div className="space-y-1">
                     {docs
-                      .filter(n => showArchived ? n.archived === true : n.tagId === activeTag && n.archived !== true)
+                      .filter(n => n.tagId === activeTag)
                       .sort((a, b) => {
                         // Pinned docs first
                         if (a.pinned && !b.pinned) return -1;
@@ -504,11 +496,7 @@ function App() {
                             onRename={(doc, newTitle) => {
                               updateDoc(doc.id, { title: newTitle });
                             }}
-                            onArchive={(n) => {
-                              toggleArchive(n.id);
-                            }}
                             onShare={handleShare}
-                            isArchivedView={showArchived}
                           />
                         </div>
                       </div>
@@ -517,16 +505,6 @@ function App() {
                 </div>
               )}
             </div>
-
-            {/* User info */}
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-              <UserDisplay
-                userHash={userHash}
-                onLogout={logout}
-                onDeleteAccount={() => deleteAccount(userHash)}
-                onShowKey={getUserKey}
-              />
-            </div>
           </div>
         </aside>
 
@@ -534,13 +512,13 @@ function App() {
         {showSidebar && (
           <div
             className="fixed inset-y-0 right-0 left-0 bg-black/50 z-20 lg:hidden"
-            style={{ left: '18rem' }} // w-72 = 18rem, start overlay after sidebar
+            style={{ left: '280px' }} // Match the sidebar width so its drawer overlay starts at the edge
             onClick={() => setShowSidebar(false)}
           />
         )}
 
         {/* ===== MAIN CONTENT ===== */}
-        <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${showSidebar ? 'lg:ml-72' : 'lg:ml-0'}`}>
+        <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${showSidebar ? 'lg:ml-[280px]' : 'lg:ml-0'}`}>
           {/* Header */}
           <header className="sticky top-0 z-10 bg-bg-primary/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between px-4 py-3 gap-2 sm:gap-4">
@@ -591,25 +569,27 @@ function App() {
                   {/* Mobile menu button */}
                   <button
                     onClick={() => setShowSidebar(true)}
-                    className="p-2 rounded-lg hover:bg-gray-100 dark:bg-gray-700 lg:hidden"
+                    className="w-[38px] h-[38px] p-0 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:bg-gray-700 lg:hidden"
                     aria-label="Open sidebar"
+                    aria-controls="docsSidebar"
+                    aria-expanded={showSidebar}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m5 6 6 6-6 6m8-12 6 6-6 6" />
                     </svg>
                   </button>
 
                   {/* Desktop/tablet sidebar toggle button */}
                   <button
                     onClick={() => setShowSidebar(!showSidebar)}
-                    className="hidden lg:flex p-2 rounded-lg hover:bg-gray-100 dark:bg-gray-700 items-center justify-center transition-all duration-200"
-                    aria-label={showSidebar ? 'Hide sidebar' : 'Show sidebar'}
+                    className="hidden lg:flex w-[38px] h-[38px] rounded-lg hover:bg-gray-100 dark:bg-gray-700 items-center justify-center transition-colors"
+                    aria-label={showSidebar ? "Close sidebar" : "Open sidebar"}
+                    aria-controls="docsSidebar"
+                    aria-expanded={showSidebar}
                   >
-                    <div className={`transition-transform duration-200 ${showSidebar ? '' : 'rotate-180'}`}>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                      </svg>
-                    </div>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d={showSidebar ? "m11 6-6 6 6 6m8-12-6 6 6 6" : "m5 6 6 6-6 6m8-12 6 6-6 6"} />
+                    </svg>
                   </button>
 
                   {/* Search - desktop/tablet */}
@@ -621,63 +601,54 @@ function App() {
                     />
                   </div>
 
-                  {/* Mobile search icon */}
-                  <button
-                    onClick={() => setIsSearchExpanded(true)}
-                    className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:bg-gray-700"
-                    aria-label="Search"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </button>
-
                   {/* Actions - hidden only when search is expanded on mobile */}
                   <div className={`${isSearchExpanded ? 'hidden' : ''} flex items-center gap-2 sm:gap-2`}>
-                    <ThemeToggle theme={theme} systemTheme={systemTheme} onSetTheme={setTheme} />
+                    <button
+                      onClick={() => setIsSearchExpanded(true)}
+                      className="md:hidden w-[38px] h-[38px] p-0 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:bg-gray-700"
+                      aria-label="Search"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </button>
+
                     <Tooltip text={viewMode === 'card' ? 'Switch to list view' : 'Switch to card view'}>
                       <button
                         onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')}
-                        className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        aria-label={viewMode === 'card' ? 'Switch to list view' : 'Switch to card view'}
+                        aria-pressed={viewMode === 'list'}
+                        className="w-[38px] h-[38px] p-0 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                       >
                         {viewMode === 'card' ? (
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
                           </svg>
                         ) : (
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            <rect x="3" y="3" width="7" height="7" rx="1" strokeWidth={2} /><rect x="14" y="3" width="7" height="7" rx="1" strokeWidth={2} /><rect x="14" y="14" width="7" height="7" rx="1" strokeWidth={2} /><rect x="3" y="14" width="7" height="7" rx="1" strokeWidth={2} />
                           </svg>
                         )}
                       </button>
                     </Tooltip>
-                    <Tooltip text={showArchived ? 'Show active docs' : 'Show archived docs'}>
+                    <Tooltip text="Create new doc">
                       <button
-                        onClick={() => setShowArchived(!showArchived)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          showArchived
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
+                        onClick={handleCreateDoc}
+                        className="btn-primary flex items-center gap-2"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
                         </svg>
+                        <span className="hidden sm:inline">New Doc</span>
                       </button>
                     </Tooltip>
-                    {!showArchived && (
-                      <Tooltip text="Create new doc">
-                        <button
-                          onClick={handleCreateDoc}
-                          className="btn-primary flex items-center gap-2"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                          <span className="hidden sm:inline">New Doc</span>
-                        </button>
-                      </Tooltip>
-                    )}
+                    <UserDisplay
+                      onLogout={logout}
+                      onDeleteAccount={() => deleteAccount(userHash)}
+                      onShowKey={getUserKey}
+                      theme={theme}
+                      onSetTheme={setTheme}
+                    />
                   </div>
                 </>
               )}
@@ -687,7 +658,7 @@ function App() {
           {/* Folder/View indicator */}
           <div className="px-4 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {showArchived ? 'Archived Docs' : (activeTag ? (tags.find(t => t.id === activeTag)?.name || 'Unknown Tag') : 'All Docs')}
+              {activeTag ? (tags.find(t => t.id === activeTag)?.name || 'Unknown Tag') : 'All Docs'}
             </h2>
           </div>
 
@@ -702,16 +673,12 @@ function App() {
                   </svg>
                 </div>
                 <h3 className="text-lg font-semibold mb-1">
-                  {searchQuery ? 'No docs found' : showArchived ? '' : 'No docs yet'}
+                  {searchQuery ? 'No docs found' : 'No docs yet'}
                 </h3>
                 <p className="text-gray-500 dark:text-gray-400 mb-4">
-                  {searchQuery
-                    ? 'Try a different search term'
-                    : showArchived
-                      ? 'No docs in archive'
-                      : 'Welcome! Create your first doc to get started'}
+                  {searchQuery ? 'Try a different search term' : 'Welcome! Create your first doc to get started'}
                 </p>
-                {!searchQuery && !showArchived && (
+                {!searchQuery && (
                   <button onClick={handleCreateDoc} className="btn-primary">
                     Create First Doc
                   </button>
@@ -732,11 +699,7 @@ function App() {
                       onRename={(doc, newTitle) => {
                         updateDoc(doc.id, { title: newTitle });
                       }}
-                      onArchive={(n) => {
-                        toggleArchive(n.id);
-                      }}
                       onShare={handleShare}
-                      isArchivedView={showArchived}
                       tags={tags}
                       currentTagId={activeTag}
                       isSearchResult={searchQuery.length > 0}
@@ -753,11 +716,7 @@ function App() {
                     onRename={(doc, newTitle) => {
                       updateDoc(doc.id, { title: newTitle });
                     }}
-                    onArchive={(n) => {
-                      toggleArchive(n.id);
-                    }}
                     onShare={handleShare}
-                    isArchivedView={showArchived}
                     tags={tags}
                     currentTagId={activeTag}
                     isSearchResult={searchQuery.length > 0}
@@ -772,8 +731,8 @@ function App() {
           <footer className="sticky bottom-0 z-20 mt-auto px-4 sm:px-6 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] border-t border-gray-200 dark:border-gray-700 bg-[rgb(var(--bg-primary))] flex items-center justify-between gap-4 text-[11.5px] leading-none text-gray-400 dark:text-gray-500 tabular-nums select-none">
             <span className="truncate">
               {searchQuery
-                ? `${filteredDocs.length} of ${docs.filter(n => !n.archived).length} files`
-                : `${docs.filter(n => !n.archived).length} files · ${tags.length} ${tags.length === 1 ? 'tag' : 'tags'}`}
+                ? `${filteredDocs.length} of ${docs.length} files`
+                : `${docs.length} files · ${tags.length} ${tags.length === 1 ? 'tag' : 'tags'}`}
             </span>
           </footer>
         </main>

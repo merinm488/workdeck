@@ -60,12 +60,21 @@ async function init() {
 // Views
 // ================================================
 
+function setBackLink(inEditor) {
+    const link = document.querySelector('.blog-home-link');
+    link.href = inEditor ? '/blog/' : '/';
+    link.title = inEditor ? 'Back to Blog' : 'Back to Workdeck';
+    link.setAttribute('aria-label', link.title);
+}
+
 function showPostsView() {
     state.editingId = null;
+    setBackLink(false);
     $('postsView').classList.remove('hidden');
     $('editorView').classList.add('hidden');
     $('newPostBtn').classList.remove('hidden');
     $('postsSearchWrap').classList.remove('hidden');
+    $('postsSearchToggle').classList.remove('hidden');
     $('pageTitle').textContent = 'Blog';
     // Drop the post id — the posts home is always plain /blog/.
     history.replaceState({}, '', '/blog/');
@@ -74,10 +83,14 @@ function showPostsView() {
 }
 
 function showEditorView() {
+    setBackLink(true);
     $('postsView').classList.add('hidden');
     $('editorView').classList.remove('hidden');
     $('newPostBtn').classList.add('hidden');
     $('postsSearchWrap').classList.add('hidden');
+    $('postsSearchToggle').classList.add('hidden');
+    document.querySelector('.blog-topbar').classList.remove('search-open');
+    $('postsSearchToggle').setAttribute('aria-expanded', 'false');
     $('pageTitle').textContent = 'Edit Post';
 }
 
@@ -126,6 +139,12 @@ function renderPosts() {
     visible.forEach(post => {
         const row = $('blogPostRowTemplate').content.firstElementChild.cloneNode(true);
         row.dataset.id = post.id;
+        row.setAttribute('role', 'button');
+        row.tabIndex = 0;
+        const icon = document.createElement('span');
+        icon.className = 'blog-post-row-icon';
+        icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>';
+        row.querySelector('.blog-post-row-head').prepend(icon);
         row.querySelector('.blog-post-row-title').textContent = post.title || 'Untitled';
         row.querySelector('.blog-post-row-public').hidden = !post.publishedAt;
         const excerpt = post.excerpt || '';
@@ -135,8 +154,43 @@ function renderPosts() {
         row.querySelector('.blog-post-row-date').textContent =
             formatWhen(post.updatedAt, lastOpened[post.id]);
         row.addEventListener('click', () => openPost(post.id));
+        row.addEventListener('keydown', (event) => {
+            if (event.target !== row || !['Enter', ' '].includes(event.key)) return;
+            event.preventDefault();
+            openPost(post.id);
+        });
+        const actions = document.createElement('div');
+        actions.className = 'blog-post-row-actions';
+        const rename = document.createElement('button');
+        rename.type = 'button'; rename.title = 'Rename'; rename.setAttribute('aria-label', 'Rename');
+        rename.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>';
+        rename.addEventListener('click', (event) => { event.stopPropagation(); renamePost(post); });
+        const remove = document.createElement('button');
+        remove.type = 'button'; remove.title = 'Delete'; remove.setAttribute('aria-label', 'Delete');
+        remove.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+        remove.addEventListener('click', (event) => { event.stopPropagation(); deletePostFromHome(post); });
+        actions.addEventListener('keydown', (event) => event.stopPropagation());
+        actions.append(rename, remove);
+        row.append(actions);
         list.appendChild(row);
     });
+}
+
+async function renamePost(post) {
+    const name = prompt('Rename post', post.title || 'Untitled');
+    if (name === null || !name.trim() || name.trim() === post.title) return;
+    if (name.trim().length > 200) { showToast('Post title must be 200 characters or less', true); return; }
+    const result = await blogStorage.request('updatePost', { id: post.id, title: name.trim() });
+    if (!result.success) { showToast(result.error || 'Could not rename the post', true); return; }
+    // Reload the records used by the shared tag sidebar as well as the cards.
+    window.location.reload();
+}
+
+async function deletePostFromHome(post) {
+    if (!confirm(`Delete "${post.title || 'Untitled'}"? This cannot be undone.`)) return;
+    const result = await blogStorage.deletePost(post.id);
+    if (!result) { showToast('Could not delete the post', true); return; }
+    window.location.reload();
 }
 
 function formatWhen(updatedAt, lastOpenedAt) {
@@ -234,9 +288,24 @@ function closeSettingsMenu() {
     $('settingsBtn').setAttribute('aria-expanded', 'false');
 }
 
+function handleHomeLinkClick(event) {
+    if (!state.editingId || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    // Use the same return path as the editor's Posts button so pending
+    // autosaves are flushed before showing the blog's post list.
+    BlogEditor.close();
+}
+
 function wireChrome() {
+    document.querySelector('.blog-home-link').addEventListener('click', handleHomeLinkClick);
     $('newPostBtn').addEventListener('click', createPost);
     $('emptyNewPostBtn').addEventListener('click', createPost);
+    $('postsSearchToggle').addEventListener('click', () => {
+        const nav = document.querySelector('.blog-topbar');
+        const open = nav.classList.toggle('search-open');
+        $('postsSearchToggle').setAttribute('aria-expanded', String(open));
+        if (open) $('postsSearch').focus();
+    });
     $('postsSearch').addEventListener('input', (e) => {
         state.searchQuery = e.target.value;
         renderPosts();

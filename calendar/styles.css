@@ -79,6 +79,10 @@ body {
     z-index: 50;
 }
 
+/* Calendar home has no Workdeck back/title pair in the top bar. */
+.top-nav-left #homeBtn,
+.top-nav-left #pageTitle { display: none; }
+
 .top-nav-left {
     display: flex;
     align-items: center;
@@ -411,6 +415,7 @@ body {
 }
 
 .cal-sidebar {
+    position: relative;
     width: var(--sidebar-width);
     flex-shrink: 0;
     padding: 14px 12px;
@@ -581,10 +586,14 @@ body {
     color: var(--text-secondary);
 }
 
-/* Mobile drawer toggle + scrim (inert on desktop) */
-.cal-sidebar-toggle {
-    display: none;
-}
+/* Sidebar toggle: double chevrons show the next action at every size. */
+.cal-sidebar-toggle { display: inline-flex; }
+.cal-sidebar-toggle[aria-expanded="true"] .cal-icon-expand,
+.cal-sidebar-toggle[aria-expanded="false"] .cal-icon-collapse { display: none; }
+.cal-sidebar-head { display:flex; align-items:center; justify-content:space-between; min-height:38px; margin-bottom:12px; padding:0 6px; font-size:17px; }
+.cal-sidebar-close { display:grid; place-items:center; flex:none; width:32px; height:32px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--text-secondary); }
+.cal-sidebar-close:hover { background:var(--bg-tertiary); }
+@media (min-width: 701px) { body.cal-sidebar-collapsed .cal-sidebar { display:none; } }
 
 .cal-scrim {
     position: fixed;

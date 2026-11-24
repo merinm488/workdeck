@@ -116,7 +116,8 @@ html.fb-deep-boot .fb-app {
    ================================================ */
 
 .fb-sidebar {
-    width: 264px;
+    position: relative;
+    width: 280px;
     flex-shrink: 0;
     background: var(--bg-sidebar);
     border-right: 1px solid var(--border);
@@ -125,7 +126,7 @@ html.fb-deep-boot .fb-app {
 }
 
 .fb-side-close {
-    display: none;
+    display: flex;
     position: absolute;
     top: 14px;
     right: 12px;
@@ -413,8 +414,8 @@ html.fb-deep-boot .fb-app {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 9px;
     color: var(--text-secondary);
     flex-shrink: 0;
@@ -427,7 +428,14 @@ html.fb-deep-boot .fb-app {
 }
 
 .fb-sidebar-toggle {
-    display: none;
+    display: flex;
+}
+.fb-sidebar-toggle[aria-expanded="true"] .fb-icon-expand,
+.fb-sidebar-toggle[aria-expanded="false"] .fb-icon-collapse { display: none; }
+
+@media (min-width: 1024px) {
+    body.fb-sidebar-collapsed .fb-sidebar { display: none; }
+    body.fb-sidebar-collapsed .fb-footer { left: 0; }
 }
 
 .fb-search {
@@ -544,28 +552,8 @@ html.fb-deep-boot .fb-app {
 }
 
 .fb-view-toggle {
-    display: flex;
     background: var(--bg-input);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 3px;
-    gap: 2px;
-}
-
-.fb-view-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 28px;
-    border-radius: 7px;
-    color: var(--text-tertiary);
-}
-
-.fb-view-btn.active {
-    background: var(--bg);
-    color: var(--text);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* Settings dropdown */
@@ -807,8 +795,13 @@ html.fb-deep-boot .fb-app {
 /* ⋮ hides on cards until hover/focus; list rows keep it always visible */
 .fb-card .fb-item-menu {
     opacity: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
     transition: opacity 0.15s ease;
 }
+.fb-card .fb-item-menu:hover, .fb-card .fb-item-menu:focus-visible { background: var(--bg-input); }
 
 .fb-card:hover .fb-item-menu,
 .fb-card:focus-within .fb-item-menu {
@@ -1078,7 +1071,7 @@ html.fb-deep-boot .fb-app {
     position: fixed;
     bottom: 0;
     right: 0;
-    left: 264px;
+    left: 280px;
     padding: 8px 20px;
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
@@ -2133,4 +2126,34 @@ html.fb-deep-boot .fb-app {
     color: inherit;
     font-size: 16px;
     padding: 2px 6px;
+}
+
+/* Docs-style table list (the original card view is unchanged). */
+.fb-list-head, #fbList { box-sizing:border-box; width:100%; max-width:760px; margin-inline:auto; }
+.fb-list-head { display: none; }
+.fb-list-head:has(+ #fbList:not(.hidden)) { display: grid; }
+.fb-list-head, #fbList .fb-row { grid-template-columns: minmax(0,6fr) minmax(80px,2fr) minmax(95px,2fr) 64px; gap:12px; align-items:center; }
+.fb-list-head { padding:10px 16px; border:1px solid var(--border); border-radius:12px 12px 0 0; background:var(--bg-input); color:var(--text-secondary); font-size:12px; font-weight:600; }
+.fb-list-head span:last-child { text-align:right; }
+#fbList:not(.hidden) { gap:0; border:1px solid var(--border); border-top:0; border-radius:0 0 12px 12px; overflow:hidden; }
+#fbList .fb-row { display:grid; min-height:55px; padding:10px 16px; border-bottom:1px solid var(--border); border-radius:0; }
+#fbList .fb-row:last-child { border-bottom:0; }
+#fbList .fb-row-main { grid-column:1; display:flex; align-items:center; gap:10px; min-width:0; }
+#fbList .fb-row-title { min-width:0; }
+#fbList .fb-row-tags { grid-column:2; min-width:0; overflow:hidden; white-space:nowrap; }
+#fbList .fb-row-tags:empty::before { content:'—'; color:var(--text-secondary); font-size:12px; }
+#fbList .fb-row-count, #fbList .fb-row-size { display:none; }
+#fbList .fb-row-date { grid-column:3; min-width:0; text-align:left; }
+#fbList .fb-item-menu { grid-column:4; justify-self:end; width:36px; height:36px; }
+/* The same compact horizontal action picker is available on grid cards. */
+#fbItemMenu { min-width:0; max-width:calc(100vw - 16px); }
+#fbItemMenu.open { display:flex; align-items:center; flex-wrap:wrap; width:max-content; gap:3px; }
+#fbItemMenu button { flex:none; justify-content:center; width:34px; height:34px; padding:0; }
+#fbItemMenu button span { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media(max-width:640px) {
+    .fb-list-head, #fbList .fb-row { grid-template-columns:minmax(0,1fr) minmax(65px,auto) 40px; gap:8px; padding-left:10px; padding-right:10px; }
+    .fb-list-head span:nth-child(2), #fbList .fb-row-tags { display:none; }
+    .fb-list-head span:nth-child(3), #fbList .fb-row-date { grid-column:2; display:block; }
+    .fb-list-head span:nth-child(4), #fbList .fb-item-menu { grid-column:3; }
+    #fbList .fb-row-main .fb-row-icon { display:none; }
 }

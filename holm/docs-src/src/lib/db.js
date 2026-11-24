@@ -65,12 +65,6 @@ export function toggleDocPin(_hash, docId) {
     return remember(result.data).docs.find(doc => doc.id === docId) || null;
   });
 }
-export function toggleDocArchive(_hash, docId) {
-  return queue(docId, async () => {
-    const result = await mutate(API, 'toggleArchive', { docId, version: version(docId) });
-    return remember(result.data).docs.find(doc => doc.id === docId) || null;
-  });
-}
 export async function getTags(hash) { return (await getUserData(hash)).tags || []; }
 export async function createTag(_hash, tagData) {
   const result = await mutate('/api/workdeck', 'createTag', tagData);

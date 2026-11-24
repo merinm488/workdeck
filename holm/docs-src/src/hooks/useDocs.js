@@ -15,7 +15,6 @@ export function useDocs(userHash) {
   const [tags, setTags] = useState([]);
   const [activeTag, setActiveTag] = useState(null); // null = All Docs view
   const [searchQuery, setSearchQuery] = useState('');
-  const [showArchived, setShowArchived] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
 
@@ -110,23 +109,6 @@ export function useDocs(userHash) {
   }, [userHash]);
 
   /**
-   * Toggle doc archive status
-   */
-  const toggleArchive = useCallback(async (docId) => {
-    if (!userHash) return null;
-
-    const updatedDoc = await db.toggleDocArchive(userHash, docId);
-    if (updatedDoc) {
-      setDocs(prev =>
-        prev.map(doc =>
-          doc.id === docId ? updatedDoc : doc
-        )
-      );
-    }
-    return updatedDoc;
-  }, [userHash]);
-
-  /**
    * Create a new tag
    */
   const createTag = useCallback(async (tagData) => {
@@ -186,12 +168,7 @@ export function useDocs(userHash) {
 
     let filtered = docs;
 
-    // Filter by archived status
-    if (showArchived) {
-      filtered = filtered.filter(doc => doc.archived === true);
-    } else {
-      filtered = filtered.filter(doc => doc.archived === false || doc.archived === undefined);
-    }
+    // Previously archived docs remain visible now that archive is no longer available.
 
     // Apply search filter - searches across all tags when there's a search query
     if (searchQuery) {
@@ -200,8 +177,7 @@ export function useDocs(userHash) {
         doc.title.toLowerCase().includes(query) ||
         doc.content.toLowerCase().includes(query)
       );
-    } else if (activeTag && !showArchived) {
-      // Only filter by tag when not searching and not in archived view
+    } else if (activeTag) {
       filtered = filtered.filter(doc => doc.tagId === activeTag);
     }
     // If activeTag is null (All Docs view), show all docs (already done above)
@@ -212,7 +188,7 @@ export function useDocs(userHash) {
       if (!a.pinned && b.pinned) return 1;
       return new Date(b.updatedAt) - new Date(a.updatedAt);
     });
-  }, [docs, activeTag, searchQuery, showArchived]);
+  }, [docs, activeTag, searchQuery]);
 
   // Fetch data when user hash changes
   useEffect(() => {
@@ -220,25 +196,22 @@ export function useDocs(userHash) {
   }, [fetchData]);
 
   // Memoize filtered docs to avoid expensive filtering on every render
-  const filteredDocs = useMemo(getFilteredDocs, [docs, activeTag, searchQuery, showArchived]);
+  const filteredDocs = useMemo(getFilteredDocs, [getFilteredDocs]);
 
   return {
     docs,
     tags,
     activeTag,
     searchQuery,
-    showArchived,
     isLoading,
     hasLoaded,
     filteredDocs,
     setActiveTag,
     setSearchQuery,
-    setShowArchived,
     createDoc,
     updateDoc,
     deleteDoc,
     togglePin,
-    toggleArchive,
     createTag,
     updateTag,
     deleteTag,

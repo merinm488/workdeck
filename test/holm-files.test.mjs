@@ -91,7 +91,26 @@ test('Files uploads/reads are member-private; no access key, client path, or cac
   assert.equal((await json(handleWorkspace, bob)).body.data.files.length, 0);
 });
 
-test('Files nested folders, moves, multi-tags and destructive folder cascade are owner-scoped', async () => {
+test('Files retries and post-commit lookups reuse one member-private upload', async () => {
+  const { member, anon, json, upload } = fixture();
+  const alice = member('alice'), bob = member('bob');
+  const uploadId = 'upload_0123456789abcdef';
+  const first = await upload(alice, { name: 'once.txt', uploadId });
+  const retry = await upload(alice, { name: 'once.txt', uploadId });
+  assert.equal(first.status, 201);
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.file.id, first.body.file.id);
+  assert.equal((await json(handleWorkspace, alice)).body.data.files.length, 1);
+  const path = `/api/filebox?uploadId=${uploadId}`;
+  assert.equal((await json(handleFilebox, alice, 'GET', undefined, path)).body.file.id, first.body.file.id);
+  assert.equal((await json(handleFilebox, bob, 'GET', undefined, path)).status, 404);
+  assert.equal((await json(handleFilebox, anon, 'GET', undefined, path)).status, 401);
+  assert.equal((await json(handleFilebox, alice, 'GET', undefined, '/api/filebox?uploadId=bad')).status, 400);
+  assert.equal((await upload(alice, { name: 'different.txt', uploadId })).status, 409);
+  assert.equal((await upload(alice, { name: 'invalid.txt', uploadId: 'bad' })).status, 400);
+});
+
+test('Files nested folders, single tags and destructive folder cascade are owner-scoped', async () => {
   const { member, anon, call, json, put, upload } = fixture();
   const alice = member('alice'), bob = member('bob');
   const folder = (await put(handleWorkspace, alice, 'createFolder', { name: 'Projects', color: '#33aa99' })).body.data.folders[0];
@@ -102,7 +121,14 @@ test('Files nested folders, moves, multi-tags and destructive folder cascade are
   assert.equal((await upload(bob, { name: 'foreign.txt', folderId: child.id })).status, 404);
   const tag = (await put(handleWorkspace, alice, 'createTag', { name: 'Tagged', color: '#113355', origin: 'filebox' })).body.data.tags[0];
   assert.equal(tag.origin, 'filebox');
-  assert.equal((await put(handleWorkspace, alice, 'setFileTags', { fileId: file.id, tagIds: [tag.id, tag.id] })).status, 200);
+  const other = (await put(handleWorkspace, alice, 'createTag', { name: 'Other', origin: 'filebox' })).body.data.tags[0];
+  assert.equal((await put(handleWorkspace, alice, 'setFileTags', { fileId: file.id, tagIds: [tag.id, other.id] })).status, 400);
+  assert.equal((await put(handleWorkspace, alice, 'setFolderTags', { folderId: folder.id, tagIds: [tag.id, other.id] })).status, 400);
+  assert.equal((await put(handleWorkspace, alice, 'createFolder', { name: 'Invalid', tags: [tag.id, other.id] })).status, 400);
+  assert.equal((await upload(alice, { name: 'invalid.txt', tags: [tag.id, other.id] })).status, 400);
+  assert.equal((await put(handleWorkspace, alice, 'setFileTags', { fileId: file.id, tagIds: [tag.id] })).status, 200);
+  assert.equal((await put(handleWorkspace, alice, 'setFileTags', { fileId: file.id, tagIds: [other.id] })).body.data.files.find(item => item.id === file.id).tags[0], other.id);
+  assert.equal((await put(handleWorkspace, alice, 'setFileTags', { fileId: file.id, tagIds: [tag.id] })).status, 200);
   assert.equal((await put(handleWorkspace, alice, 'setFolderTags', { folderId: folder.id, tagIds: [tag.id] })).status, 200);
   const doc = (await put(handleDocs, alice, 'createDoc', { title: 'Single-tagged', tagId: tag.id })).body.doc;
   const removedTag = await put(handleWorkspace, alice, 'deleteTag', { tagId: tag.id });
@@ -145,6 +171,40 @@ test('Files links, thumbs and metadata operations work without exposing other ac
   assert.equal((await put(handleWorkspace, a, 'deleteFile', { app: 'filebox', fileId: first.id })).status, 200);
   assert.equal((await json(handleSheets, a, 'GET', undefined, `/api/users?thumbs=${first.id}`)).body.thumbnails[first.id], undefined);
   assert.equal((await json(handleFilebox, a, 'GET', undefined, `/api/filebox?fileId=${first.id}`)).status, 404);
+});
+
+test('Holm Files tag modal rerenders without duplicates and selects only one tag', async () => {
+  const source = readFileSync(new URL('../holm/files/main.js', import.meta.url), 'utf8');
+  const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
+  const node = () => ({ children: [], className: '', classList: { add() {}, remove() {} },
+    append(...items) { this.children.push(...items); }, appendChild(item) { this.children.push(item); },
+    replaceChildren(...items) { this.children = items; },
+    addEventListener(event, callback) { this[event] = callback; } });
+  const els = new Map(), $ = id => {
+    if (!els.has(id)) els.set(id, node());
+    return els.get(id);
+  };
+  const record = { id: 'file', name: 'report', tags: ['first'] };
+  const state = { tags: [{ id: 'first', name: 'First' }, { id: 'second', name: 'Second' }], folders: [] };
+  const calls = [];
+  const ui = vm.runInNewContext(`${section('function openTagsModal(', 'async function createTagInline(')}
+    ${section('async function confirmTags(', '// ================================================\n// Drag & drop:')}
+    ${section('async function addTagToRecord(', 'async function moveFileToFolder(')}
+    ({ openTagsModal, renderTagChecks, confirmTags, addTagToRecord })`, {
+    state, $, document: { createElement: node }, fbDot: node, fbIcon: node,
+    fileboxTags: () => state.tags, openModal() {}, closeModal() {},
+    getFile: () => record, getFolder: () => null, getTag: id => state.tags.find(t => t.id === id),
+    applyRecordTags: (file, kind, ids) => { calls.push(Array.from(ids)); file.tags = Array.from(ids); },
+  });
+  ui.openTagsModal(record, 'file');
+  assert.equal($('fbTagChecks').children.length, 3); // No tag + two choices
+  $('fbTagChecks').children[2].click();
+  assert.equal($('fbTagChecks').children.length, 3);
+  assert.equal(state.tagSelection, 'second');
+  await ui.confirmTags();
+  assert.deepEqual(calls[0], ['second']);
+  await ui.addTagToRecord(record.id, 'first');
+  assert.deepEqual(calls[1], ['first']); // drag-and-drop replaces the tag
 });
 
 test('Holm Files retains original manager/viewers but removes key auth and uses reload-safe URLs', () => {
