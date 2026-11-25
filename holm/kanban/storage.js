@@ -5,13 +5,13 @@ class KanbanStorage {
 
   async request(method = 'GET', action, data) {
     try {
-      const response = await fetch('/api/kanban', {
+      const response = await (window.WDBoot?.fetch || fetch)('/api/kanban', {
         method, cache: 'no-store', credentials: 'same-origin',
         ...(action ? { headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action, data }) } : {}),
       });
       if (response.status === 401) {
-        window.location.assign('/auth/login?redirect=%2Fkanban%2F');
+        window.location.assign('/auth/login?redirect=' + encodeURIComponent(location.pathname + location.search));
         return null;
       }
       const result = await response.json().catch(() => ({}));
@@ -52,6 +52,8 @@ class KanbanStorage {
     });
     if (!result?.board) return false;
     this.versions.set(board.id, result.board.version);
+    board.version = result.board.version;
+    board.updatedAt = result.board.updatedAt;
     return true;
   }
 

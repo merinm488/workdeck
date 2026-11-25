@@ -2,7 +2,7 @@
 const todoAuth = {
   async logout() {
     try {
-      const response = await fetch('/auth/logout', {
+      const response = await (window.WDBoot?.fetch || fetch)('/auth/logout', {
         method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' },
       });
       if (!response.ok) throw new Error('Sign out failed.');

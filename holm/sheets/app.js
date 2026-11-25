@@ -230,8 +230,8 @@ class SheetsApp {
 
         // Home button - navigate back to home page
         if (homeBtn) {
-            homeBtn.addEventListener('click', () => {
-                window.location.href = '/sheets/';
+            homeBtn.addEventListener('click', async () => {
+                if (await this.save()) window.location.href = '/sheets/';
             });
         }
 
@@ -480,8 +480,10 @@ class SheetsApp {
             spreadsheetData.name = newTitle;
             spreadsheetData.updatedAt = new Date().toISOString();
 
-            // Save to storage
-            const success = await spreadsheetManager.saveSpreadsheetMetadata(spreadsheetData);
+            // Rename participates in the same queue as workbook edits.
+            spreadsheetManager.currentSpreadsheetMetadata.name = newTitle;
+            this.markAsChanged();
+            const success = await this.save();
 
             if (success) {
                 // Reflect the new name in the editor header right away —
@@ -557,42 +559,9 @@ class SheetsApp {
      * @param {boolean} [options.explicit=true] - False for auto-save paths
      * @returns {Promise<boolean>} Success status
      */
-    async save(options = {}) {
-        const { explicit = true } = options;
-
-        try {
-            // Rename reminder: only on user-initiated saves, only while the
-            // name is still the default, and only until dismissed once.
-            if (explicit && !this.renamePromptDismissed && this.isUntitledSpreadsheet()) {
-                this.openRenamePrompt();
-                return false; // Actual save happens after Rename/Later is chosen
-            }
-
-            // Ensure IDs are consistent
-            if (this.spreadsheetId && spreadsheetManager.currentSheetId !== this.spreadsheetId) {
-                console.warn('[APP] ID mismatch detected, correcting');
-                spreadsheetManager.currentSheetId = this.spreadsheetId;
-            }
-
-            // Save spreadsheet data
-            const success = await spreadsheetManager.save();
-
-            if (success) {
-                // Update hasUnsavedChanges flag
-                this.hasUnsavedChanges = false;
-
-                // Show save confirmation
-                this.showNotification('Spreadsheet saved successfully', 'success');
-                return true;
-            } else {
-                this.showError('Failed to save spreadsheet');
-                return false;
-            }
-        } catch (error) {
-            console.error('[APP] Error saving spreadsheet:', error);
-            this.showError('Error saving spreadsheet');
-            return false;
-        }
+    async save() {
+        this.setupAutoSave();
+        return this.autosave.flush();
     }
 
     /**
@@ -702,18 +671,7 @@ class SheetsApp {
      * Periodic save logic
      */
     async autoSave() {
-        // Check if has unsaved changes
-        if (this.hasUnsavedChanges) {
-            // Ensure ID consistency before saving
-            if (this.spreadsheetId && spreadsheetManager.currentSheetId !== this.spreadsheetId) {
-                console.warn('[APP] Auto-save: Correcting ID mismatch');
-                spreadsheetManager.currentSheetId = this.spreadsheetId;
-            }
-            // Save if changed
-            await spreadsheetManager.save();
-            // Reset unsaved flag
-            this.hasUnsavedChanges = false;
-        }
+        return this.save();
     }
 
     /**
@@ -743,13 +701,17 @@ class SheetsApp {
      * Setup auto-save interval
      */
     setupAutoSave() {
-        if (this.autoSaveInterval) {
-            clearInterval(this.autoSaveInterval);
-        }
-
-        this.autoSaveInterval = setInterval(() => {
-            this.autoSave();
-        }, APP_CONFIG.autoSave.interval);
+        if (this.autosave) return;
+        this.autosave = WDAutosave.create({
+            save: async () => {
+                if (this.spreadsheetId) spreadsheetManager.currentSheetId = this.spreadsheetId;
+                return spreadsheetManager.save();
+            },
+            onState: (state, dirty) => {
+                this.hasUnsavedChanges = dirty;
+                WDAutosave.status(state);
+            }
+        });
     }
 
     // ================================================
@@ -834,6 +796,7 @@ class SheetsApp {
      * Logout and redirect to login page
      */
     async logout() {
+        if (!await this.save()) return;
         try {
             await authManager.logout();
         } catch (error) {
@@ -852,6 +815,7 @@ class SheetsApp {
      * Display shareable link for current spreadsheet
      */
     async showShareModal() {
+        if (!await this.save()) return;
         try {
             if (!this.spreadsheetId) {
                 this.showError('No spreadsheet to share');
@@ -1053,7 +1017,8 @@ class SheetsApp {
      * Set unsaved changes flag
      */
     markAsChanged() {
-        this.hasUnsavedChanges = true;
+        this.setupAutoSave();
+        this.autosave.change();
         this.queueSheetFooterUpdate();
     }
 
@@ -1323,8 +1288,24 @@ class SheetsApp {
  * Initialize application when DOM is ready
  * Set up app and start initialization
  */
+function ensureSheetsRuntime() {
+    if (window.WDAutosave) return true;
+    const url = new URL(window.location.href);
+    const hasRuntimeScript = document.querySelector('script[src*="/js/autosave.js"]');
+    if (!hasRuntimeScript && !url.searchParams.has('wd-shell')) {
+        // A v2 worker may have served an old query-string editor shell with
+        // fresh app.js. A new cache key bypasses it before any workbook loads
+        // or edits can be made. The canonical URL is restored after boot.
+        url.searchParams.set('wd-shell', '3');
+        window.location.replace(url.href);
+        return false;
+    }
+    throw new Error('The Sheets autosave script could not load. Check your connection and reload.');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     try {
+        if (!ensureSheetsRuntime()) return;
         // Wait for Univer to be available (CDN loading)
         let attempts = 0;
         const maxAttempts = 100; // 10 seconds timeout (more realistic for CDN)

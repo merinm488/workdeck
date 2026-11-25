@@ -1,0 +1,164 @@
+/* Shared home adapters. Component rules themselves are generated from /home. */
+/* One Workdeck home target in the top-left of every app sidebar. */
+html[data-wd-app] .wd-sidebar-brand {
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+  box-sizing:border-box; min-height:74px; padding:16px; margin:0;
+  border-bottom:1px solid var(--wd-ui-border);
+}
+html[data-wd-app] .wd-sidebar-home {
+  display:inline-flex; align-items:center; justify-content:center; flex:none;
+  width:42px; height:42px; padding:0; border-radius:10px;
+  text-decoration:none; cursor:pointer;
+}
+/* Navigation is neutral like the account avatar, not a primary app action. */
+html[data-wd-app] :is(.wd-sidebar-home, .wd-side-brand .wd-logo-icon) {
+  box-sizing:border-box; border:1px solid var(--wd-ui-border);
+  background:var(--wd-ui-bg-elevated); color:var(--wd-ui-text);
+  box-shadow:none;
+}
+html[data-wd-app] .wd-sidebar-home svg { display:block; width:20px; height:20px; }
+html[data-wd-app] :is(.wd-sidebar-home:hover, .wd-side-brand .wd-logo:hover .wd-logo-icon) { background:var(--wd-ui-bg-input); }
+html[data-wd-app] :is(.wd-sidebar-home, .wd-side-brand .wd-logo):focus-visible { outline:2px solid var(--wd-ui-text-secondary); outline-offset:3px; }
+/* Calendar pads its whole sidebar; compensate only in its brand row. */
+html[data-wd-app="calendar"] .cal-sidebar-head.wd-sidebar-brand { margin:-14px -12px 12px; }
+
+/* All-items is a shared sidebar control, including React Docs. The active
+   fill comes from the app's soft accent in suite-theme.css, not Home yellow. */
+html[data-wd-app] .wd-app-side-all {
+  display:flex; align-items:center; gap:10px; box-sizing:border-box;
+  width:100%; margin:0; padding:9px 10px; border:0; border-radius:8px;
+  text-align:left; background:transparent; color:var(--wd-ui-text);
+  font:400 14px/1.4 Inter,system-ui,sans-serif; cursor:pointer;
+}
+html[data-wd-app] .wd-app-side-all:hover:not(.active) { background:var(--wd-ui-bg-input); }
+html[data-wd-app] .wd-app-side-all.active { font-weight:700; }
+
+/* List geometry follows Docs: max-w-5xl, with its 51px desktop / 53px phone rows. */
+html[data-wd-app] { --wd-home-list-width:1024px; --wd-home-list-row-height:51px; --wd-home-gutter:24px; }
+html[data-wd-home-pending] :is(#homeGrid,#listsGrid,#boardsGrid,#postsList,#meetingList,#spreadsheetsContainer,.wd-app-table-head) { visibility:hidden; }
+html[data-wd-app] .wd-home-loading { color:var(--wd-ui-text-secondary); font:14px/1.5 Inter,system-ui,sans-serif; padding:16px 24px; }
+html[data-wd-app] :is(.wd-tag-ui, .wd-home-search, .wd-home-card-face, .wd-doc-card) {
+  --bg-elevated: var(--wd-ui-bg-elevated); --bg-input: var(--wd-ui-bg-input);
+  --text: var(--wd-ui-text); --text-secondary: var(--wd-ui-text-secondary); --text-tertiary: var(--wd-ui-text-tertiary);
+  --border: var(--wd-ui-border); --border-strong: var(--wd-ui-border-strong);
+  --radius: var(--wd-ui-radius); --radius-sm: var(--wd-ui-radius-sm);
+  --danger: var(--wd-ui-danger); --danger-soft: var(--wd-ui-danger-soft);
+  --shadow: var(--wd-ui-shadow); --shadow-sm: var(--wd-ui-shadow-sm);
+  --accent: var(--wd-ui-focus); --accent-soft: var(--wd-ui-bg-input);
+  color: var(--wd-ui-text); font-family: Inter, system-ui, sans-serif;
+}
+html[data-wd-app] :is(.wd-side-header,.fb-side-header,#projectForm,#fbTagForm,#projectEmpty,#fbTagEmpty)[hidden] { display:none!important; }
+html[data-wd-app] .wd-tag-ui :is(.wd-side-add,.wd-side-action) { color:var(--wd-ui-text-tertiary); }
+/* Reset native button styles (Minutes and React have different base resets). */
+html[data-wd-app] .wd-tag-ui button { font-family:inherit; cursor:pointer; margin:0; }
+html[data-wd-app] .wd-tag-ui :is(.wd-side-add,.wd-side-action,.wd-color-swatch,.wd-modal-close) { border:0; padding:0; background:transparent; }
+html[data-wd-app] .wd-tag-ui :is(.wd-side-action,.wd-side-add):hover { background:var(--bg-input); }
+html[data-wd-app] .wd-tag-ui .wd-side-action.danger:hover { background:var(--danger-soft); color:var(--danger); }
+html[data-wd-app] .wd-tag-ui .wd-primary-btn { background:var(--wd-control-accent); color:var(--wd-control-on-accent); border:0; }
+html[data-wd-app] .wd-tag-ui .wd-danger-btn { border:0; }
+html[data-wd-app] .wd-tag-ui .wd-project-form { margin:6px 0 10px; }
+html[data-wd-app] .wd-tag-ui .wd-project-input { padding:8px 10px; font:13px/1.4 Inter,system-ui,sans-serif; }
+html[data-wd-app] .wd-tag-ui [hidden] { display:none!important; }
+html[data-wd-app] .wd-tag-ui button:disabled { opacity:.6; cursor:wait; }
+html[data-wd-app] .wd-tag-ui .wd-side-row { min-height:40px; }
+html[data-wd-app] .wd-tag-error { margin:0; color:var(--wd-ui-danger); font-size:12px; }
+html[data-wd-app] dialog.wd-tag-dialog { position:fixed; inset:0; max-height:calc(100dvh - 40px); overflow:auto; transform:none; padding:24px; width:calc(100% - 40px); }
+html[data-wd-app] dialog.wd-tag-dialog::backdrop { background:rgba(0,0,0,.55); }
+html[data-wd-app] .wd-tag-ui .wd-modal-title { margin:0; font-size:17px; line-height:1.4; }
+html[data-wd-app] .wd-tag-ui .wd-modal-actions button { font-size:14px; padding:10px 18px; }
+/* Keep count and actions stable and keyboard reachable, just like /home. */
+@media (hover:none) {
+  html[data-wd-app] :is(.wd-tag-ui,#projectList) .wd-side-actions { display:flex; }
+  html[data-wd-app] :is(.wd-tag-ui,#projectList) .wd-side-count { display:none; }
+}
+html[data-wd-app] .wd-app-sidebar { visibility:hidden; }
+html[data-wd-app] body.wd-app-side-open .wd-app-sidebar { visibility:visible; }
+html[data-wd-app] :is(.wd-app-sidebar nav,.fb-sidebar-scroll,.wd-home-sidebar-scroll) { padding-left:12px; padding-right:12px; }
+/* Shared headers/search: left after sidebar toggle, actions at the right. */
+html[data-wd-app] .wd-home-header { display:flex; align-items:center; justify-content:flex-start; gap:16px; width:100%; max-width:1280px; margin:0 auto; padding:28px 24px 20px; height:auto; flex-shrink:0; background:var(--wd-ui-bg); border:0; box-shadow:none; box-sizing:border-box; }
+/* Docs, Sheets and Files wrap the shared row in another header. Clear that
+   wrapper's divider too, but leave editor headers and card/table borders alone.
+   Calendar has a workspace header rather than a card-home row. */
+html[data-wd-app] header:has(> .wd-home-header),
+html[data-wd-app="calendar"] .top-nav { border-bottom:0; box-shadow:none; }
+html[data-wd-app] .wd-home-header .top-nav-left { flex:0 0 auto; }
+html[data-wd-app] .wd-home-header > :not(.wd-home-search,.top-nav-left,.wd-app-side-toggle) { order:1; }
+html[data-wd-app] .wd-home-header :is(.wd-app-side-toggle,.fb-sidebar-toggle,button[aria-controls="docsSidebar"]) { width:40px; height:40px; flex-shrink:0; order:-1; }
+html[data-wd-app="sheets"] body.wd-app-side-available .home-logo { display:none; }
+html[data-wd-app="files"] .fb-header { padding:0; }
+html[data-wd-app] .wd-home-header :is(.top-nav-right,.home-actions,.blog-topbar-actions,.fb-actions,.wd-docs-actions) { margin-left:auto; flex-shrink:0; }
+html[data-wd-app] .wd-home-header :is(.home-search-toggle,.blog-search-toggle,#boardsSearchToggle) { display:none!important; }
+html[data-wd-app] .wd-home-search { display:flex; align-items:center; flex:1 1 220px; min-width:0; max-width:520px; margin:0; padding:0; border:0; border-radius:0; background:none; order:0; box-shadow:none; }
+html[data-wd-app] .wd-home-search-box { position:relative; width:100%; display:flex; align-items:center; }
+html[data-wd-app] .wd-home-search .wd-search-input { box-sizing:border-box; width:100%; height:42px; margin:0; padding:11px 40px 11px 42px; border:1px solid var(--wd-ui-border); border-radius:999px; background:var(--wd-ui-bg-input); color:var(--wd-ui-text); font:14px/18px Inter,system-ui,sans-serif; text-align:center; outline:none; }
+html[data-wd-app] .wd-home-search .wd-search-input:focus { border-color:var(--wd-control-focus); box-shadow:0 0 0 3px var(--wd-control-soft); }
+html[data-wd-app] .wd-home-search .wd-search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--wd-ui-text-tertiary); pointer-events:none; }
+html[data-wd-app] .wd-home-search .wd-search-clear { position:absolute; right:10px; top:50%; transform:translateY(-50%); display:flex; align-items:center; justify-content:center; width:26px; height:26px; padding:0; border:0; border-radius:50%; color:var(--wd-ui-text-tertiary); background:none; }
+html[data-wd-app] .wd-home-search .wd-search-clear:is(.hidden,[hidden]) { display:none; }
+html[data-wd-app] .wd-home-search .wd-search-clear:hover { background:var(--wd-ui-bg-elevated); color:var(--wd-ui-text); }
+html[data-wd-app] #boardsView.wd-home-content,
+html[data-wd-app] .wd-home-content { width:100%; max-width:1280px; margin:0 auto; padding:0 var(--wd-home-gutter) 40px; box-sizing:border-box; }
+html[data-wd-app] .wd-home-grid:not(.as-list) { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr)); gap:16px; max-width:none; padding:0; border:0; background:none; }
+html[data-wd-app="sheets"] .home-main { width:100%; max-width:1280px; margin:0 auto; }
+html[data-wd-app="sheets"] #spreadsheetsContainer:not(.as-list) { margin:0 24px 40px; width:calc(100% - 48px); }
+html[data-wd-app="todo"] body.wd-app-side-available .todo-main { max-width:1280px; width:100%; padding:0; }
+/* One centered, responsive table width for Docs, Workdeck, Files and the
+   shared app-home adapter. Keep these rules off card grids and editor tables. */
+html[data-wd-app] body :is(.wd-home-list,.wd-app-table-head,.wd-app-items.as-list,.wd-file-list-head,#filesList,.fb-list-head,#fbList) { box-sizing:border-box; width:100%; max-width:var(--wd-home-list-width); margin-inline:auto; }
+html[data-wd-app="sheets"] .home-main:has(#spreadsheetsContainer.as-list),
+html[data-wd-app="home"] .wd-container:has(#filesList:not(.hidden)) { box-sizing:border-box; padding-inline:var(--wd-home-gutter); }
+/* Explicit border-box heights keep the first/last row and different native
+   icons/buttons equal. Center the controls without shrinking their hit areas. */
+html[data-wd-app] body :is(.wd-app-items.as-list > [data-id],#filesList > .wd-file-row,#fbList > .fb-row,.wd-home-list .docs-list-grid + .docs-list-grid) { box-sizing:border-box; height:var(--wd-home-list-row-height); min-height:var(--wd-home-list-row-height); padding-block:0; align-items:center; }
+/* Split header/body tables include the top border in the header; Docs has
+   that border on its wrapper (1px + its 33px header = the same 34px). */
+html[data-wd-app] body :is(.wd-app-table-head,.wd-file-list-head,.fb-list-head) { height:34px; min-height:34px; padding-block:0; font-size:12px; line-height:16px; }
+html[data-wd-app] .wd-home-list .docs-list-tag > span { max-width:100%; overflow:hidden; white-space:nowrap; }
+html[data-wd-app] .wd-home-list .docs-list-tag > span > div { flex-shrink:0; }
+/* Existing list records and click handlers are retained. Grid faces use the
+   exact title/preview/metadata hierarchy from Workdeck, not app-specific tiles. */
+html[data-wd-app] .wd-home-grid:not(.as-list) > .wd-home-card,
+html[data-wd-app] .wd-doc-card { position:relative; display:flex; flex-direction:column; min-width:0; min-height:0; gap:10px; padding:12px 12px 14px; border:1px solid var(--wd-ui-border); border-radius:var(--wd-ui-radius); background:var(--wd-ui-bg-elevated); box-shadow:none; overflow:visible; cursor:pointer; transition:transform .15s,border-color .15s,box-shadow .15s; }
+html[data-wd-app] .wd-home-grid:not(.as-list) > .wd-home-card:hover,
+html[data-wd-app] .wd-doc-card:hover { transform:translateY(-2px); border-color:var(--wd-ui-border-strong); box-shadow:var(--wd-ui-shadow-sm); background:var(--wd-ui-bg-elevated); }
+html[data-wd-app] .wd-home-grid:not(.as-list) > .wd-home-card > :not(.wd-home-card-face),
+html[data-wd-app] .wd-home-grid:not(.as-list) > .wd-home-card::before { display:none!important; }
+html[data-wd-app] .wd-home-card-face { display:contents; font:14px/normal Inter,system-ui,sans-serif; }
+html[data-wd-app] .wd-home-grid.as-list .wd-home-card-face { display:none; }
+html[data-wd-app] :is(.wd-home-card-face,.wd-doc-card) .wd-file-title { font:600 15px/normal Inter,system-ui,sans-serif; margin:0; }
+html[data-wd-app] :is(.wd-home-card-face,.wd-doc-card) .wd-file-preview { width:100%; }
+html[data-wd-app] :is(.wd-home-card-face,.wd-doc-card) :is(.wd-file-app-badge,.wd-file-icon) { color:var(--wd-app-color); background:var(--wd-app-tint); }
+html[data-wd-app] :is(.wd-home-card-face,.wd-doc-card) .wd-file-project[hidden] { display:none; }
+html[data-wd-app] .wd-home-card-face .wd-file-project { min-width:0; }
+html[data-wd-app] .wd-home-card-face .wd-file-meta { flex-wrap:nowrap; font:12px/normal Inter,system-ui,sans-serif; }
+html[data-wd-app] .wd-home-card-face .wd-home-card-actions { position:static; display:flex; align-items:center; gap:4px; opacity:0; transform:none; background:none; }
+html[data-wd-app] .wd-home-card:is(:hover,:focus-within) .wd-home-card-actions { opacity:1; }
+html[data-wd-app] .wd-home-card-actions button { display:grid; place-items:center; width:30px; height:30px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--wd-ui-text-tertiary); }
+html[data-wd-app] .wd-home-card-actions button:hover { background:var(--wd-ui-bg-input); color:var(--wd-ui-text); }
+html[data-wd-app] .wd-home-card-actions button.danger:hover { background:var(--wd-ui-danger-soft); color:var(--wd-ui-danger); }
+/* Calendar has a live calendar workspace rather than a file-home grid. Keep
+   its navigation intact, but remove the independently centered search column. */
+html[data-wd-app="calendar"] .top-nav-left { flex:0 0 auto; }
+html[data-wd-app="calendar"] .top-nav-center { flex:1; max-width:520px; justify-content:flex-start; margin-right:auto; }
+/* Files already has the same preview hierarchy; only normalize its metrics. */
+/* Breadcrumb and results share a centered column, with either sidebar state. */
+html[data-wd-app="files"] .fb-main { --fb-home-gutter:var(--wd-home-gutter); }
+html[data-wd-app="files"] :is(.fb-breadcrumb,.fb-content) { width:100%; max-width:1280px; margin:0 auto; padding-left:var(--fb-home-gutter); padding-right:var(--fb-home-gutter); box-sizing:border-box; }
+html[data-wd-app="files"] .fb-main:has(#fbList:not(.hidden)) :is(.fb-breadcrumb,.fb-content) { max-width:calc(var(--wd-home-list-width) + 2 * var(--fb-home-gutter)); }
+html[data-wd-app="files"] .fb-breadcrumb > .fb-crumb:first-child { padding-left:0; }
+html[data-wd-app="files"] .fb-grid { grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr)); gap:16px; }
+.wd-save-status { font-size:12px; color:var(--wd-ui-text-secondary); white-space:nowrap; }
+html[data-wd-app="files"] .fb-card { padding:12px 12px 14px; gap:10px; border-radius:var(--wd-ui-radius); }
+html[data-wd-app="files"] .fb-card-preview { aspect-ratio:16/10; border-radius:10px; }
+html[data-wd-app="minutes"] body.wd-app-side-available .topbar :is(.home-link,.bar-divider,.app-name,.bar-spacer) { display:none; }
+html[data-wd-app="minutes"] body:not(.wd-app-side-available) .topbar .wd-home-search { display:none; }
+html[data-wd-app="minutes"] .home-controls { margin:16px 0; justify-content:flex-end; }
+@media (max-width:700px) {
+  html[data-wd-app] .wd-home-header { flex-wrap:wrap; padding:20px 16px; gap:12px; }
+  html[data-wd-app] .wd-home-header .wd-home-search { order:2; flex:1 0 100%; max-width:none; margin:0; }
+  html[data-wd-app] { --wd-home-gutter:16px; }
+  html[data-wd-app] .wd-home-grid:not(.as-list),html[data-wd-app="files"] .fb-grid { grid-template-columns:repeat(auto-fill,minmax(min(160px,100%),1fr)); }
+}
+@media (max-width:639px) { html[data-wd-app] { --wd-home-list-row-height:53px; } }
+@media (hover:none) { html[data-wd-app] .wd-home-card-face .wd-home-card-actions { opacity:1; } }
+@media (prefers-reduced-motion:reduce) { html[data-wd-app] .wd-home-card { transition:none; } }

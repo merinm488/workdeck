@@ -71,7 +71,7 @@ async function init() {
     }
     editorState.drawing = drawing;
 
-    const userData = await drawStorage.loadUserData();
+    const userData = drawStorage.lastUserData;
     if (userData && userData.settings && userData.settings.theme) {
         drawThemeManager.applyFromServer(userData.settings.theme);
     }
@@ -1125,60 +1125,33 @@ function restoreSnapshot(objectsJson) {
 // Persistence
 // ================================================
 
-/** Set isDirty, update #saveState ("Unsaved changes"), reset autoSaveTimer. */
-function markDirty() {
-    editorState.isDirty = true;
-    $('saveState').textContent = 'Unsaved changes';
-
-    // restart the autosave countdown — each change pushes the next save a
-    // full interval away, so autosave fires 30s after the LAST edit
-    clearInterval(editorState.autoSaveTimer);
-    editorState.autoSaveTimer = setInterval(() => {
-        if (editorState.isDirty) {
-            saveDrawing();
+function startAutoSave() {
+    if (editorState.autosave) return;
+    editorState.autosave = WDAutosave.create({
+        save: async () => {
+            const drawingData = { ...editorState.drawing,
+                background: editorState.canvas.backgroundColor,
+                objects: editorState.canvas.toObject(EXTRA_SERIALIZED_PROPS).objects,
+                viewport: getViewport(), name: $('drawingTitle').textContent };
+            delete drawingData.sharedId;
+            return drawStorage.saveDrawing(editorState.drawingId, drawingData);
+        },
+        onState: (state, dirty) => {
+            editorState.isDirty = dirty;
+            editorState.isSaving = state === 'saving';
+            WDAutosave.status(state);
         }
-    }, APP_CONFIG.autoSave.interval);
+    });
+}
+
+function markDirty() {
+    startAutoSave();
+    editorState.autosave.change();
 }
 
 async function saveDrawing() {
-    if (editorState.isSaving || !editorState.isDirty) return false;
-
-    editorState.isSaving = true;
-    $('saveState').textContent = 'Saving…';
-
-    const drawingData = {
-        ...editorState.drawing,                          // keep every field the record already has
-        background: editorState.canvas.backgroundColor,
-        objects: editorState.canvas.toObject(EXTRA_SERIALIZED_PROPS).objects,
-        viewport: getViewport(),
-        name: $('drawingTitle').textContent
-    };
-
-    delete drawingData.sharedId;
-
-    const ok = await drawStorage.saveDrawing(editorState.drawingId, drawingData);
-
-    if (ok) {
-        editorState.isDirty = false;
-
-        const now = new Date();
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        $('saveState').textContent = `Saved · ${hh}:${mm}`;
-    } else {
-        showNotification('Save failed — will retry automatically', true);
-    }
-
-    editorState.isSaving = false;
-    return ok;
-}
-
-function startAutoSave() {
-    editorState.autoSaveTimer = setInterval(() => {
-        if (editorState.isDirty) {
-            saveDrawing();
-        }
-    }, APP_CONFIG.autoSave.interval);
+    startAutoSave();
+    return editorState.autosave.flush();
 }
 
 function bindBeforeUnload() {
@@ -1254,12 +1227,8 @@ function exportPng() {
 // Top nav / settings / modals
 // ================================================
 
-function goHome() {
-    offerRenameBeforeLeaving(async () => {
-        if (editorState.isSaving) { showNotification('Wait for the save to finish', true); return; }
-        if (editorState.isDirty && !await saveDrawing()) return;
-        window.location.href = '/draw/';
-    });
+async function goHome() {
+    if (await saveDrawing()) window.location.href = '/draw/';
 }
 
 function openRenameModal() {
@@ -1340,7 +1309,7 @@ function closeModal(el) {
 
 function bindTopNav() {
     $('homeBtn').addEventListener('click', goHome);
-    $('saveBtn').addEventListener('click', saveDrawing);
+
     $('drawingTitle').addEventListener('click', openRenameModal);
 
     // --- dropdown toggles: opening one closes the other ---
@@ -1377,12 +1346,8 @@ function bindTopNav() {
     $('shareBtn').addEventListener('click', openShareModal);
     $('copyLinkBtn').addEventListener('click', copyDrawingLink);
 
-    $('logoutBtn').addEventListener('click', () => {
-        offerRenameBeforeLeaving(async () => {
-            if (editorState.isSaving) { showNotification('Wait for the save to finish', true); return; }
-            if (editorState.isDirty && !await saveDrawing()) return;
-            await drawAuth.logout();
-        });
+    $('logoutBtn').addEventListener('click', async () => {
+        if (await saveDrawing()) await drawAuth.logout();
     });
 
     // --- a click anywhere else closes both sheets ---

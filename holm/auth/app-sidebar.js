@@ -39,23 +39,28 @@
   }
 
   async function request(action, data) {
-    const response = await fetch('/api/workdeck', {
+    const response = await (window.WDBoot?.fetch || fetch)(action ? '/api/workdeck' : ({ sheets: '/api/users', forms: '/api/forms', slides: '/api/slides', draw: '/api/draw', todo: '/api/todo/lists', kanban: '/api/kanban', minutes: '/api/minutes', blog: '/api/blog' })[app], {
       method: action ? 'PUT' : 'GET', credentials: 'same-origin', cache: 'no-store',
       ...(action ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, data }) } : {}),
     });
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Could not load tags');
-    return (await response.json()).data;
+    const result = await response.json();
+    return !action && app === 'todo' ? { todo: result.lists, tags: result.tags, settings: result.settings } : result.data;
   }
 
   document.addEventListener('DOMContentLoaded', async () => {
     const grid = $(config.grid), home = $(config.home), nav = $(config.nav);
     if (!grid || !home || !nav) return;
-    // Only show the panel once the member session has been verified.
-    let data;
-    try { data = await request(); } catch (error) { console.warn('Tag sidebar:', error); return; }
-    tags = data.tags || [];
-    records = data[config.key] || [];
-    if (active && !tags.some(tag => tag.id === active)) active = null;
+    // Mount the empty shell and restore presentation synchronously. Neither
+    // sidebar geometry nor the saved layout may depend on a network response.
+    const layoutKeys = { sheets: 'sheets_home_layout', forms: 'forms_home_layout', slides: 'slides_home_layout', draw: 'draw_home_layout', todo: 'todo_lists_layout' };
+    try { grid.classList.toggle('as-list', localStorage.getItem(layoutKeys[app] || `wd_${app}_layout`) === 'list'); }
+    catch (_) { /* private mode */ }
+    const loading = document.createElement('p');
+    loading.className = 'wd-home-loading';
+    loading.setAttribute('role', 'status');
+    loading.textContent = 'Loading…';
+    grid.before(loading);
 
     const toggle = document.createElement('button');
     toggle.type = 'button';
@@ -71,50 +76,13 @@
     aside.className = 'wd-app-sidebar';
     aside.id = 'wdAppSidebar';
     aside.setAttribute('aria-label', `${app} tags`);
-    aside.innerHTML = `<div class="wd-app-side-brand"><strong>${app === 'draw' ? 'Draw' : app[0].toUpperCase() + app.slice(1)}</strong></div>
+    aside.innerHTML = `<div class="wd-app-side-brand wd-sidebar-brand">${window.WDHomeLink}</div>
       <nav aria-label="Filter by tag"><button type="button" class="wd-app-side-all">All items</button>
-        <div class="wd-app-side-heading"><span>Tags</span><button type="button" class="wd-app-side-add" aria-label="New tag" title="New tag"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button></div>
-        <form class="wd-app-side-form" hidden><input type="text" maxlength="60" required placeholder="Tag name" aria-label="Tag name" autocomplete="off"><div class="wd-app-side-colors" role="group" aria-label="Tag color"></div><div class="wd-app-side-form-actions"><button type="submit" class="wd-app-side-submit">Create</button><button type="button" class="wd-app-side-cancel">Cancel</button></div><button type="button" class="wd-app-side-delete" hidden>Delete tag</button><p class="wd-app-side-error" role="alert" hidden></p></form>
         <div class="wd-app-side-tags"></div></nav>`;
     document.body.append(scrim, aside);
     home.classList.add('wd-app-side-home');
-    const all = $('.wd-app-side-all'), list = $('.wd-app-side-tags'), form = $('.wd-app-side-form');
-    const nameInput = form.querySelector('input[type=text]'), colors = form.querySelector('.wd-app-side-colors');
-    const submit = form.querySelector('.wd-app-side-submit'), deleteButton = form.querySelector('.wd-app-side-delete');
-    const errorText = form.querySelector('.wd-app-side-error');
-    const palette = ['#FACC15', '#3B82F6', '#10B981', '#8B5CF6', '#EF4444', '#EC4899', '#06B6D4', '#F97316'];
-    let editing = null, selectedColor = palette[0];
-    function renderColors() {
-      colors.replaceChildren();
-      for (const color of palette) {
-        const swatch = document.createElement('button');
-        swatch.type = 'button';
-        swatch.className = 'wd-app-side-swatch';
-        swatch.style.background = color;
-        swatch.setAttribute('aria-label', 'Pick color ' + color);
-        swatch.setAttribute('aria-pressed', String(selectedColor.toLowerCase() === color.toLowerCase()));
-        swatch.onclick = () => { selectedColor = color; renderColors(); };
-        colors.append(swatch);
-      }
-    }
-    function closeForm() {
-      form.hidden = true;
-      form.reset();
-      editing = null;
-      errorText.hidden = true;
-    }
-    function openForm(tag = null) {
-      editing = tag;
-      nameInput.value = tag ? tag.name : '';
-      selectedColor = tag?.color || palette[0];
-      submit.textContent = tag ? 'Save' : 'Create';
-      deleteButton.hidden = !tag;
-      errorText.hidden = true;
-      renderColors();
-      form.hidden = false;
-      form.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      nameInput.focus();
-    }
+    const all = $('.wd-app-side-all'), list = $('.wd-app-side-tags');
+    let tagUI;
     const brand = aside.querySelector('.wd-app-side-brand');
     const sync = () => {
       const visible = !home.classList.contains('hidden');
@@ -139,63 +107,20 @@
       if (!matchMedia('(min-width: 1024px)').matches) setOpen(false);
     };
     all.onclick = () => choose(null);
-    aside.querySelector('.wd-app-side-add').onclick = () => { if (form.hidden || editing) openForm(); else closeForm(); };
-    aside.querySelector('.wd-app-side-cancel').onclick = closeForm;
-    deleteButton.onclick = async () => {
-      if (!editing || !confirm(`Delete “${editing.name}” and every tagged item in ALL apps? This cannot be undone.`)) return;
-      deleteButton.disabled = true;
-      errorText.hidden = true;
-      try {
-        await request('deleteTag', { tagId: editing.id });
-        // A suite tag can contain items in other apps. Reload their cards too.
-        choose(null); location.reload();
-      } catch (error) { errorText.textContent = error.message; errorText.hidden = false; }
-      finally { deleteButton.disabled = false; }
-    };
-    nameInput.onkeydown = event => { if (event.key === 'Escape') closeForm(); };
-    form.onsubmit = async event => {
-      event.preventDefault();
-      const name = nameInput.value.trim();
-      if (!name) { nameInput.focus(); return; }
-      submit.disabled = true;
-      errorText.hidden = true;
-      try {
-        const result = editing
-          ? await request('updateTag', { tagId: editing.id, updates: { name, color: selectedColor } })
-          : await request('createTag', { name, color: selectedColor });
-        tags = result.tags || [];
-        closeForm(); drawTags(); filterCards();
-      } catch (error) { errorText.textContent = error.message; errorText.hidden = false; }
-      finally { submit.disabled = false; }
-    };
     function drawTags() {
       all.classList.toggle('active', !active);
       all.setAttribute('aria-current', String(!active));
-      list.replaceChildren();
-      for (const tag of tags) {
-        const row = document.createElement('div');
-        row.className = 'wd-app-side-tag';
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'wd-app-side-tag-name';
-        button.classList.toggle('active', active === tag.id);
-        button.setAttribute('aria-current', String(active === tag.id));
-        const dot = document.createElement('span');
-        dot.className = 'wd-app-side-dot';
-        dot.style.backgroundColor = tag.color || '#facc15';
-        button.append(dot, document.createTextNode(tag.name));
-        const count = document.createElement('span');
-        count.className = 'wd-app-side-count';
-        count.textContent = String(records.filter(record => record.tagId === tag.id).length);
-        button.append(count);
-        button.onclick = () => choose(tag.id);
-        const rename = document.createElement('button');
-        rename.type = 'button'; rename.textContent = '···'; rename.title = `Edit or delete ${tag.name}`;
-        rename.setAttribute('aria-label', `Edit or delete ${tag.name}`);
-        rename.className = 'wd-app-side-more';
-        rename.onclick = () => openForm(tag);
-        row.append(button, rename); list.append(row);
-      }
+      const options = {
+        tags, active, count: id => records.filter(record => record.tagId === id).length,
+        onSelect: choose,
+        onSave: async (id, values) => {
+          const result = await request(id ? 'updateTag' : 'createTag', id ? { tagId: id, updates: values } : values);
+          tags = result.tags || []; drawTags(); filterCards();
+        },
+        onDelete: async id => { await request('deleteTag', { tagId: id }); location.reload(); },
+      };
+      if (tagUI) tagUI.update(options);
+      else tagUI = window.WDTagUI.mount(list, options);
     }
     grid.classList.add('wd-app-items');
     const tableHead = document.createElement('div');
@@ -216,7 +141,6 @@
         view.title = view.getAttribute('aria-label');
         view.setAttribute('aria-pressed', String(listView));
       };
-      try { grid.classList.toggle('as-list', localStorage.getItem(`wd_${app}_layout`) === 'list'); } catch (_) { /* private mode */ }
       syncView();
       view.onclick = () => {
         grid.classList.toggle('as-list'); syncView();
@@ -227,50 +151,15 @@
       if (app === 'minutes') viewNav.insertBefore(view, nav.querySelector('#newBtn'));
       else viewNav.prepend(view);
     }
-    let actionStrip = null, actionTrigger = null;
-    const closeActions = () => {
-      actionStrip?.remove(); actionStrip = null;
-      actionTrigger?.setAttribute('aria-expanded', 'false'); actionTrigger = null;
+    let actionMenu = null;
+    const closeActions = () => { actionMenu?.close(); actionMenu = null; };
+    const showActions = (card, trigger, focusLast = false) => {
+      const source = card.querySelector('.wd-home-card-actions') || card.querySelector(config.actions) || card;
+      const originals = [...source.querySelectorAll('button')];
+      const items = originals.filter(button => button !== trigger && !button.matches('.wd-app-list-more, .wd-card-more'))
+        .map(button => WDActionMenu.fromButton(button));
+      actionMenu = WDActionMenu.open(trigger, items, { focusLast, onClose: () => { actionMenu = null; } });
     };
-    const showActions = (card, trigger) => {
-      if (actionTrigger === trigger) { closeActions(); return; }
-      closeActions();
-      actionTrigger = trigger;
-      trigger.setAttribute('aria-expanded', 'true');
-      const strip = document.createElement('div');
-      strip.className = 'wd-app-action-strip';
-      strip.setAttribute('role', 'group');
-      strip.setAttribute('aria-label', 'File actions');
-      const originals = (card.querySelector(config.actions) || card).querySelectorAll('button');
-      for (const original of originals) {
-        if (original === trigger || original.classList.contains('wd-app-list-more')) continue;
-        const proxy = document.createElement('button');
-        proxy.type = 'button';
-        const label = original.getAttribute('aria-label') || original.title || original.textContent.trim();
-        proxy.setAttribute('aria-label', label); proxy.title = label;
-        proxy.innerHTML = original.classList.contains('delete-meeting')
-          ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>'
-          : original.innerHTML;
-        proxy.classList.toggle('danger', /delete/i.test(label));
-        proxy.onclick = event => { event.preventDefault(); event.stopPropagation(); closeActions(); original.click(); };
-        strip.append(proxy);
-      }
-      if (!strip.childElementCount) { closeActions(); return; }
-      document.body.append(strip);
-      const rect = trigger.getBoundingClientRect(), width = strip.offsetWidth, height = strip.offsetHeight;
-      const left = rect.left - width - 6, right = rect.right + 6;
-      strip.style.left = `${left >= 8 ? left : right + width <= innerWidth - 8 ? right : Math.max(8, innerWidth - width - 8)}px`;
-      strip.style.top = `${Math.max(8, Math.min(rect.top + (rect.height - height) / 2, innerHeight - height - 8))}px`;
-      actionStrip = strip;
-    };
-    document.addEventListener('pointerdown', event => {
-      if (actionStrip && !actionStrip.contains(event.target) && !actionTrigger?.contains(event.target)) closeActions();
-    });
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && actionStrip) { const trigger = actionTrigger; closeActions(); trigger?.focus(); }
-    });
-    window.addEventListener('scroll', closeActions, true);
-    window.addEventListener('resize', closeActions);
     function decorateRow(card, assignedTag, record) {
       let badge = card.querySelector(':scope > .wd-app-row-tag');
       if (!badge) {
@@ -279,10 +168,13 @@
         const more = document.createElement('button');
         more.type = 'button'; more.className = 'wd-app-list-more';
         more.setAttribute('aria-label', 'More actions'); more.title = 'More actions';
-        more.setAttribute('aria-haspopup', 'true'); more.setAttribute('aria-expanded', 'false');
+        more.setAttribute('aria-haspopup', 'menu'); more.setAttribute('aria-expanded', 'false');
         more.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
         more.onclick = event => { event.preventDefault(); event.stopPropagation(); showActions(card, more); };
-        more.onkeydown = event => event.stopPropagation();
+        more.onkeydown = event => {
+          event.stopPropagation();
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); showActions(card, more, event.key === 'ArrowUp'); }
+        };
         card.append(badge, date, more);
       }
       badge.replaceChildren();
@@ -332,6 +224,7 @@
           existingButton.setAttribute('aria-label', label);
           existingButton.title = label;
           decorateRow(card, assignedTag, record);
+          window.WDHomeUI?.decorateCard(card, app, record, assignedTag, config.actions);
           continue;
         }
         const button = document.createElement('button');
@@ -355,6 +248,7 @@
         });
         (card.querySelector(config.actions) || card).append(button);
         decorateRow(card, assignedTag, record);
+        window.WDHomeUI?.decorateCard(card, app, record, assignedTag, config.actions);
       }
       const noResults = aside.querySelector('.wd-app-side-no-results');
       if (noResults) noResults.remove();
@@ -364,6 +258,17 @@
         list.append(empty);
       }
     }
+    function applyData(data) {
+      tags = data.tags || [];
+      records = data[config.key] || [];
+      if (active && !tags.some(tag => tag.id === active)) active = null;
+      drawTags(); filterCards();
+      loading.remove();
+      delete document.documentElement.dataset.wdHomePending;
+    }
+    document.addEventListener('wd:home-data', event => {
+      if (event.detail?.app === app) applyData(event.detail.data);
+    });
     drawTags(); filterCards(); sync();
     // Relative labels change while the home page remains open.
     setInterval(() => {
@@ -371,13 +276,44 @@
         date.textContent = formatUpdatedAt(date.getAttribute('datetime'));
       }
     }, 60_000);
-    new MutationObserver(() => { if (actionTrigger && !actionTrigger.isConnected) closeActions(); filterCards(); }).observe(grid, { childList: true });
+    let refreshTimer;
+    // Repainting/searching is not a data mutation. Never download the entire
+    // workspace just because results changed or a user returned from an editor.
+    document.addEventListener('wd:data-changed', event => {
+      if (event.detail?.app !== app || app === 'kanban') return;
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(async () => {
+        try { applyData(await request()); } catch (_) { /* Keep the last view when offline. */ }
+      }, 100);
+    });
+    new MutationObserver(() => {
+      if (actionMenu && !actionMenu.trigger.isConnected) closeActions();
+      filterCards();
+    }).observe(grid, { childList: true });
     new MutationObserver(sync).observe(home, { attributes: true, attributeFilter: ['class'] });
     const desktop = matchMedia('(min-width: 1024px)');
     desktop.addEventListener('change', () => setOpen(desktop.matches));
     window.addEventListener('resize', sync);
-    window.addEventListener('pageshow', async () => {
-      try { const fresh = await request(); tags = fresh.tags || []; records = fresh[config.key] || []; drawTags(); filterCards(); } catch (_) { /* no session */ }
+    window.addEventListener('pageshow', async event => {
+      if (!event.persisted) return;
+      try { applyData(await request()); } catch (_) { /* no session */ }
     });
+    const load = async () => {
+      loading.textContent = 'Loading…';
+      try {
+        const data = app === 'kanban' && window.WDKanbanData ? await window.WDKanbanData
+          : window.WDBoot ? await window.WDBoot.homeData(true) : await request();
+        if (!data) throw new Error('Could not load items');
+        applyData(data);
+      } catch (error) {
+        loading.textContent = 'Could not load this view. ';
+        const retry = document.createElement('button');
+        retry.type = 'button'; retry.textContent = 'Retry';
+        retry.onclick = () => location.reload();
+        loading.append(retry);
+        console.warn('App home:', error);
+      }
+    };
+    await load();
   });
 })();

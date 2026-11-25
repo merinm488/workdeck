@@ -2,7 +2,7 @@
 const blogAuth = {
     async verifySession() {
         try {
-            const response = await fetch('/api/me', { cache: 'no-store', credentials: 'same-origin' });
+            const response = await (window.WDBoot?.fetch || fetch)('/api/me', { cache: 'no-store', credentials: 'same-origin' });
             const data = await response.json();
             if (!data.member) return false;
             if (['light', 'dark', 'system'].includes(data.member.theme))
@@ -12,7 +12,7 @@ const blogAuth = {
     },
     async logout() {
         try {
-            const response = await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin',
+            const response = await (window.WDBoot?.fetch || fetch)('/auth/logout', { method: 'POST', credentials: 'same-origin',
                 headers: { Accept: 'application/json' } });
             if (!response.ok) throw new Error('Sign out failed');
             location.assign('/');

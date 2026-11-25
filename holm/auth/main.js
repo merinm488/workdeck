@@ -57,9 +57,8 @@ export default {
     if (pathname.startsWith('/api/')) {
       return Response.json({ error: 'Not found.' }, { status: 404 });
     }
-    if (pathname === '/' && env.holm.auth.getMember()) {
-      return Response.redirect(new URL('/home', request.url), 302);
-    }
+    // The landing page stays public for members too. /home is the workspace;
+    // signing in must never prevent someone from visiting the public site.
     if (pathname === '/account') {
       return Response.redirect(new URL('/home', request.url), 302);
     }

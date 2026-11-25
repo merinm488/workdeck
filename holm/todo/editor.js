@@ -511,6 +511,7 @@ async function toggleKanbanStaged(id) {
     showNotification(staged ? 'Removed from Kanban' : 'Added to Kanban');
 }
 
+let taskAutosave = null;
 function openEditModal(id) {
     const task = currentList.items.find(t => t.id === id);
     if (!task) return;
@@ -521,13 +522,36 @@ function openEditModal(id) {
     editDateInput.value = task.dueDate || '';
     editPriorityInput.value = task.priority || 'medium';
 
+    taskAutosave?.dispose();
+    const list = currentList;
+    taskAutosave = WDAutosave.create({
+        save: async () => {
+            const ok = await todoStorage.saveList(list);
+            if (ok) renderTasks();
+            return ok;
+        },
+        onState: state => WDAutosave.status(state, $('taskSaveState'))
+    });
     openModal(editTaskModal);
     editTitleInput.focus();
 }
 
-function closeEditModal() {
+async function closeEditModal() {
+    if (taskAutosave && !await taskAutosave.flush()) return;
+    taskAutosave?.dispose(); taskAutosave = null;
     closeModal(editTaskModal);
     editForm.reset();
+}
+
+function changeTaskDetails() {
+    if (!taskAutosave) return;
+    const task = currentList.items.find(item => item.id === editIdInput.value);
+    if (!task) return;
+    task.title = editTitleInput.value.trim() || 'Untitled task';
+    task.description = editDescriptionInput.value;
+    task.dueDate = editDateInput.value || null;
+    task.priority = editPriorityInput.value;
+    taskAutosave.change();
 }
 
 async function updateTodo(id, title, description, dueDate, priority) {
@@ -737,18 +761,9 @@ function wireEvents() {
         showView('list');
     });
 
-    editForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const id = editIdInput.value;
-        const title = editTitleInput.value.trim();
-        if (!title) {
-            showNotification('Please enter a task title', 'error');
-            return;
-        }
-
-        await updateTodo(id, title, editDescriptionInput.value.trim(), editDateInput.value, editPriorityInput.value);
-    });
+    editForm.addEventListener('input', changeTaskDetails);
+    editForm.addEventListener('change', changeTaskDetails);
+    editForm.addEventListener('submit', (e) => { e.preventDefault(); closeEditModal(); });
 
     // Settings dropdown
     settingsBtn.addEventListener('click', (e) => {
@@ -794,7 +809,7 @@ function wireEvents() {
     // Close modals on backdrop click / Escape
     [renameListModal, confirmModal].forEach(modal => {
         modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeModal(modal);
+            if (e.target === modal) { if (modal === editTaskModal) closeEditModal(); else closeModal(modal); }
         });
     });
 
@@ -829,6 +844,7 @@ async function init() {
 
     const userData = await todoStorage.loadUserData();
     if (!userData) {
+        listsView.classList.remove('hidden');
         loadingOverlay.classList.add('hidden');
         showNotification('Could not load your lists. Please try again.', 'error');
         return;

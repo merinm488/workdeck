@@ -6,7 +6,7 @@ class TodoStorage {
 
   async request(path, method = 'GET', data) {
     try {
-      const response = await fetch(path, {
+      const response = await (window.WDBoot?.fetch || fetch)(path, {
         method, credentials: 'same-origin', cache: 'no-store',
         ...(data !== undefined ? {
           headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),

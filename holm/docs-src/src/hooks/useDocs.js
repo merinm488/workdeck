@@ -17,6 +17,7 @@ export function useDocs(userHash) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
   /**
    * Fetch all data for the user
@@ -28,6 +29,7 @@ export function useDocs(userHash) {
     }
 
     setIsLoading(true);
+    setLoadError(null);
     try {
       
       const userData = await db.getUserData(userHash);
@@ -37,8 +39,7 @@ export function useDocs(userHash) {
       setHasLoaded(true);
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      setDocs([]);
-      setTags([]);
+      setLoadError('Could not load docs. Please try again.');
       setHasLoaded(true);
     }
 
@@ -92,23 +93,6 @@ export function useDocs(userHash) {
   }, [userHash]);
 
   /**
-   * Toggle doc pin status
-   */
-  const togglePin = useCallback(async (docId) => {
-    if (!userHash) return null;
-
-    const updatedDoc = await db.toggleDocPin(userHash, docId);
-    if (updatedDoc) {
-      setDocs(prev =>
-        prev.map(doc =>
-          doc.id === docId ? updatedDoc : doc
-        )
-      );
-    }
-    return updatedDoc;
-  }, [userHash]);
-
-  /**
    * Create a new tag
    */
   const createTag = useCallback(async (tagData) => {
@@ -145,6 +129,8 @@ export function useDocs(userHash) {
     const success = await db.deleteTag(userHash, tagId);
     if (success) {
       setTags(prev => prev.filter(tag => tag.id !== tagId));
+      // Suite tag deletion removes tagged docs too, not just the label.
+      setDocs(prev => prev.filter(doc => doc.tagId !== tagId));
       // Workdeck's suite-wide Delete Tag deletes single-tag documents (and
       // their public snapshots); keep Docs' local list in sync immediately.
       setDocs(prev => prev.filter(doc => doc.tagId !== tagId));
@@ -182,10 +168,8 @@ export function useDocs(userHash) {
     }
     // If activeTag is null (All Docs view), show all docs (already done above)
 
-    // Sort: pinned first, then by date
-    return filtered.sort((a, b) => {
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
+    // Legacy pin flags no longer affect ordering. Never sort React state in place.
+    return [...filtered].sort((a, b) => {
       return new Date(b.updatedAt) - new Date(a.updatedAt);
     });
   }, [docs, activeTag, searchQuery]);
@@ -205,13 +189,13 @@ export function useDocs(userHash) {
     searchQuery,
     isLoading,
     hasLoaded,
+    loadError,
     filteredDocs,
     setActiveTag,
     setSearchQuery,
     createDoc,
     updateDoc,
     deleteDoc,
-    togglePin,
     createTag,
     updateTag,
     deleteTag,

@@ -294,7 +294,7 @@ function closeSettingsMenus() {
 
 function wireEvents() {
     homeBtn.addEventListener('click', () => {
-        window.location.href = '/';
+        window.location.href = '/home';
     });
 
     newDrawingBtn.addEventListener('click', createNewDrawing);

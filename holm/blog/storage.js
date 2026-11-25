@@ -3,7 +3,7 @@
 const blogStorage = {
     async loadUserData() {
         try {
-            const response = await fetch('/api/blog', { credentials: 'same-origin', cache: 'no-store' });
+            const response = await (window.WDBoot?.fetch || fetch)('/api/blog', { credentials: 'same-origin', cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             return result.success ? result.data : null;
@@ -11,7 +11,7 @@ const blogStorage = {
     },
     async request(action, data = {}, path = '/api/blog') {
         try {
-            const response = await fetch(path, { method: 'PUT', credentials: 'same-origin',
+            const response = await (window.WDBoot?.fetch || fetch)(path, { method: 'PUT', credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action, data }) });
             return await response.json();

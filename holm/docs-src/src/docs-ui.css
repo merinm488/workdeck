@@ -1,0 +1,27 @@
+/* Docs keeps its blue identity in both themes, including React's nested dark
+   scopes and dialogs portaled to body. The legacy dark palette used white. */
+html[data-wd-app="docs"], html[data-wd-app="docs"] .dark {
+  --accent: 66 133 244;
+  --accent-hover: 51 103 214;
+}
+/* Legacy logo/Share icons also had explicit white dark-mode utilities. */
+html[data-wd-app="docs"] :is(.bg-blue-400\/10, .dark\:bg-white\/10.bg-blue-400\/10) { background-color: rgb(var(--accent) / .1); }
+html[data-wd-app="docs"] .text-blue-500.dark\:text-white { color: rgb(var(--accent)); }
+
+html[data-wd-app="docs"] .wd-doc-tags {
+  position: fixed; inset: 0; margin: auto; padding: 24px;
+  width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto;
+  background: var(--wd-ui-bg-elevated); color: var(--wd-ui-text);
+  border: 1px solid var(--wd-ui-border); border-radius: var(--wd-ui-radius);
+  box-shadow: var(--wd-ui-shadow);
+}
+.wd-doc-tags::backdrop { background: rgb(0 0 0 / .55); }
+.wd-doc-tags form { display: flex; flex-direction: column; gap: 12px; }
+.wd-doc-tags h2 { font-size: 18px; font-weight: 600; }
+.wd-doc-tags p { font-size: 14px; color: var(--wd-ui-text-secondary); overflow-wrap: anywhere; }
+.wd-doc-tags label { font-size: 14px; font-weight: 500; }
+.wd-doc-tags :is(select, input) { width: 100%; min-height: 40px; padding: 8px; background: var(--wd-ui-bg-input); color: var(--wd-ui-text); border: 1px solid var(--wd-ui-border); border-radius: 6px; }
+.wd-doc-tags input[type="color"] { width: 56px; padding: 4px; }
+.wd-doc-tags-create { display: grid; gap: 8px; }
+.wd-doc-tags .wd-doc-tags-error { color: var(--wd-ui-danger); }
+.wd-doc-tags-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }

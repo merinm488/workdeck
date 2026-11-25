@@ -8,7 +8,7 @@ class SlidesStorage {
   }
   async request(method = 'GET', action, data, query = '') {
     try {
-      const response = await fetch('/api/slides' + query, {
+      const response = await (window.WDBoot?.fetch || fetch)('/api/slides' + query, {
         method, credentials: 'same-origin', cache: 'no-store',
         ...(action ? { headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action, data }) } : {}),
@@ -35,7 +35,11 @@ class SlidesStorage {
     return next;
   }
   async loadUserData() { return (await this.request())?.data || null; }
-  async getDeck(deckId) { return (await this.loadUserData())?.slides?.find(deck => deck.id === deckId) || null; }
+  async getDeck(deckId) {
+    const data = await this.loadUserData();
+    this.lastUserData = data;
+    return data?.slides?.find(deck => deck.id === deckId) || null;
+  }
   saveDeck(deckId, deckData) {
     return this.queue(deckId, async () => {
       const version = this.versions.get(deckId);
@@ -64,7 +68,7 @@ class SlidesStorage {
   }
   async getSharedDeck(shareId) {
     try {
-      const response = await fetch('/api/slides?shared=' + encodeURIComponent(shareId), { cache: 'no-store' });
+      const response = await (window.WDBoot?.fetch || fetch)('/api/slides?shared=' + encodeURIComponent(shareId), { cache: 'no-store' });
       if (!response.ok) return null;
       const result = await response.json();
       return result.success ? { deck: result.deck, sharedAt: result.sharedAt } : null;

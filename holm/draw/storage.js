@@ -8,7 +8,7 @@ class DrawStorage {
   }
   async request(method = 'GET', action, data, query = '') {
     try {
-      const response = await fetch('/api/draw' + query, {
+      const response = await (window.WDBoot?.fetch || fetch)('/api/draw' + query, {
         method, credentials: 'same-origin', cache: 'no-store',
         ...(action ? { headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action, data }) } : {}),
@@ -35,7 +35,11 @@ class DrawStorage {
     return next;
   }
   async loadUserData() { return (await this.request())?.data || null; }
-  async getDrawing(id) { return (await this.loadUserData())?.draws?.find(drawing => drawing.id === id) || null; }
+  async getDrawing(id) {
+    const data = await this.loadUserData();
+    this.lastUserData = data;
+    return data?.draws?.find(drawing => drawing.id === id) || null;
+  }
   saveDrawing(drawingId, drawingData) {
     return this.queue(drawingId, async () => {
       const version = this.versions.get(drawingId);
@@ -64,7 +68,7 @@ class DrawStorage {
   }
   async getSharedDrawing(shareId) {
     try {
-      const response = await fetch('/api/draw?shared=' + encodeURIComponent(shareId), { cache: 'no-store' });
+      const response = await (window.WDBoot?.fetch || fetch)('/api/draw?shared=' + encodeURIComponent(shareId), { cache: 'no-store' });
       if (!response.ok) return null;
       const result = await response.json();
       return result.success ? { drawing: result.drawing, sharedAt: result.sharedAt } : null;

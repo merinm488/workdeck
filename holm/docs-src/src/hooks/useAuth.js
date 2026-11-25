@@ -9,9 +9,10 @@ export function useAuth() {
   const [error, setError] = useState(null);
   const checkSession = useCallback(async () => {
     try {
-      const response = await fetch('/api/me', { credentials: 'same-origin', cache: 'no-store' });
+      const response = await (window.WDBoot?.fetch || fetch)('/api/me', { credentials: 'same-origin', cache: 'no-store' });
       if (!response.ok) throw new Error('Could not check your session.');
       const session = await response.json();
+      window.dispatchEvent(new CustomEvent('wd:session', { detail: session }));
       setUserHash(session.member ? 'holm-session' : null);
       setIsAuthenticated(!!session.member);
       setError(null);
@@ -25,7 +26,7 @@ export function useAuth() {
   const login = useCallback(() => { location.assign('/auth/login?redirect=%2Fdocs%2F'); }, []);
   const logout = useCallback(async () => {
     try {
-      const response = await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin',
+      const response = await (window.WDBoot?.fetch || fetch)('/auth/logout', { method: 'POST', credentials: 'same-origin',
         headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('Could not sign out');
       setUserHash(null); setIsAuthenticated(false);

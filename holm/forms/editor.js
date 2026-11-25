@@ -780,48 +780,32 @@ class FormsEditorApp {
      * @param {object} [options] - { explicit: true } default; autosave passes false
      * @returns {Promise<boolean>}
      */
-    async save(options = {}) {
-        const { explicit = true } = options;
-
-        // Rename reminder: only on user-initiated saves, only while the
-        // name is still the default, and only until dismissed once.
-        if (explicit && !this.renamePromptDismissed && this.isUntitledForm()) {
-            this.openRenamePrompt();
-            return false; // Actual save happens after Rename/Later is chosen
-        }
-
-        const formData = this.getBuilderSchema();
-        if(!formData) {
-            this.showError('Nothing to save');
-            return false;
-        }
-        const ok = await formsStorage.saveForm(this.formId,formData);
-        if(!ok){
-            this.showError('Failed to save form');
-            return false;
-        }
-        else {
-            this.hasUnsavedChanges = false;
-            this.showNotification('Form Saved', 'success');
-            return true;
-        }
+    async save() {
+        this.setupAutoSave();
+        return this.autosave.flush();
     }
 
     /**
    
      */
     setupAutoSave() {
-        clearInterval(this.autoSaveInterval);
-       this.autoSaveInterval = setInterval(() => {
-        if(this.hasUnsavedChanges) {
-            this.save({explicit:false});
-        }
-       }, APP_CONFIG.autoSave.interval);
+        if (this.autosave) return;
+        this.autosave = WDAutosave.create({
+            save: async () => {
+                const data = this.getBuilderSchema();
+                return data ? formsStorage.saveForm(this.formId, data) : false;
+            },
+            onState: (state, dirty) => {
+                this.hasUnsavedChanges = dirty;
+                WDAutosave.status(state);
+            }
+        });
     }
 
     /** Mark dirty (called from the builder 'change' hook). */
     markAsChanged() {
-        this.hasUnsavedChanges = true;
+        this.setupAutoSave();
+        this.autosave.change();
     }
 
     // ================================================
@@ -992,7 +976,8 @@ class FormsEditorApp {
             if (newName !== currentTitle) {
                 this.formRecord.name = newName;
                 this.updateFormTitle(newName);
-                await formsStorage.saveForm(this.formId, this.getBuilderSchema());
+                this.markAsChanged();
+                await this.save();
             }
             this.restoreTitleDisplay(newName);
         };
@@ -1042,8 +1027,8 @@ class FormsEditorApp {
         // --- Top nav ---
         const homeBtn = document.getElementById('homeBtn');
         if (homeBtn) {
-            homeBtn.addEventListener('click', () => {
-                window.location.href = '/forms/';
+            homeBtn.addEventListener('click', async () => {
+                if (await this.save()) window.location.href = '/forms/';
             });
         }
 
@@ -1261,7 +1246,7 @@ class FormsEditorApp {
 
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => formsAuth.logout());
+            logoutBtn.addEventListener('click', async () => { if (await this.save()) await formsAuth.logout(); });
         }
 
         // --- Title rename ---
@@ -1555,6 +1540,7 @@ class FormsEditorApp {
 
   
     async showShareModal() {
+        if (!await this.save()) return;
         if (!this.formId) {
             this.showError('No form to share');
             return;
@@ -1753,8 +1739,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Free the builder DOM when leaving the page.
-window.addEventListener('beforeunload', () => {
+// Do not destroy the editor when a pending-save unload warning is cancelled.
+window.addEventListener('pagehide', (event) => {
+    if (event.persisted) return;
     if (window.formsEditorApp) {
         window.formsEditorApp.destroy();
     }

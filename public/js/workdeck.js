@@ -867,9 +867,14 @@ function renderFooter() {
 }
 
 function renderViewToggle() {
-    document.querySelectorAll('.wd-view-btn').forEach(function (btn) {
-        btn.classList.toggle('active', btn.dataset.view === state.viewMode);
-    });
+    const btn = $('viewToggle');
+    const asList = state.viewMode === 'list';
+    btn.querySelector('.wd-layout-icon-list').classList.toggle('hidden', asList);
+    btn.querySelector('.wd-layout-icon-cards').classList.toggle('hidden', !asList);
+    const label = asList ? 'Switch to card view' : 'Switch to list view';
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    btn.setAttribute('aria-pressed', String(asList));
 }
 
 /**
@@ -1024,6 +1029,9 @@ function renderFiles() {
     }
 
     emptyState.classList.add('hidden');
+    // Both sides must be set on every render (search, tags and view changes).
+    gridView.classList.toggle('hidden', state.viewMode === 'list');
+    listView.classList.toggle('hidden', state.viewMode !== 'list');
 
     if (state.viewMode === 'list') {
         listView.classList.remove('hidden');
@@ -2352,13 +2360,11 @@ function setupEventListeners() {
     }
 
     // ----- View toggle -----
-    document.querySelectorAll('.wd-view-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            state.viewMode = btn.dataset.view;
-            localStorage.setItem(WD_APP.viewKey, state.viewMode);
-            saveSettings({ viewMode: state.viewMode });
-            render();
-        });
+    $('viewToggle').addEventListener('click', function () {
+        state.viewMode = state.viewMode === 'list' ? 'grid' : 'list';
+        localStorage.setItem(WD_APP.viewKey, state.viewMode);
+        saveSettings({ viewMode: state.viewMode });
+        render();
     });
 
     // ----- Settings dropdown -----

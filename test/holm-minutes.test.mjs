@@ -132,9 +132,17 @@ test('Holm package preserves Minutes UI but removes legacy hash auth and uses re
     const original = readFileSync(new URL('../minutes/index.html', import.meta.url), 'utf8');
     const html = readFileSync(join(dir, 'web/minutes/index.html'), 'utf8');
     assert.match(html, /<link rel="stylesheet" href="\/app-sidebar\.css">/);
-    assert.match(html, /<script src="\/js\/app-sidebar\.js" data-app="minutes"><\/script>/);
-    assert.equal(html.replace('<link rel="stylesheet" href="/app-sidebar.css">', '')
-      .replace('<script src="/js/app-sidebar.js" data-app="minutes"></script>', ''), original);
+    assert.match(html, /<script defer src="\/js\/app-sidebar\.js" data-app="minutes"><\/script>/);
+    // Holm adds suite styling and PWA metadata, but retains the meeting UI.
+    const body = page => page.slice(page.indexOf('<body>'))
+      .replaceAll('<script defer ', '<script ')
+      .replace('id="home" class="home hidden"', 'id="home" class="home"')
+      .replace('<script src="/js/app-sidebar.js" data-app="minutes"></script>', '')
+      .replace('<script src="/minutes/pwa.js" defer></script>', '')
+      .replace(/<script src="\/js\/(?:previews|tag-ui|home-ui|home-icons|action-menu)\.js"><\/script>/g, '');
+    assert.equal(body(html), body(original).replace('href="/" class="home-link"', 'href="/home" class="home-link"').replace('>Save status<', '>Apply status<'));
+    assert.match(html, /data-wd-app="minutes"/);
+    assert.match(html, /href="\/suite-theme\.css"/);
     assert.equal(readFileSync(join(dir, 'web/minutes/styles.css'), 'utf8'),
       readFileSync(new URL('../minutes/styles.css', import.meta.url), 'utf8'));
     const script = readFileSync(join(dir, 'web/minutes/app.js'), 'utf8');

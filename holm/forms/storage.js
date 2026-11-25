@@ -11,7 +11,7 @@ class FormsStorage {
   }
   async owner(action, data) {
     try {
-      const response = await fetch('/api/forms', { method: 'PUT', credentials: 'same-origin',
+      const response = await (window.WDBoot?.fetch || fetch)('/api/forms', { method: 'PUT', credentials: 'same-origin',
         cache: 'no-store', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, data }),
       });
@@ -38,7 +38,7 @@ class FormsStorage {
   }
   async loadUserData() {
     try {
-      const response = await fetch('/api/forms', { credentials: 'same-origin', cache: 'no-store' });
+      const response = await (window.WDBoot?.fetch || fetch)('/api/forms', { credentials: 'same-origin', cache: 'no-store' });
       if (response.status === 401) {
         location.assign('/auth/login?redirect=' + encodeURIComponent(location.pathname + location.search));
         return null;
@@ -100,7 +100,7 @@ class FormsStorage {
   unlinkSheet(formId) { return this.queue(formId, async () => !!(await this.owner('unlinkSheet', { formId }))); }
   async getSharedForm(shareId) {
     try {
-      const response = await fetch('/api/forms?shared=' + encodeURIComponent(shareId), { cache: 'no-store' });
+      const response = await (window.WDBoot?.fetch || fetch)('/api/forms?shared=' + encodeURIComponent(shareId), { cache: 'no-store' });
       if (!response.ok) return null;
       const result = await response.json();
       return result.success ? { form: result.form } : null;
@@ -108,7 +108,7 @@ class FormsStorage {
   }
   async submitResponse(shareId, responseData) {
     try {
-      const response = await fetch('/api/forms', { method: 'POST', cache: 'no-store',
+      const response = await (window.WDBoot?.fetch || fetch)('/api/forms', { method: 'POST', cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'submitResponse', shareId, data: { response: responseData } }),
       });

@@ -1,7 +1,5 @@
 /* Suite-wide Holm tag sidebar for app home pages. */
-body.wd-app-side-available { --wd-side-bg:#fff; --wd-side-fg:#1f2937; --wd-side-muted:#6b7280; --wd-side-line:#e5e7eb; --wd-side-hover:#f3f4f6; }
-body.wd-app-side-available.dark, body.wd-app-side-available[data-theme="dark"],
-[data-theme="dark"] body.wd-app-side-available { --wd-side-bg:#1f2937; --wd-side-fg:#f3f4f6; --wd-side-muted:#9ca3af; --wd-side-line:#374151; --wd-side-hover:#374151; }
+body.wd-app-side-available { --wd-side-bg:var(--wd-ui-bg); --wd-side-fg:var(--wd-ui-text); --wd-side-muted:var(--wd-ui-text-secondary); --wd-side-line:var(--wd-ui-border); --wd-side-hover:var(--wd-ui-bg-input); }
 .wd-app-side-toggle { order:-1; flex:none; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:0; border-radius:8px; background:transparent; color:inherit; cursor:pointer; }
 .wd-app-side-toggle:hover { background:var(--wd-side-hover,#eee); }
 .wd-app-side-toggle[aria-expanded="true"] .wd-app-side-expand, .wd-app-side-toggle[aria-expanded="false"] .wd-app-side-collapse { display:none; }
@@ -12,9 +10,9 @@ body.wd-app-side-open .wd-app-sidebar { transform:translateX(0); }
 .wd-app-side-brand .wd-app-side-toggle { order:0; }
 .wd-app-sidebar nav { padding:16px; }
 .wd-app-sidebar button { font-family:inherit; cursor:pointer; color:inherit; }
-.wd-app-side-all,.wd-app-side-tag-name { display:flex; align-items:center; gap:10px; width:100%; padding:9px 10px; border:0; border-radius:8px; text-align:left; background:transparent; font-size:14px; }
-.wd-app-side-all:hover,.wd-app-side-tag-name:hover,.wd-app-side-more:hover,.wd-app-side-all.active,.wd-app-side-tag-name.active { background:var(--wd-side-hover); }
-.wd-app-side-all.active,.wd-app-side-tag-name.active { font-weight:700; }
+.wd-app-side-tag-name { display:flex; align-items:center; gap:10px; width:100%; padding:9px 10px; border:0; border-radius:8px; text-align:left; background:transparent; font-size:14px; }
+.wd-app-side-tag-name:hover,.wd-app-side-more:hover,.wd-app-side-tag-name.active { background:var(--wd-side-hover); }
+.wd-app-side-tag-name.active { font-weight:700; }
 .wd-app-side-heading { display:flex; align-items:center; justify-content:space-between; color:var(--wd-side-muted); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; margin:24px 2px 8px 10px; }
 .wd-app-side-add,.wd-app-side-more { border:0; border-radius:6px; padding:3px 6px; background:transparent; font-size:17px; }
 .wd-app-side-add { display:grid; place-items:center; width:30px; height:30px; padding:0; }
@@ -26,7 +24,7 @@ body.wd-app-side-open .wd-app-sidebar { transform:translateX(0); }
 .wd-app-side-form { display:flex; flex-direction:column; gap:10px; margin:6px 0 10px; padding:10px; border:1px solid var(--wd-side-line); border-radius:8px; background:var(--wd-side-hover); }
 .wd-app-side-form[hidden] { display:none; }
 .wd-app-side-form input[type=text] { box-sizing:border-box; width:100%; min-width:0; padding:8px 10px; border:1px solid var(--wd-side-line); border-radius:7px; background:var(--wd-side-bg); color:var(--wd-side-fg); font:13px/1.4 system-ui,sans-serif; }
-.wd-app-side-form input[type=text]:focus-visible { outline:2px solid #3b82f6; outline-offset:1px; }
+.wd-app-side-form input[type=text]:focus-visible { outline:2px solid var(--wd-control-focus); outline-offset:2px; }
 .wd-app-side-colors { display:flex; flex-wrap:wrap; gap:7px; }
 .wd-app-sidebar .wd-app-side-swatch { flex:none; width:22px; height:22px; padding:0; border:0; border-radius:50%; transition:transform .15s ease,box-shadow .15s ease; }
 .wd-app-side-swatch:hover { transform:scale(1.15); }
@@ -34,8 +32,8 @@ body.wd-app-side-open .wd-app-sidebar { transform:translateX(0); }
 .wd-app-side-swatch:focus-visible { outline:2px solid var(--wd-side-fg); outline-offset:3px; }
 .wd-app-side-form-actions { display:flex; gap:8px; }
 .wd-app-sidebar .wd-app-side-form-actions button { flex:1; padding:7px 10px; border:1px solid var(--wd-side-line); border-radius:7px; font-size:12.5px; }
-.wd-app-sidebar .wd-app-side-submit { background:#3b82f6; border-color:#3b82f6; color:#fff; font-weight:600; }
-.wd-app-sidebar .wd-app-side-submit:hover { background:#2563eb; }
+.wd-app-sidebar .wd-app-side-submit { background:var(--wd-control-accent); border-color:var(--wd-control-accent); color:var(--wd-control-on-accent); font-weight:600; }
+.wd-app-sidebar .wd-app-side-submit:hover { filter:brightness(1.08); }
 .wd-app-sidebar .wd-app-side-cancel { background:var(--wd-side-bg); color:var(--wd-side-fg); }
 .wd-app-sidebar .wd-app-side-cancel:hover { background:var(--wd-side-line); }
 .wd-app-sidebar .wd-app-side-delete { align-self:flex-start; border:0; background:transparent; color:#dc2626; font-size:12px; padding:2px 0; }
@@ -76,11 +74,6 @@ body.wd-app-side-available .blog-posts:not(.as-list) .blog-post-row-main { paddi
 body.wd-app-side-available .blog-post-row:focus-visible { outline:2px solid var(--accent-color); outline-offset:2px; }
 body.wd-app-side-available .blog-posts.as-list .blog-post-row-actions { display:none!important; }
 
-/* Match Forms' 760px list table instead of stretching Kanban's 1160px grid.
-   Leave the Kanban card grid at its original width. */
-body.wd-app-side-available #boardsView .wd-app-table-head:has(+ #boardsGrid.as-list),
-body.wd-app-side-available #boardsView #boardsGrid.as-list,
-body.wd-app-side-available #boardsView:has(#boardsGrid.as-list) .lists-toolbar { max-width:760px; }
 /* The search field is already visible on desktop; on narrow screens the
    search button still reveals it in the header's second row. */
 #boardsSearchToggle { display:none; }

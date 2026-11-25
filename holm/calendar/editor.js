@@ -18,7 +18,8 @@
 
 let userData = null;          // whole unified doc (calendars, events, todo, ...)
 let calendar = null;          // FullCalendar instance
-let editing = null;           // { recordId, occKey } while the editor is open
+let editing = null;           // { recordId, occKey, scope } while the editor is open
+let eventAutosave = null;
 let pendingLinks = [];        // [{ app, id, name }] in the open editor
 let pendingScope = null;      // { kind: 'save'|'delete', recordId, occKey, record }
 let linkPickerTarget = null;  // null | function(link)
@@ -48,8 +49,13 @@ function openModal(el) {
     el.classList.add('active');
 }
 
-function closeModal(el) {
+async function closeModal(el) {
+    if (el === $('eventModal') && eventAutosave) {
+        if (!await eventAutosave.flush()) return false;
+        eventAutosave.dispose(); eventAutosave = null;
+    }
     el.classList.remove('active');
+    return true;
 }
 
 function anyModalOpen() {
@@ -611,10 +617,31 @@ function openEditorForRecord(recordId, occKey) {
     if (!record) return;
     editing = { recordId, occKey: occKey || null };
     populateEditor({ record, occKey: occKey || null });
+    if (record.rrule && occKey) {
+        pendingScope = { kind: 'edit', recordId, occKey };
+        openScopeModal('edit');
+    }
 }
 
 function populateEditor({ record, occKey }) {
     const isNew = !editing;
+    eventAutosave?.dispose(); eventAutosave = null;
+    $('evSaveBtn').textContent = 'Create event';
+    $('evSaveBtn').classList.toggle('hidden', !isNew);
+    $('evCancelBtn').textContent = isNew ? 'Cancel' : 'Done';
+    let status = $('eventSaveState');
+    if (!status) {
+        status = document.createElement('span'); status.id = 'eventSaveState';
+        status.className = 'wd-save-status';
+        // Keep status outside the button row: blur can start a save between
+        // pointerdown and pointerup, and must not move Done under the pointer.
+        $('evSaveBtn').closest('.modal-actions').before(status);
+    }
+    status.hidden = isNew;
+    if (!isNew) eventAutosave = WDAutosave.create({
+        save: () => saveEditor({ automatic: true }),
+        onState: state => WDAutosave.status(state, status)
+    });
     $('evModalTitle').textContent = isNew ? 'New Event'
         : (record.rrule && occKey ? 'Edit Repeating Event' : 'Edit Event');
     $('evDeleteBtn').classList.toggle('hidden', isNew);
@@ -754,9 +781,9 @@ function collectEditor() {
     return record;
 }
 
-async function saveEditor() {
+async function saveEditor({ automatic = false } = {}) {
     const record = collectEditor();
-    if (!record) return;
+    if (!record) return false;
 
     if (!editing) {
         const result = await calendarStorage.createEvent({
@@ -778,9 +805,10 @@ async function saveEditor() {
     // Recurring + editing a single occurrence -> ask about scope.
     const target = findRecord(editing.recordId);
     if (target && target.rrule && editing.occKey) {
-        pendingScope = { kind: 'save', recordId: editing.recordId, occKey: editing.occKey, record };
+        pendingScope = { kind: 'save', recordId: editing.recordId, occKey: editing.occKey, record, automatic };
+        if (editing.scope) return applyScope(editing.scope);
         openScopeModal('save');
-        return;
+        return false;
     }
 
     const updated = { ...target, ...record, id: target.id,
@@ -790,15 +818,14 @@ async function saveEditor() {
         updatedAt: new Date().toISOString() };
     const result = await calendarStorage.updateEvent(target.id, updated);
     if (!result) {
-        showNotification('Could not save the event.', 'error');
-        return;
+        return false;
     }
     setUserData(result);
     refreshAll();
-    closeModal($('eventModal'));
+    if (!automatic) closeModal($('eventModal'));
     hidePopover();
-    showNotification('Event saved', 'success');
     maybeAskNotificationPermission(record);
+    return true;
 }
 
 // ================================================
@@ -806,8 +833,8 @@ async function saveEditor() {
 // ================================================
 
 function openScopeModal(kind) {
-    $('scopeTitle').textContent = kind === 'save' ? 'Apply changes' : 'Delete recurring event';
-    $('scopeMessage').textContent = kind === 'save'
+    $('scopeTitle').textContent = kind === 'delete' ? 'Delete recurring event' : 'Edit repeating event';
+    $('scopeMessage').textContent = kind !== 'delete'
         ? 'This event repeats. Which occurrences should change?'
         : 'This event repeats. Which occurrences should be deleted?';
     openModal($('scopeModal'));
@@ -817,8 +844,12 @@ async function applyScope(choice) {
     const scope = pendingScope;
     pendingScope = null;
     closeModal($('scopeModal'));
-    if (!scope) return;
-
+    if (!scope) return false;
+    if (scope.kind === 'edit') {
+        editing.scope = choice;
+        return true;
+    }
+    let editedRecordId = scope.recordId;
     const master = findRecord(scope.recordId);
     if (!master) return;
 
@@ -842,6 +873,7 @@ async function applyScope(choice) {
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
+                editedRecordId = exception.id;
                 const result = await calendarStorage.createEvent(exception);
                 if (!result) throw new Error('save failed');
                 setUserData(result);
@@ -859,6 +891,7 @@ async function applyScope(choice) {
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
+                editedRecordId = next.id;
                 const result2 = await calendarStorage.createEvent(next);
                 if (!result2) throw new Error('save failed');
                 setUserData(result2);
@@ -872,7 +905,8 @@ async function applyScope(choice) {
                 if (!result) throw new Error('save failed');
                 setUserData(result);
             }
-            showNotification('Series updated', 'success');
+            if (scope.automatic) editing = { recordId: editedRecordId, occKey: null };
+            else showNotification('Series updated', 'success');
         } else {
             if (choice === 'this') {
                 const updated = {
@@ -911,12 +945,14 @@ async function applyScope(choice) {
             showNotification('Deleted', 'success');
         }
         refreshAll();
-        closeModal($('eventModal'));
+        if (!scope.automatic) closeModal($('eventModal'));
         hidePopover();
+        return true;
     } catch (err) {
         console.error('[SCOPE] Failed:', err);
         showNotification('The change could not be saved. Please try again.', 'error');
         refreshAll();
+        return false;
     }
 }
 
@@ -934,7 +970,7 @@ function renderBuilderDays() {
         btn.dataset.day = name;
         btn.textContent = name.charAt(0);
         btn.title = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][index];
-        btn.addEventListener('click', () => btn.classList.toggle('selected'));
+        btn.addEventListener('click', () => { btn.classList.toggle('selected'); eventAutosave?.change(); });
         wrap.appendChild(btn);
     });
 }
@@ -1366,6 +1402,7 @@ function linkChip(link, removable) {
         remove.addEventListener('click', () => {
             pendingLinks = pendingLinks.filter(l => !(l.id === link.id && l.app === link.app));
             renderLinkChips();
+            eventAutosave?.change();
         });
     }
     return chip;
@@ -1436,6 +1473,7 @@ function renderLinkPickerResults(query) {
             if (!pendingLinks.some(l => l.id === file.id && l.app === file.app)) {
                 pendingLinks.push(file);
                 renderLinkChips();
+                eventAutosave?.change();
             }
             closeModal($('linkPickerModal'));
         });
@@ -1843,7 +1881,7 @@ function handleShortcut(e) {
 // ================================================
 
 function bindUi() {
-    $('homeBtn').addEventListener('click', () => { window.location.href = '/'; });
+    $('homeBtn').addEventListener('click', () => { window.location.href = '/home'; });
 
     // Settings dropdown
     $('settingsBtn').addEventListener('click', (e) => {
@@ -1907,9 +1945,12 @@ function bindUi() {
     // Event editor
     $('evModalClose').addEventListener('click', () => closeModal($('eventModal')));
     $('evCancelBtn').addEventListener('click', () => closeModal($('eventModal')));
-    $('evForm').addEventListener('submit', (e) => {
+    $('evForm').addEventListener('input', () => eventAutosave?.change());
+    $('evForm').addEventListener('change', () => eventAutosave?.change());
+    $('evForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        saveEditor();
+        if (eventAutosave) await closeModal($('eventModal'));
+        else saveEditor();
     });
     $('evAllDay').addEventListener('change', syncAllDayFields);
     $('evRepeat').addEventListener('change', () => {
@@ -1924,18 +1965,19 @@ function bindUi() {
     });
     $('rbFreq').addEventListener('change', syncBuilderFreq);
     $('evLinkFileBtn').addEventListener('click', openLinkPicker);
-    $('evDeleteBtn').addEventListener('click', () => {
-        if (!editing) return;
-        closeModal($('eventModal'));
+    $('evDeleteBtn').addEventListener('click', async () => {
+        if (!editing || !await closeModal($('eventModal'))) return;
         requestDelete(editing.recordId, editing.occKey);
     });
 
     // Scope modal
     $('scopeModalClose').addEventListener('click', () => {
+        if (pendingScope?.kind === 'edit') closeModal($('eventModal'));
         pendingScope = null;
         closeModal($('scopeModal'));
     });
     $('scopeCancel').addEventListener('click', () => {
+        if (pendingScope?.kind === 'edit') closeModal($('eventModal'));
         pendingScope = null;
         closeModal($('scopeModal'));
     });

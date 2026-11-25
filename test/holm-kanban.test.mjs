@@ -123,7 +123,7 @@ test('Holm hard links for Todo and Kanban survive the static router on reload', 
 
 test('Holm Kanban home renders no Create board tile; the header New Board button remains', () => {
   const source = readFileSync(new URL('../holm/kanban/app.js', import.meta.url), 'utf8');
-  const render = source.slice(source.indexOf('function renderBoards()'), source.indexOf('function openBoard('));
+  const render = source.slice(source.indexOf('function renderBoards()'), source.indexOf('async function openBoard('));
   const grid = { children: [], innerHTML: '', appendChild(card) { this.children.push(card); } };
   const elements = {
     boardsGrid: grid, boardsNoResults: { classList: { toggle() {} } },
@@ -150,7 +150,10 @@ test('Holm Kanban keeps the original board UI but never ships access-key login',
     const html = readFileSync(join(dir, 'web/kanban/index.html'), 'utf8');
     const css = readFileSync(join(dir, 'web/kanban/styles.css'), 'utf8');
     const sidebarCSS = readFileSync(join(dir, 'web/app-sidebar.css'), 'utf8');
-    assert.match(sidebarCSS, /#boardsView #boardsGrid\.as-list,[\s\S]*?max-width:760px/);
+    assert.doesNotMatch(sidebarCSS, /max-width:760px/);
+    const homeCSS = readFileSync(join(dir, 'web/home-ui.css'), 'utf8');
+    assert.match(homeCSS, /--wd-home-list-width:1024px/);
+    assert.match(homeCSS, /\.wd-app-items\.as-list,[^}]*max-width:var\(--wd-home-list-width\)/);
     assert.match(sidebarCSS, /#boardsSearchToggle \{ display:none; \}/);
     assert.match(sidebarCSS, /@media\(max-width:700px\) \{ #boardsSearchToggle:not\(\.hidden\) \{ display:inline-flex; \} \}/);
     assert.match(html, /id="listsSearchInput"/);

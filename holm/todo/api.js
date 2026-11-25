@@ -43,7 +43,7 @@ function tasksOf(items) {
 }
 function exposed(record) {
   return { id: record.id, name: record.name, items: record.items || [],
-    version: record.version, updatedAt: record.updatedAt };
+    version: record.version, tagId: record.tagId || null, updatedAt: record.updatedAt };
 }
 
 export async function handleTodo(request, env) {
@@ -57,6 +57,7 @@ export async function handleTodo(request, env) {
   if (pathname === '/api/todo/lists' && request.method === 'GET') {
     const shared = env.holm.app.member.kv.get('workdeck_settings') || {};
     return json({ lists: ds.find(COLLECTION, {}, { limit: MAX_LISTS, order: 'desc' }).map(exposed),
+      tags: ds.find('workspace_tags', {}, { limit: 200, order: 'desc' }),
       settings: { ...(env.holm.app.member.kv.get('todo_settings') || {}), ...(shared.theme ? { theme: shared.theme } : {}) } });
   }
   if (!['POST', 'PUT', 'DELETE'].includes(request.method)) return json({ error: 'Not found.' }, 404);

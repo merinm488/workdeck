@@ -15,7 +15,7 @@ class CalendarStorage {
 
   async loadUserData() {
     try {
-      const response = await fetch('/api/calendar', { credentials: 'same-origin', cache: 'no-store' });
+      const response = await (window.WDBoot?.fetch || fetch)('/api/calendar', { credentials: 'same-origin', cache: 'no-store' });
       if (response.status === 401) { location.assign('/auth/login?redirect=%2Fcalendar%2F'); return null; }
       const result = await response.json();
       return response.ok && result.success ? this.remember(result.data) : null;
@@ -27,7 +27,7 @@ class CalendarStorage {
       const payload = { ...data };
       if (['updateCalendar', 'deleteCalendar'].includes(action)) payload.version = this.calendarVersions.get(data.calId);
       if (['updateEvent', 'deleteEvent'].includes(action)) payload.version = this.eventVersions.get(data.eventId);
-      const response = await fetch('/api/calendar', { method: 'PUT', credentials: 'same-origin',
+      const response = await (window.WDBoot?.fetch || fetch)('/api/calendar', { method: 'PUT', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, data: payload }) });
       if (response.status === 401) { location.assign('/auth/login?redirect=%2Fcalendar%2F'); return null; }
       const result = await response.json().catch(() => ({}));

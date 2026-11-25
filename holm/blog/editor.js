@@ -100,13 +100,26 @@ const BlogEditor = {
     // ================================================
 
     open(post) {
+        this.autosave?.dispose();
         this.post = post;
+        this.autosave = WDAutosave.create({
+            save: async () => {
+                const editing = this.post;
+                const result = await blogStorage.savePost({ id: editing.id, title: editing.title, html: editing.html });
+                if (!result.success) return false;
+                const savedPost = result.data?.posts?.find(p => p.id === editing.id);
+                if (savedPost?.slug) editing.slug = savedPost.slug;
+                editing.updatedAt = new Date().toISOString();
+                return true;
+            },
+            onState: state => WDAutosave.status(state, $('saveIndicator'))
+        });
         clearTimeout(this.saveTimer);
         this.saving = false;
         this.pendingSave = false;
 
         $('postTitleInput').value = post.title || '';
-        this.setIndicator('saved');
+        WDAutosave.status('saved', $('saveIndicator'));
 
         this.suppressChange = true;
         this.quill.clipboard.dangerouslyPasteHTML(post.html || '<p><br></p>');
@@ -115,13 +128,8 @@ const BlogEditor = {
         refreshPublishMenu();
     },
 
-    close() {
-        if (this.saveTimer) {
-            clearTimeout(this.saveTimer);
-            this.saveTimer = null;
-            this.save();
-        }
-        window.BlogApp.showPostsView();
+    async close() {
+        if (await this.save()) window.BlogApp.showPostsView();
     },
 
     // ================================================
@@ -272,48 +280,11 @@ const BlogEditor = {
     },
 
     scheduleSave() {
-        this.setIndicator('saving');
-        clearTimeout(this.saveTimer);
-        this.saveTimer = setTimeout(() => this.save(), 800);
+        this.autosave?.change();
     },
 
     async save() {
-        if (!this.post) return false;
-        if (this.saving) {
-            this.pendingSave = true;
-            // An in-flight autosave must finish before publish can proceed.
-            await this.inFlight;
-            return this.save();
-        }
-        this.saving = true;
-        const editing = this.post;
-        this.inFlight = blogStorage.savePost({
-            id: editing.id,
-            title: editing.title,
-            html: editing.html
-        });
-        const result = await this.inFlight;
-        this.saving = false;
-        this.inFlight = null;
-
-        if (!result.success) {
-            this.setIndicator('error');
-            window.BlogApp.showToast('Save failed — check your connection', true);
-            return false;
-        }
-        editing.updatedAt = new Date().toISOString();
-        // The server derives the slug suggestion from the title for
-        // never-published posts — mirror it so the modal pre-fills fresh.
-        const savedPost = result.data && result.data.posts
-            ? result.data.posts.find(p => p && p.id === editing.id)
-            : null;
-        if (savedPost && savedPost.slug) editing.slug = savedPost.slug;
-        this.setIndicator('saved');
-        if (this.pendingSave) {
-            this.pendingSave = false;
-            return this.save();
-        }
-        return true;
+        return this.autosave ? this.autosave.flush() : false;
     },
 
     setIndicator(stateName) {

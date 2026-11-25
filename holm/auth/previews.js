@@ -213,6 +213,9 @@
     // ================================================
 
     function registerScaledPage(inner, virtualWidth) {
+        for (let i = scaledPages.length - 1; i >= 0; i--) {
+            if (!scaledPages[i].el.isConnected) scaledPages.splice(i, 1);
+        }
         scaledPages.push({ el: inner, w: virtualWidth });
         scalePage(inner, virtualWidth);
         // Cards mount before their grid append, so clientWidth is still 0
@@ -500,7 +503,9 @@
     // ================================================
 
     function frameSrcdoc(kind) {
-        const doc = document.getElementById('wdPreviewFrameDoc').value;
+        const template = document.getElementById('wdPreviewFrameDoc');
+        const doc = template ? template.value : window.WDPreviewFrameDoc;
+        if (!doc) return null;
         return doc
             .replace('__FABRIC_SRC__', FABRIC_CDN[kind])
             .replace('__KIND__', kind);
@@ -508,6 +513,8 @@
 
     function ensureFrame(kind) {
         if (frames[kind]) return frames[kind];
+        const srcdoc = frameSrcdoc(kind);
+        if (!srcdoc) return Promise.resolve(null);
         frames[kind] = new Promise(function (resolve) {
             const frame = document.createElement('iframe');
             frame.setAttribute('sandbox', 'allow-scripts');
@@ -524,7 +531,7 @@
             };
             window.addEventListener('message', onMessage);
 
-            frame.srcdoc = frameSrcdoc(kind);
+            frame.srcdoc = srcdoc;
             document.body.appendChild(frame);
 
             setTimeout(function () {
@@ -857,7 +864,7 @@
      * Fill a card's preview page with a mini-render of the file.
      * Leaves the skeleton in place for empty files / unsupported apps.
      */
-    function mount(page, file) {
+    function renderPreview(page, file) {
         if (!page || !file) return;
         switch (file.app) {
             case 'docs': renderDocs(page, file); break;
@@ -874,5 +881,30 @@
         }
     }
 
+    // Thumbnails must not compete with navigation or render every offscreen
+    // canvas on every keystroke. Observe only cards near the viewport.
+    const waiting = new Map();
+    const observer = typeof IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
+        for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            const file = waiting.get(entry.target);
+            waiting.delete(entry.target);
+            observer.unobserve(entry.target);
+            if (entry.target.isConnected && file) renderPreview(entry.target, file);
+        }
+    }, { rootMargin: '160px' }) : null;
+    let cleanupFrame;
+    function mount(page, file) {
+        if (!page || !file) return;
+        if (!observer) { renderPreview(page, file); return; }
+        waiting.set(page, file);
+        observer.observe(page);
+        if (!cleanupFrame) cleanupFrame = requestAnimationFrame(() => {
+            cleanupFrame = null;
+            for (const node of waiting.keys()) if (!node.isConnected) {
+                observer.unobserve(node); waiting.delete(node);
+            }
+        });
+    }
     window.WDPreviews = { mount: mount };
 })();

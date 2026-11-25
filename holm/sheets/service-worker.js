@@ -1,107 +1,41 @@
-const STATIC_CACHE = 'sheets-static-holm-v1';
-const DYNAMIC_CACHE = 'sheets-dynamic-holm-v1';
-const API_CACHE = 'sheets-api-holm-v1';
+// Cache only non-executable, same-origin artwork/fonts. HTML, JS and CSS
+// must stay together on the current release, including /editor?id=... links.
+const STATIC_CACHE = 'sheets-static-holm-v3';
 
-// Install event - cache static assets
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then((cache) => {
-        return cache.addAll([
-          '/sheets/',
-          '/sheets/editor.html',
-          '/sheets/styles.css',
-          '/sheets/home.css',
-          '/sheets/manifest.json'
-        ]);
-      })
-      .then(() => {
-        return self.skipWaiting();
-      })
-  );
+self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
+self.addEventListener('activate', event => {
+  event.waitUntil(caches.keys().then(names => Promise.all(
+    names.filter(name => name.startsWith('sheets-') && name !== STATIC_CACHE)
+      .map(name => caches.delete(name))
+  )).then(() => self.clients.claim()));
 });
 
-// Activate event - clean up old caches and force update
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (!cacheName.startsWith('sheets-') || [STATIC_CACHE, DYNAMIC_CACHE].includes(cacheName)) return;
-          return caches.delete(cacheName);
-        })
-      );
-    }).then(() => {
-      // Force all clients to adopt this new service worker immediately
-      return self.clients.claim();
-    })
-  );
-});
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  const url = new URL(request.url);
+  // Let the browser handle navigations, private/auth requests and remote
+  // resources. Re-fetching a font stylesheet inside a worker changes a
+  // style-src request into connect-src and can violate the worker's CSP.
+  if (request.method !== 'GET' || url.origin !== self.location.origin ||
+      request.mode === 'navigate' ||
+      !/^\/(?:sheets\/icons\/|icons\/sheets|fonts\/)/.test(url.pathname) ||
+      !/\.(?:png|svg|webp|ico|woff2?)$/.test(url.pathname)) return;
 
-// Fetch event - handle API requests differently
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-
-  // Handle API requests - NEVER cache, always go to network
-  // This prevents authentication issues in production
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(event.request, {
-        // Important: Include credentials for authenticated requests
-        credentials: 'include',
-        // Don't cache API responses
-        cache: 'no-store',
-        // Ensure we don't use cached responses
-        redirect: 'follow'
-      })
-    );
-    return;
-  }
-
-  // Handle static assets - network first for critical files (JS/CSS/HTML)
-  const isCriticalFile = event.request.url.endsWith('.js') ||
-                        event.request.url.endsWith('.css') ||
-                        event.request.url.endsWith('.html');
-
-  if (isCriticalFile) {
-    // Network first for critical files to ensure fresh code
-    event.respondWith(
-      fetch(event.request).then((response) => {
-        // Cache the fresh response
-        const responseToCache = response.clone();
-        caches.open(DYNAMIC_CACHE).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-        return response;
-      }).catch(() => {
-        // If network fails, try cache as fallback
-        return caches.match(event.request);
-      })
-    );
-  } else {
-    // Cache first for images and other static assets
-    event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        return fetch(event.request).then((response) => {
-          if (response && response.status === 200) {
-            const responseToCache = response.clone();
-            caches.open(DYNAMIC_CACHE).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-          }
-          return response;
-        }).catch((error) => {
-          if (event.request.headers.get('accept').includes('text/html')) {
-            return caches.match('/sheets/');
-          }
-        });
-      })
-    );
-  }
+  event.respondWith((async () => {
+    try {
+      const response = await fetch(request);
+      if (response.ok && response.type === 'basic') {
+        const copy = response.clone();
+        event.waitUntil(caches.open(STATIC_CACHE).then(cache => cache.put(request, copy)).catch(() => {}));
+      }
+      return response;
+    } catch {
+      // A cache miss is a deliberate network error, never undefined (which
+      // makes FetchEvent reject with "Failed to convert value to Response").
+      const cached = await caches.open(STATIC_CACHE).then(cache => cache.match(request)).catch(() => null);
+      return cached || Response.error();
+    }
+  })());
 });
 
 // Handle background sync for offline actions
@@ -130,7 +64,7 @@ self.addEventListener('push', (event) => {
     const data = event.data.json();
     const options = {
       body: data.body || 'New notification',
-      icon: '/icons/icon-192x192.png',
+      icon: '/sheets/icons/icon-192x192.png',
       badge: '/icons/badge-72x72.png',
       vibrate: [200, 100, 200],
       data: {

@@ -852,15 +852,7 @@ html[data-theme="dark"] .wd-theme-option-icon {
     display: block;
 }
 
-/* ---------- Filter bar ---------- */
-.wd-filter-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding: 6px 0 16px;
-}
+/* ---------- Filter controls ---------- */
 
 .wd-filter {
     padding: 7px 16px;
@@ -925,34 +917,9 @@ html[data-theme="dark"] .wd-theme-option-icon {
     flex-shrink: 0;
 }
 
-/* View toggle */
-.wd-view-toggle {
-    display: inline-flex;
-    gap: 4px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    padding: 4px;
-    border-radius: 999px;
-}
-
-.wd-view-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 999px;
-    color: var(--text-tertiary);
-    transition: background 0.15s ease, color 0.15s ease;
-}
-
-.wd-view-btn:hover {
-    color: var(--text);
-}
-
-.wd-view-btn.active {
-    background: var(--accent);
-    color: var(--accent-text-on);
+/* One view button in the header, matching the app home pages. */
+.wd-layout-btn {
+    flex-shrink: 0;
 }
 
 /* ---------- View title ---------- */
@@ -1216,6 +1183,7 @@ html[data-theme="dark"] .wd-theme-option-icon {
 
 .wd-preview-doc,
 .wd-preview-form,
+.wd-preview-todo,
 .wd-preview-kanban {
     transform-origin: 0 0;
     background: #ffffff;
@@ -1945,6 +1913,7 @@ html[data-theme="dark"] .wd-theme-option-icon {
     .wd-search-container {
         order: 3;
         flex-basis: 100%;
+        min-width: 0;
         max-width: none;
     }
 
@@ -1981,6 +1950,16 @@ html[data-theme="dark"] .wd-theme-option-icon {
 
     .wd-filter {
         padding: 7px 12px;
+    }
+}
+
+@media (max-width: 360px) {
+    .wd-logo-text {
+        display: none; /* leave room for view, New and Settings on one row */
+    }
+
+    .wd-actions {
+        gap: 6px;
     }
 }
 

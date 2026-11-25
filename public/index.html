@@ -110,12 +110,12 @@
                         <article class="lp-app-card" style="--lp-color:#7248b9;--lp-tint:rgba(114,72,185,.12)"><span class="lp-app-icon" data-icon="forms">F</span><span class="lp-app-number">03</span><h3>Forms</h3><p>Ask better questions and collect answers in one place.</p><span class="lp-app-tag">Ask &amp; collect</span></article>
                         <article class="lp-app-card" style="--lp-color:#ea580c;--lp-tint:rgba(234,88,12,.12)"><span class="lp-app-icon" data-icon="slides">S</span><span class="lp-app-number">04</span><h3>Slides</h3><p>Turn the big picture into a story worth sharing.</p><span class="lp-app-tag">Present &amp; share</span></article>
                         <article class="lp-app-card" style="--lp-color:#e11d48;--lp-tint:rgba(225,29,72,.12)"><span class="lp-app-icon" data-icon="draw">D</span><span class="lp-app-number">05</span><h3>Draw</h3><p>Sketch freely when words aren't quite enough.</p><span class="lp-app-tag">Sketch &amp; explore</span></article>
-                        <article class="lp-app-card" style="--lp-color:#d9a506;--lp-tint:rgba(217,165,6,.13)"><span class="lp-app-icon" data-icon="filebox">F</span><span class="lp-app-number">06</span><h3>Files</h3><p>Keep the things you need close, organized, and easy to find.</p><span class="lp-app-tag">Store &amp; find</span></article>
+                        <article class="lp-app-card" style="--lp-color:#0d9488;--lp-tint:rgba(13,148,136,.12)"><span class="lp-app-icon" data-icon="filebox">F</span><span class="lp-app-number">06</span><h3>Files</h3><p>Keep the things you need close, organized, and easy to find.</p><span class="lp-app-tag">Store &amp; find</span></article>
                         <article class="lp-app-card" style="--lp-color:#188038;--lp-tint:rgba(24,128,56,.12)"><span class="lp-app-icon" data-icon="todo">T</span><span class="lp-app-number">07</span><h3>Todo</h3><p>Make progress on the little things and the important ones.</p><span class="lp-app-tag">Focus &amp; finish</span></article>
                         <article class="lp-app-card" style="--lp-color:#0284c7;--lp-tint:rgba(2,132,199,.12)"><span class="lp-app-icon" data-icon="calendar">C</span><span class="lp-app-number">08</span><h3>Calendar</h3><p>Make time for what needs your attention.</p><span class="lp-app-tag">Schedule &amp; see</span></article>
                         <article class="lp-app-card" style="--lp-color:#a21caf;--lp-tint:rgba(162,28,175,.12)"><span class="lp-app-icon" data-icon="kanban">K</span><span class="lp-app-number">09</span><h3>Kanban</h3><p>See how projects move from first step to done.</p><span class="lp-app-tag">Track &amp; move</span></article>
-                        <article class="lp-app-card" style="--lp-color:#14b8a6;--lp-tint:rgba(20,184,166,.12)"><span class="lp-app-icon" data-icon="blog">B</span><span class="lp-app-number">10</span><h3>Blog</h3><p>Give your ideas a home beyond the draft.</p><span class="lp-app-tag">Publish &amp; express</span></article>
-                        <article class="lp-app-card" style="--lp-color:#b07843;--lp-tint:rgba(176,120,67,.12)"><span class="lp-app-icon" data-icon="minutes">M</span><span class="lp-app-number">11</span><h3>Minutes</h3><p>Capture the conversations that move things forward.</p><span class="lp-app-tag">Meet &amp; remember</span></article>
+                        <article class="lp-app-card" style="--lp-color:#0d9488;--lp-tint:rgba(13,148,136,.12)"><span class="lp-app-icon" data-icon="blog">B</span><span class="lp-app-number">10</span><h3>Blog</h3><p>Give your ideas a home beyond the draft.</p><span class="lp-app-tag">Publish &amp; express</span></article>
+                        <article class="lp-app-card" style="--lp-color:#276b53;--lp-tint:rgba(39,107,83,.12)"><span class="lp-app-icon" data-icon="minutes">M</span><span class="lp-app-number">11</span><h3>Minutes</h3><p>Capture the conversations that move things forward.</p><span class="lp-app-tag">Meet &amp; remember</span></article>
                         <div class="lp-app-end"><span>✳</span><p>There’s more to make<br>when it all connects.</p><small>App migration will happen one by one.</small></div>
                     </div>
                 </div>
@@ -289,6 +289,17 @@
 
                     <!-- Actions -->
                     <div class="wd-actions">
+                        <!-- Toggle card/list view (the icon shows the view to switch to) -->
+                        <button id="viewToggle" class="wd-icon-btn wd-layout-btn" type="button" aria-label="Switch to list view" title="Switch to list view" aria-pressed="false">
+                            <svg class="wd-layout-icon-list" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line>
+                                <line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            </svg>
+                            <svg class="wd-layout-icon-cards hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect>
+                            </svg>
+                        </button>
+
                         <!-- + New with dropdown -->
                         <div class="wd-new-container">
                             <button id="newBtn" class="wd-new-btn" aria-haspopup="true" aria-expanded="false" aria-controls="newDropdown" aria-label="New — choose an app">
@@ -397,30 +408,6 @@
                     </div>
                 </div>
             </header>
-
-            <!-- Filter bar: view toggle -->
-            <div class="wd-filter-bar">
-                <div class="wd-view-toggle" id="viewToggle" role="group" aria-label="Switch between grid and list view">
-                    <button class="wd-view-btn active" data-view="grid" aria-label="Grid view" title="Grid view">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                        </svg>
-                    </button>
-                    <button class="wd-view-btn" data-view="list" aria-label="List view" title="List view">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="8" y1="6" x2="21" y2="6"></line>
-                            <line x1="8" y1="12" x2="21" y2="12"></line>
-                            <line x1="8" y1="18" x2="21" y2="18"></line>
-                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                        </svg>
-                    </button>
-                </div>
-            </div>
 
             <!-- Section title -->
             <div class="wd-view-indicator">

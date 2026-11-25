@@ -12,8 +12,8 @@
     if (!menu || !trigger) return;
     menu.classList.add('wd-account-panel');
     trigger.classList.add('wd-account-trigger');
-    trigger.setAttribute('aria-label', 'Settings');
-    trigger.setAttribute('title', 'Settings');
+    trigger.setAttribute('aria-label', 'Account menu');
+    trigger.setAttribute('title', 'Account menu');
     trigger.setAttribute('aria-haspopup', 'true');
     trigger.setAttribute('aria-controls', menu.id);
     const positionMenu = () => menu.style.setProperty('--wd-menu-top', `${Math.round(trigger.getBoundingClientRect().bottom + 8)}px`);
@@ -23,7 +23,7 @@
     // Only hide the original controls; their JS listeners still handle persistence
     // and server-side preference updates when the new choices forward a click.
     const legacy = menu.querySelector('.wd-theme-container, .theme-dropdown-container, .fb-theme-container, .blog-theme-wrap');
-    if (legacy) {
+    if (legacy && !menu.querySelector('.wd-theme-setting')) {
       legacy.classList.add('wd-legacy-theme');
       const row = document.createElement('div');
       row.className = 'wd-theme-setting';

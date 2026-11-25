@@ -6,7 +6,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const labels = { discussion: 'Note', action: 'Action', decision: 'Decision', information: 'Info', question: 'Question' };
 const app = { meetings: [], todo: [], events: [], meeting: null, detailId: null, quill: null, sortables: [], dirty: false, saving: null, timer: null, conflict: false };
 async function request(action, data) {
-  const response = await fetch('/api/minutes', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, data }) });
+  const response = await (window.WDBoot?.fetch || fetch)('/api/minutes', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, data }) });
   if (response.status === 401) { location.assign('/auth/login?redirect=%2Fminutes%2F'); throw new Error('Sign in to continue.'); }
   const result = await response.json();
   if (!response.ok || !result.success) throw new Error(result.error || 'Could not save Minutes');
@@ -78,7 +78,7 @@ function openMeeting(meeting) {
 }
 async function load() {
   try {
-    const response = await fetch('/api/minutes', { cache: 'no-store', credentials: 'same-origin' });
+    const response = await (window.WDBoot?.fetch || fetch)('/api/minutes', { cache: 'no-store', credentials: 'same-origin' });
     if (response.status === 401) { location.assign('/auth/login?redirect=%2Fminutes%2F'); return; }
     if (!response.ok) throw new Error('Cannot load your meetings. Return to Workdeck and check your session.');
     const result = await response.json();
@@ -86,12 +86,12 @@ async function load() {
     const preference = result.data.settings?.theme;
     if (['light', 'dark', 'system'].includes(preference)) {
       localStorage.setItem('workdeck_theme', preference);
-      document.body.classList.toggle('dark', preference === 'dark' || (preference === 'system' && matchMedia('(prefers-color-scheme: dark)').matches));
+      applyTheme();
     }
     const id = new URLSearchParams(location.search).get('meeting') || /^\/minutes\/([a-z0-9_]{14,})\/?$/.exec(location.pathname)?.[1];
     const meeting = app.meetings.find(item => item.id === id);
     if (meeting) openMeeting(meeting); else showHome();
-  } catch (error) { $('home').innerHTML = `<div class="empty"><p>${esc(error.message)}</p><a href="/">Return to Workdeck</a></div>`; }
+  } catch (error) { $('home').classList.remove('hidden'); $('home').innerHTML = `<div class="empty"><p>${esc(error.message)}</p><button type="button" id="loadRetry">Retry</button><a href="/home">Return to Workdeck</a></div>`; $('loadRetry').onclick = () => location.reload(); }
 }
 function renderHome() {
   const term = $('search').value.toLowerCase().trim(), filter = $('filter').value;
@@ -269,13 +269,22 @@ async function createMeeting() {
     app.meetings.unshift(result.meeting); openMeeting(result.meeting); $('title').focus();
   } catch (error) { alert(error.message); }
 }
+function applyTheme() {
+  const stored = localStorage.getItem('workdeck_theme');
+  const theme = ['light', 'dark', 'system'].includes(stored) ? stored : 'dark';
+  const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.body.classList.toggle('dark', dark);
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+}
 function init() {
-  const applyTheme = () => { const theme = localStorage.getItem('workdeck_theme') || 'light'; document.body.classList.toggle('dark', theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)); };
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (localStorage.getItem('workdeck_theme') === 'system') applyTheme();
+  });
   applyTheme(); $('themeBtn').onclick = async () => {
     const theme = document.body.classList.contains('dark') ? 'light' : 'dark';
     localStorage.setItem('workdeck_theme', theme); applyTheme();
     try {
-      const response = await fetch('/api/workdeck', { method: 'PUT', credentials: 'same-origin',
+      const response = await (window.WDBoot?.fetch || fetch)('/api/workdeck', { method: 'PUT', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'updateSettings', data: { settings: { theme } } }),
       });
@@ -310,7 +319,7 @@ function init() {
   };
   $('actionsDisclosure').ontoggle = async () => {
     if (!$('actionsDisclosure').open || !app.meeting || app.dirty) return;
-    try { const response = await fetch('/api/minutes', { cache: 'no-store', credentials: 'same-origin' }); if (response.ok) { app.todo = (await response.json()).data.todo || []; updateTaskBadges(); updateActionSummary(); } } catch (_) { /* Keep last known status. */ }
+    try { const response = await (window.WDBoot?.fetch || fetch)('/api/minutes', { cache: 'no-store', credentials: 'same-origin' }); if (response.ok) { app.todo = (await response.json()).data.todo || []; updateTaskBadges(); updateActionSummary(); } } catch (_) { /* Keep last known status. */ }
   };
   $('closeReview').onclick = $('cancelReview').onclick = () => $('reviewOverlay').classList.add('hidden');
   $('recordState').onchange = () => $('approvedLabel').classList.toggle('hidden', $('recordState').value !== 'final');

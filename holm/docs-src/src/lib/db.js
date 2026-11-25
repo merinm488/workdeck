@@ -10,7 +10,7 @@ const remember = data => {
   return data;
 };
 async function call(url, method = 'GET', action, data) {
-  const response = await fetch(url, {
+  const response = await (window.WDBoot?.fetch || fetch)(url, {
     method, credentials: 'same-origin', cache: 'no-store',
     ...(action ? { headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, data }) } : {}),
@@ -57,12 +57,6 @@ export function deleteDoc(_hash, docId) {
     await mutate(API, 'deleteDoc', { docId, version: version(docId) });
     versions.delete(docId);
     return true;
-  });
-}
-export function toggleDocPin(_hash, docId) {
-  return queue(docId, async () => {
-    const result = await mutate(API, 'togglePin', { docId, version: version(docId) });
-    return remember(result.data).docs.find(doc => doc.id === docId) || null;
   });
 }
 export async function getTags(hash) { return (await getUserData(hash)).tags || []; }

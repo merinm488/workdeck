@@ -38,7 +38,8 @@ async function init() {
     showLoading(false);
 
     if (!doc) {
-        window.location.href = '/account';
+        $('postsView').classList.remove('hidden');
+        showToast('Could not load posts. Please retry.', true);
         return;
     }
 
@@ -62,7 +63,7 @@ async function init() {
 
 function setBackLink(inEditor) {
     const link = document.querySelector('.blog-home-link');
-    link.href = inEditor ? '/blog/' : '/';
+    link.href = inEditor ? '/blog/' : '/home';
     link.title = inEditor ? 'Back to Blog' : 'Back to Workdeck';
     link.setAttribute('aria-label', link.title);
 }
@@ -182,15 +183,16 @@ async function renamePost(post) {
     if (name.trim().length > 200) { showToast('Post title must be 200 characters or less', true); return; }
     const result = await blogStorage.request('updatePost', { id: post.id, title: name.trim() });
     if (!result.success) { showToast(result.error || 'Could not rename the post', true); return; }
-    // Reload the records used by the shared tag sidebar as well as the cards.
-    window.location.reload();
+    state.posts = result.data.posts || [];
+    renderPosts();
 }
 
 async function deletePostFromHome(post) {
     if (!confirm(`Delete "${post.title || 'Untitled'}"? This cannot be undone.`)) return;
     const result = await blogStorage.deletePost(post.id);
     if (!result) { showToast('Could not delete the post', true); return; }
-    window.location.reload();
+    state.posts = result.posts || [];
+    renderPosts();
 }
 
 function formatWhen(updatedAt, lastOpenedAt) {
@@ -346,7 +348,9 @@ function wireChrome() {
         BlogEditor.copyPostLink();
     });
     $('openPostLinkItem').addEventListener('click', () => closeSettingsMenu());
-    $('logoutBtn').addEventListener('click', () => blogAuth.logout());
+    $('logoutBtn').addEventListener('click', async () => {
+        if (!state.editingId || await BlogEditor.save()) await blogAuth.logout();
+    });
     document.addEventListener('click', (e) => {
         if (e.target.closest('.blog-menu-wrap')) return;
         settingsMenu.classList.add('hidden');

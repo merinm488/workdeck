@@ -49,6 +49,8 @@ class BoardController {
         this.todos = [];
         this.saveTimer = null;
         this.saving = false;
+        this.dirty = false;
+        this.savePromise = null;
         this.checklistCardId = null;
         this.editingCardId = null;
         this.sortables = [];
@@ -1163,35 +1165,58 @@ class BoardController {
     // ================================================
 
     scheduleSave() {
+        this.dirty = true;
         clearTimeout(this.saveTimer);
         this.saveTimer = setTimeout(() => this.save(), 800);
     }
 
-    async save() {
-        if (!this.board) return;
-        if (this.saving) {
-            // A change landed mid-save; don't drop it
-            this.scheduleSave();
-            return;
+    async flush() {
+        clearTimeout(this.saveTimer);
+        if (this.savePromise && !(await this.savePromise)) return false;
+        clearTimeout(this.saveTimer);
+        // Changes made during an in-flight save need their own revision.
+        if (this.dirty) {
+            if (!(await this.save())) return false;
+            return this.flush();
         }
+        return true;
+    }
+
+    save() {
+        clearTimeout(this.saveTimer);
+        if (this.savePromise) return this.savePromise;
+        if (!this.board || !this.dirty) return Promise.resolve(true);
+        const board = this.board;
+        this.dirty = false;
         this.saving = true;
-        try {
-            // The live model is the source of truth — sanitize() builds a
-            // persistence copy and must never be assigned back into it
-            const record = {
-                name: this.board.name,
-                columns: this.board.columns.map(c => this.sanitizeColumn(c)),
-                rows: (this.board.rows || []).map(r => this.sanitizeRow(r)),
-                cards: this.board.cards.map(c => this.sanitizeCard(c)),
-                links: this.board.links || []
-            };
-            const ok = await kanbanStorage.saveBoard({ id: this.board.id, ...record });
-            if (!ok) {
-                showNotification('Save failed — changes kept locally', 'error');
+        this.savePromise = (async () => {
+            let ok = false;
+            try {
+                const record = {
+                    id: board.id, name: board.name,
+                    columns: board.columns.map(c => this.sanitizeColumn(c)),
+                    rows: (board.rows || []).map(r => this.sanitizeRow(r)),
+                    cards: board.cards.map(c => this.sanitizeCard(c)),
+                    links: board.links || []
+                };
+                ok = await kanbanStorage.saveBoard(record);
+                if (ok) {
+                    board.version = record.version;
+                    board.updatedAt = record.updatedAt;
+                }
+                return ok;
+            } catch (_) {
+                return false;
+            } finally {
+                this.saving = false;
+                this.savePromise = null;
+                if (!ok) {
+                    this.dirty = true;
+                    showNotification('Save failed — changes kept here. Retry before leaving the board.', 'error');
+                } else if (this.dirty) this.scheduleSave();
             }
-        } finally {
-            this.saving = false;
-        }
+        })();
+        return this.savePromise;
     }
 
     sanitizeColumn(c) {
@@ -1233,7 +1258,7 @@ class BoardController {
         const settings = this.userDoc.settings || {};
         const lastOpened = { ...(settings.lastOpened || {}) };
         lastOpened[this.board.id] = new Date().toISOString();
-        kanbanStorage.saveSettings({ lastOpened }).catch(() => {});
+        kanbanStorage.saveSettings({ lastOpened: { [this.board.id]: lastOpened[this.board.id] } }).catch(() => {});
     }
 
     // ================================================
@@ -1348,6 +1373,7 @@ class BoardController {
         modal.querySelector('#wipLimitColumn').textContent = col.label || 'Column';
         const input = modal.querySelector('#wipLimitInput');
         input.value = col.limit != null ? col.limit : '';
+        input.oninput = () => this.confirmWipLimit(false);
         modal.classList.add('open');
         modal.dataset.columnId = columnId;
         input.focus();
@@ -1357,7 +1383,7 @@ class BoardController {
         document.getElementById('wipLimitModal').classList.remove('open');
     }
 
-    confirmWipLimit() {
+    confirmWipLimit(close = true) {
         const modal = document.getElementById('wipLimitModal');
         const col = this.board.columns.find(c => c.id === modal.dataset.columnId);
         if (col) {
@@ -1370,7 +1396,7 @@ class BoardController {
             this.refreshCounts();
             this.scheduleSave();
         }
-        this.closeWipLimit();
+        if (close) this.closeWipLimit();
     }
 
     currentBoard() {
@@ -1391,6 +1417,12 @@ class BoardController {
         this.destroySortables();
         this.destroyTodoSortables();
         document.getElementById('boardRoot').innerHTML = '';
+        this.board = null;
+        this.searchQuery = '';
+        document.getElementById('boardSearchInput').value = '';
+        document.getElementById('boardSearchClear').classList.add('hidden');
+        this.editingCardId = null;
+        this.checklistCardId = null;
     }
 }
 

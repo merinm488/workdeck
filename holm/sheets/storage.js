@@ -9,7 +9,7 @@ class SheetsStorage {
   }
   async request(method = 'GET', action, data, query = '') {
     try {
-      const response = await fetch('/api/users' + query, {
+      const response = await (window.WDBoot?.fetch || fetch)('/api/users' + query, {
         method, cache: 'no-store', credentials: 'same-origin',
         ...(action ? { headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action, data }) } : {}),

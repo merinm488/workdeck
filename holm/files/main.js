@@ -546,46 +546,30 @@ function renderSidebar() {
  * to filter, drag a file on to tag it, edit/delete on hover). Lists
  * Filebox-born tags plus Workdeck-created tags that are in use here.
  */
+let filesTagUI;
 function renderTagSection() {
-    const list = $('fbTagList');
-    list.innerHTML = '';
-    const pool = fileboxTags();
-
-    pool.forEach(function (tag) {
-        const active = state.activeTag === tag.id;
-        const row = $('fbTagRowTemplate').content.firstElementChild.cloneNode(true);
-        if (active) {
-            row.classList.add('active');
-            if (tag.color) row.style.background = hexToRgba(tag.color, 0.14);
-        }
-        row.dataset.tag = tag.id;
-        row.tabIndex = 0;
-        row.querySelector('.fb-tag-dot').style.background = tag.color;
-        row.querySelector('.fb-side-name').textContent = tag.name;
-        row.querySelector('.fb-side-count').textContent = tagItemCount(tag.id);
-
-        row.addEventListener('click', function (e) {
-            const actionEl = e.target.closest('[data-action]');
-            if (actionEl) {
-                e.stopPropagation();
-                if (actionEl.dataset.action === 'edit') openTagForm(tag);
-                else confirmDeleteTag(tag);
-                return;
-            }
-            selectTag(tag.id);
-        });
-        row.addEventListener('keydown', function (e) {
-            if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('[data-action]')) {
-                e.preventDefault();
-                selectTag(tag.id);
-            }
-        });
-        makeTagDropTarget(row, tag.id);
-
-        list.appendChild(row);
-    });
-
-    $('fbTagEmpty').classList.toggle('hidden', pool.length > 0);
+    const options = {
+        tags: state.tags, active: state.activeTag, count: tagItemCount,
+        onSelect: selectTag, onRow: makeTagDropTarget,
+        onSave: async (id, values) => {
+            const data = id ? await fileboxStorage.updateTag(id, values) : await fileboxStorage.createTag(values.name, values.color);
+            if (!data) return false;
+            applyUserData(data);
+        },
+        onDelete: async id => {
+            const data = await fileboxStorage.deleteTag(id);
+            if (!data) return false;
+            if (state.activeTag === id) state.activeTag = null;
+            applyUserData(data);
+        },
+    };
+    if (filesTagUI) filesTagUI.update(options);
+    else {
+        $('fbNewTagBtn').closest('.fb-side-header').hidden = true;
+        $('fbTagForm').hidden = true;
+        $('fbTagEmpty').hidden = true;
+        filesTagUI = window.WDTagUI.mount($('fbTagList'), options);
+    }
 }
 
 function buildTreeLevel(container, parentId, depth) {
@@ -784,9 +768,17 @@ function renderContent() {
 }
 
 function bindItemMenu(el, record, kind) {
-    el.querySelector('.fb-item-menu').addEventListener('click', function (e) {
-        e.stopPropagation();
+    const trigger = el.querySelector('.fb-item-menu');
+    if (el.classList.contains('fb-card')) trigger.classList.add('wd-card-more');
+    trigger.setAttribute('aria-haspopup', 'menu');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
         openItemMenu(e.currentTarget, record, kind);
+    });
+    trigger.addEventListener('keydown', function (e) {
+        e.stopPropagation();
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); openItemMenu(trigger, record, kind, e.key === 'ArrowUp'); }
     });
 }
 
@@ -992,12 +984,12 @@ function renderFooter() {
 // Item action menu (⋮)
 // ================================================
 
+let itemActionMenu = null;
 function closeItemMenu() {
-    const menu = $('fbItemMenu');
-    if (menu) menu.classList.remove('open');
+    itemActionMenu?.close(); itemActionMenu = null;
 }
 
-function openItemMenu(anchor, record, kind) {
+function openItemMenu(anchor, record, kind, focusLast = false) {
     const menu = $('fbItemMenu');
     const actions = [];
     if (kind === 'file') {
@@ -1007,34 +999,19 @@ function openItemMenu(anchor, record, kind) {
     }
     actions.push({ action: 'rename', label: 'Rename', icon: 'rename' });
     if (kind === 'file') {
-        actions.push({ action: 'move', label: 'Move to folder…', icon: 'move' });
+        actions.push({ action: 'move', label: 'Move to folder', icon: 'move' });
     }
-    actions.push({ action: 'tags', label: 'Edit tags…', icon: 'tags' });
+    actions.push({ action: 'tags', label: 'Edit Tags', icon: 'tags' });
     actions.push({ action: 'delete', label: 'Delete', icon: 'trash', danger: true });
 
-    menu.replaceChildren(...actions.map(function (a) {
-        const btn = document.createElement('button');
-        btn.dataset.action = a.action;
-        btn.title = a.label;
-        btn.setAttribute('aria-label', a.label);
-        if (a.danger) btn.className = 'danger';
-        btn.append(fbIcon(a.icon));
-        const label = document.createElement('span');
-        label.textContent = a.label;
-        btn.append(label);
-        return btn;
-    }));
-
+    // Keep action dispatch's existing record lookup; the visible dropdown is
+    // shared with Workdeck and the other apps, rather than this hidden holder.
     menu.dataset.kind = kind;
     menu.dataset.id = record.id;
-
-    const rect = anchor.getBoundingClientRect();
-    menu.classList.add('open');
-    const menuRect = menu.getBoundingClientRect();
-    // Keep the icon strip beside the ⋮ button, preferably opening left.
-    const left = rect.left - menuRect.width - 6, right = rect.right + 6;
-    menu.style.left = (left >= 8 ? left : right + menuRect.width <= innerWidth - 8 ? right : Math.max(8, innerWidth - menuRect.width - 8)) + 'px';
-    menu.style.top = Math.max(8, Math.min(rect.top + (rect.height - menuRect.height) / 2, innerHeight - menuRect.height - 8)) + 'px';
+    itemActionMenu = WDActionMenu.open(anchor, actions.map(action => ({
+        label: action.label, icon: fbIcon(action.icon), danger: action.danger,
+        onSelect: () => handleItemMenuAction(action.action),
+    })), { focusLast, onClose: () => { itemActionMenu = null; } });
 }
 
 function handleItemMenuAction(action) {
@@ -1521,7 +1498,7 @@ function renderTagChecks() {
     clear.append(clearLabel, fbIcon('check'));
     clear.addEventListener('click', function () {
         state.tagSelection = null;
-        renderTagChecks();
+        confirmTags();
     });
     container.appendChild(clear);
 
@@ -1536,7 +1513,7 @@ function renderTagChecks() {
         row.append(label, fbIcon('check'));
         row.addEventListener('click', function () {
             state.tagSelection = tag.id;
-            renderTagChecks();
+            confirmTags();
         });
         container.appendChild(row);
     });
@@ -1554,6 +1531,7 @@ async function createTagInline() {
         if (created) state.tagSelection = created.id;
         $('fbNewTagName').value = '';
         renderTagChecks();
+        if (created) confirmTags();
     } else {
         showNotification('Failed to create tag', 'error');
     }
@@ -1759,14 +1737,6 @@ function setupEventListeners() {
             applySidebarDrawer(!document.body.classList.contains('fb-sidebar-open'));
         }
     });
-    $('fbSidebarClose').addEventListener('click', function () {
-        if (window.innerWidth >= 1024) {
-            document.body.classList.add('fb-sidebar-collapsed');
-            syncSidebarToggle();
-        } else {
-            applySidebarDrawer(false);
-        }
-    });
     window.matchMedia('(min-width: 1024px)').addEventListener('change', () => applySidebarDrawer(false));
     syncSidebarToggle();
     $('fbSidebarScrim').addEventListener('click', function () {
@@ -1911,7 +1881,7 @@ function setupEventListeners() {
         closeModal('fbTagsModal');
         state.tagsTarget = null;
     });
-    $('fbTagsConfirm').addEventListener('click', confirmTags);
+
     $('fbNewTagForm').addEventListener('submit', function (e) {
         e.preventDefault();
         createTagInline();
@@ -1944,6 +1914,9 @@ function setupEventListeners() {
         if (active) {
             if (active.id === 'fbViewer') closeViewer();
             else closeModal(active.id);
+        } else if (document.body.classList.contains('fb-sidebar-open')) {
+            applySidebarDrawer(false);
+            $('fbSidebarToggle').focus();
         }
     });
 

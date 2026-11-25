@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense, Component } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useDocs } from './hooks/useDocs';
 import { useTheme } from './hooks/useTheme';
@@ -10,9 +10,10 @@ import { SearchBar } from './components/SearchBar';
 import DocCard from './components/DocCard';
 import { DocListView } from './components/DocListView';
 import { DocActions } from './components/DocActions';
-import { DocDetailView } from './components/DocDetailView';
+import { DocTagsProvider } from './components/DocTags';
+const DocDetailView = lazy(() => import('./components/DocDetailView').then(module => ({ default: module.DocDetailView })));
 import { ShareModal } from './components/ShareModal';
-import { SharedDocView } from './components/SharedDocView';
+const SharedDocView = lazy(() => import('./components/SharedDocView').then(module => ({ default: module.SharedDocView })));
 import { Tooltip } from './components/Tooltip';
 import * as db from './lib/db';
 
@@ -25,6 +26,19 @@ import * as db from './lib/db';
  * 3. Coordinates between all components
  * 4. Manages theme switching
  */
+function DocLoading({ message = 'Loading document…' }) {
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-[rgb(var(--bg-primary))] text-gray-600 dark:text-gray-300" role="status">{message}</div>;
+}
+class DocLoadBoundary extends Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    return this.state.failed
+      ? <div className="fixed inset-0 z-50 grid place-items-center bg-[rgb(var(--bg-primary))]"><div role="alert">Could not load the document editor. <button onClick={() => location.reload()}>Retry</button></div></div>
+      : this.props.children;
+  }
+}
+
 function App() {
   // Auth state
   const {
@@ -53,12 +67,12 @@ function App() {
     filteredDocs,
     isLoading,
     hasLoaded,
+    loadError,
     setActiveTag,
     setSearchQuery,
     createDoc,
     updateDoc,
     deleteDoc,
-    togglePin,
     createTag,
     updateTag,
     deleteTag,
@@ -100,18 +114,18 @@ function App() {
     return width >= 1024;
   });
 
-  // Mobile search expanded state
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  // Search uses the same always-visible, responsive field as Workdeck.
 
   // View mode state with persistence
   const [viewMode, setViewMode] = useState(() => {
     // Load from localStorage on initial render (legacy key fallback for existing users)
-    return localStorage.getItem('docs_view_mode') === 'list' ? 'list' : 'card';
+    try { return localStorage.getItem('docs_view_mode') === 'list' ? 'list' : 'card'; }
+    catch (_) { return 'card'; }
   });
 
   // Save view mode to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('docs_view_mode', viewMode);
+    try { localStorage.setItem('docs_view_mode', viewMode); } catch (_) { /* private mode */ }
   }, [viewMode]);
 
   // Keep the user's collapsed state during desktop resizes; reset only when
@@ -142,7 +156,7 @@ function App() {
     return id ? { id, edit: new URLSearchParams(window.location.search).get('edit') === '1' } : null;
   });
 
-  const [editLinkDoc, setEditLinkDoc] = useState(null);
+  const [editLinkDoc, setEditLinkDoc] = useState(() => pendingDocLink?.edit ? { id: pendingDocLink.id } : null);
 
   useEffect(() => {
     if (!pendingDocLink) return;
@@ -297,8 +311,8 @@ function App() {
       // Create new doc - pass the doc data to API
       // The API will generate the ID and other fields
       return createDoc(docData).then((createdDoc) => {
-        // Switch to view mode after creating with the returned doc
-        setActiveDoc({ id: createdDoc.id, mode: 'view', doc: createdDoc });
+        // Keep typing after the first automatic save creates the document.
+        setActiveDoc({ id: createdDoc.id, mode: 'edit', doc: createdDoc });
         window.history.pushState({}, '', '/docs/?doc=' + encodeURIComponent(createdDoc.id));
         return createdDoc;
       });
@@ -330,6 +344,7 @@ function App() {
    */
   const handleBackEditLink = useCallback(() => {
     setEditLinkDoc(null);
+    window.history.pushState({}, '', '/docs/');
   }, []);
 
   // ===== SHARED DOC VIEW - Works without login =====
@@ -337,7 +352,7 @@ function App() {
     const sharedEffectiveTheme = getEffectiveTheme();
     return (
       <div className={`min-h-screen ${sharedEffectiveTheme === 'dark' ? 'dark' : ''}`}>
-        <SharedDocView
+        <DocLoadBoundary><Suspense fallback={<DocLoading />}><SharedDocView
           doc={sharedDoc}
           sharedAt={sharedAt}
           onClose={() => {
@@ -346,7 +361,7 @@ function App() {
             // Clear the shared param from URL
             window.history.replaceState({}, '', window.location.pathname);
           }}
-        />
+        /></Suspense></DocLoadBoundary>
         <div className="fixed top-4 right-4 z-50">
           <ThemeToggle theme={theme} systemTheme={systemTheme} onSetTheme={setTheme} />
         </div>
@@ -356,6 +371,8 @@ function App() {
 
   // ===== LOGIN SCREEN =====
   if (!isAuthenticated) {
+    // Never paint sign-in controls or the home beneath a pending direct link.
+    if (authLoading) return <DocLoading message="Loading workspace…" />;
     const loginEffectiveTheme = getEffectiveTheme();
 
     return (
@@ -376,6 +393,7 @@ function App() {
   const effectiveTheme = getEffectiveTheme();
 
   return (
+    <DocTagsProvider tags={tags} onUpdateDoc={updateDoc} onCreateTag={createTag}>
     <div className={`min-h-screen ${effectiveTheme === 'dark' ? 'dark' : ''}`}>
       {/* Background decoration */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -387,26 +405,16 @@ function App() {
         {/* ===== SIDEBAR ===== */}
         <aside
           id="docsSidebar"
-          className={`fixed inset-y-0 left-0 z-30 w-[280px] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out ${
+          className={`wd-docs-sidebar fixed inset-y-0 left-0 z-30 w-[280px] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out ${
             showSidebar ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
           <div className="flex flex-col h-full">
             {/* Logo */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-400/10 dark:bg-white/10 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-blue-500 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                </div>
-                <span className="font-bold text-lg">Docs</span>
-              </div>
+            <div className="wd-sidebar-brand">
+              <a className="wd-sidebar-home" href="/home" aria-label="Workdeck home" title="Workdeck home">
+                <span dangerouslySetInnerHTML={{ __html: window.WDHomeIcons.workdeck }} />
+              </a>
               {/* On mobile the header toggle is covered by the drawer; keep its close action here. */}
               <button
                 onClick={() => setShowSidebar(false)}
@@ -423,13 +431,15 @@ function App() {
             </div>
 
             {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="wd-home-sidebar-scroll flex-1 overflow-y-auto p-4 space-y-6">
               {/* Tags */}
               <TagList
                 tags={tags}
+                docs={docs}
                 activeTag={activeTag}
                 onTagSelect={handleTagSelect}
                 onCreateTag={createTag}
+                onUpdateTag={updateTag}
                 onDeleteTag={deleteTag}
               />
 
@@ -443,10 +453,6 @@ function App() {
                     {docs
                       .filter(n => n.tagId === activeTag)
                       .sort((a, b) => {
-                        // Pinned docs first
-                        if (a.pinned && !b.pinned) return -1;
-                        if (!a.pinned && b.pinned) return 1;
-                        // Then by date
                         return new Date(b.updatedAt) - new Date(a.updatedAt);
                       })
                       .map(doc => (
@@ -471,26 +477,8 @@ function App() {
 
                         {/* Doc Actions */}
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              togglePin(doc.id);
-                            }}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              doc.pinned
-                                ? 'text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
-                                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                            }`}
-                            title={doc.pinned ? 'Unpin doc' : 'Pin doc'}
-                          >
-                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M16 12V4H17V2H7V4H8V12L6 14V16H11.2V22H12.8V16H18V14L16 12Z" />
-                            </svg>
-                          </button>
-
                           <DocActions
                             doc={doc}
-                            onPin={togglePin}
                             onDelete={deleteDoc}
                             onRename={(doc, newTitle) => {
                               updateDoc(doc.id, { title: newTitle });
@@ -520,51 +508,7 @@ function App() {
         <main className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${showSidebar ? 'lg:ml-[280px]' : 'lg:ml-0'}`}>
           {/* Header */}
           <header className="sticky top-0 z-10 bg-bg-primary/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between px-4 py-3 gap-2 sm:gap-4">
-              {/* Mobile search expanded mode */}
-              {isSearchExpanded ? (
-                <>
-                  {/* Back button */}
-                  <button
-                    onClick={() => {
-                      setIsSearchExpanded(false);
-                      setSearchQuery('');
-                    }}
-                    className="p-2 rounded-lg hover:bg-gray-100 dark:bg-gray-700"
-                    aria-label="Close search"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-
-                  {/* Expanded search input */}
-                  <div className="flex-1 mx-2">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search docs..."
-                      className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      autoFocus
-                    />
-                  </div>
-
-                  {/* Clear button */}
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="p-2 rounded-lg hover:bg-gray-100 dark:bg-gray-700"
-                      aria-label="Clear search"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </>
-              ) : (
-                <>
+            <div className="wd-home-header">
                   {/* Mobile menu button */}
                   <button
                     onClick={() => setShowSidebar(true)}
@@ -592,7 +536,7 @@ function App() {
                   </button>
 
                   {/* Search - desktop/tablet */}
-                  <div className="hidden md:block flex-1 max-w-md mx-4 min-w-0">
+                  <div className="wd-home-search">
                     <SearchBar
                       value={searchQuery}
                       onChange={setSearchQuery}
@@ -600,18 +544,7 @@ function App() {
                     />
                   </div>
 
-                  {/* Actions - hidden only when search is expanded on mobile */}
-                  <div className={`${isSearchExpanded ? 'hidden' : ''} flex items-center gap-2 sm:gap-2`}>
-                    <button
-                      onClick={() => setIsSearchExpanded(true)}
-                      className="md:hidden w-[38px] h-[38px] p-0 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:bg-gray-700"
-                      aria-label="Search"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </button>
-
+                  <div className="wd-docs-actions flex items-center gap-2">
                     <Tooltip text={viewMode === 'card' ? 'Switch to list view' : 'Switch to card view'}>
                       <button
                         onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')}
@@ -643,21 +576,19 @@ function App() {
                     </Tooltip>
                     <UserDisplay onLogout={logout} theme={theme} onSetTheme={setTheme} />
                   </div>
-                </>
-              )}
             </div>
           </header>
 
-          {/* Folder/View indicator */}
-          <div className="px-4 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {activeTag ? (tags.find(t => t.id === activeTag)?.name || 'Unknown Tag') : 'All Docs'}
-            </h2>
-          </div>
-
           {/* Docs Grid */}
-          <div className="p-4 sm:p-6">
-            {filteredDocs.length === 0 ? (
+          <div className="wd-home-content">
+            {!hasLoaded || isLoading ? (
+              <p role="status" className="py-8 text-gray-500 dark:text-gray-400">Loading docs…</p>
+            ) : loadError ? (
+              <div role="alert" className="py-8">
+                <p>{loadError}</p>
+                <button onClick={refreshData} className="btn-primary mt-3">Retry</button>
+              </div>
+            ) : filteredDocs.length === 0 ? (
               // Empty state
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700/30 flex items-center justify-center mb-4">
@@ -680,14 +611,12 @@ function App() {
             ) : (
               // Docs view - card or list
               viewMode === 'card' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
+                <div className="wd-home-grid">
                   {filteredDocs.map(doc => (
                     <DocCard
                       key={doc.id}
                       doc={doc}
                       onClick={handleDocClick}
-                      onPin={togglePin}
-                      isPinned={doc.pinned}
                       onDelete={deleteDoc}
                       onRename={(doc, newTitle) => {
                         updateDoc(doc.id, { title: newTitle });
@@ -700,11 +629,10 @@ function App() {
                   ))}
                 </div>
               ) : (
-                <div className="max-w-5xl mx-auto">
+                <div className="wd-home-list max-w-5xl mx-auto">
                   <DocListView
                     docs={filteredDocs}
                     onClick={handleDocClick}
-                    onPin={togglePin}
                     onDelete={deleteDoc}
                     onRename={(doc, newTitle) => {
                       updateDoc(doc.id, { title: newTitle });
@@ -733,7 +661,7 @@ function App() {
 
       {/* ===== DOC DETAIL VIEW ===== */}
       {(editLinkDoc || (isDocViewOpen && activeDoc)) && (
-        <DocDetailView
+        <DocLoadBoundary><Suspense fallback={<DocLoading />}><DocDetailView
           doc={editLinkDoc
             ? editLinkDoc
             : (activeDoc.mode === 'create' ? null : activeDoc.doc)}
@@ -751,7 +679,7 @@ function App() {
           theme={theme}
           systemTheme={systemTheme}
           onSetTheme={setTheme}
-        />
+        /></Suspense></DocLoadBoundary>
       )}
 
       {/* Share Modal */}
@@ -768,6 +696,7 @@ function App() {
         />
       )}
     </div>
+    </DocTagsProvider>
   );
 }
 

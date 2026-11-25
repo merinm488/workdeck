@@ -71,7 +71,7 @@ async function init() {
         window.history.replaceState(null, '', '/slides/editor.html?id=' + encodeURIComponent(editorState.deckId));
     }
 
-    const userData = await slidesStorage.loadUserData();
+    const userData = slidesStorage.lastUserData;
     if (userData && userData.settings && userData.settings.theme) {
         slidesThemeManager.applyFromServer(userData.settings.theme);
     }
@@ -1575,74 +1575,34 @@ function bindKeyboard() {
 // ================================================
 
 
-function onBeforeUnload(e) {
-      e.preventDefault();
-      e.returnValue = '';   // legacy flag — Chrome needs this to show the dialog
-  }
-function markDirty() {
-    editorState.isDirty = true;
-    $('saveState').textContent = 'Unsaved changes…';
-    window.addEventListener('beforeunload', onBeforeUnload)
-}
-
-/**
- *
- * @param {object} [options]
- * @param {boolean} [options.explicit=true] - false for auto-save paths
- * @returns {Promise<boolean>} whether a save actually completed
- */
-async function saveDeck(options = {}) {
-    const { explicit = true } = options;
-
-    if (explicit && !editorState.renamePromptDismissed && isUntitledDeck()) {
-        openRenamePrompt();
-        return false;
-    }
-
-    if (editorState.isSaving || !editorState.isDirty) return false;
-
-    editorState.isSaving = true;
-    $('saveState').textContent = 'Saving…';
-
-    syncCurrentSlideFromCanvas();
-
-    const ok = await slidesStorage.saveDeck(editorState.deck.id, editorState.deck);
-
-    if (ok) {
-        editorState.isDirty = false;
-
-        const now = new Date();
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        $('saveState').textContent = `Saved · ${hh}:${mm}`;
-
-        // safe to close the tab — disarm the beforeunload guard
-        window.removeEventListener('beforeunload', onBeforeUnload);
-    } else {
-        showNotification('Save failed — will retry automatically', true);
-    }
-
-    editorState.isSaving = false;
-    return ok;
-}
-
-/**
- * True while the deck still carries a default name. Covers the variants
- * in circulation: the Workdeck API seeds 'Untitled'; the editor's rename
- * fallback uses 'Untitled deck'.
- * @returns {boolean} True if the name is empty or a default untitled name
- */
-function isUntitledDeck() {
-    const currentName = ((editorState.deck && editorState.deck.name) || '').trim().toLowerCase();
-    return !currentName || currentName === 'untitled' || currentName === 'untitled deck';
-}
-
 function startAutoSave() {
-    editorState.autoSaveTimer = setInterval(() => {
-        if (editorState.isDirty) {
-            saveDeck({ explicit: false });
+    if (editorState.autosave) return;
+    editorState.autosave = WDAutosave.create({
+        save: async () => {
+            syncCurrentSlideFromCanvas();
+            return slidesStorage.saveDeck(editorState.deck.id, structuredClone(editorState.deck));
+        },
+        onState: (state, dirty) => {
+            editorState.isDirty = dirty;
+            editorState.isSaving = state === 'saving';
+            WDAutosave.status(state);
         }
-    }, APP_CONFIG.autoSave.interval);
+    });
+}
+
+function markDirty() {
+    startAutoSave();
+    editorState.autosave.change();
+}
+
+async function saveDeck() {
+    startAutoSave();
+    return editorState.autosave.flush();
+}
+
+function isUntitledDeck() {
+    const name = (editorState.deck?.name || '').trim().toLowerCase();
+    return !name || name === 'untitled' || name === 'untitled deck';
 }
 
 // ================================================
@@ -2062,12 +2022,11 @@ async function exportPptx() {
 // ================================================
 
 function bindTopNav() {
-    $('homeBtn').addEventListener('click', () => {
-        saveDeck({ explicit: false });   // best-effort; the reminder must not block navigation
-        window.location.href = '/slides/';
+    $('homeBtn').addEventListener('click', async () => {
+        if (await saveDeck()) window.location.href = '/slides/';
     });
 
-    $('saveBtn').addEventListener('click', () => saveDeck());
+
     $('deckTitle').addEventListener('click', openRenameModal);
 
     bindExportMenu();
@@ -2216,13 +2175,13 @@ function bindSettingsMenu() {
     });
 
     $('logoutBtn').addEventListener('click', async () => {
-        if (editorState.isSaving) { showNotification('Wait for the save to finish', true); return; }
-        if (editorState.isDirty && !await saveDeck({ explicit: false })) return;
+        if (!await saveDeck()) return;
         await slidesAuth.logout();
     });
 }
 
 async function openShareModal() {
+    if (!await saveDeck()) return;
     const result = await slidesStorage.shareDeck(editorState.deck.id);
     if (!result) {
         showNotification('Could not create share link', true);

@@ -34,7 +34,7 @@ class PWAManager {
 
         // Register service worker with update detection
         const registration = await navigator.serviceWorker.register('/sheets/service-worker.js', {
-          scope: '/sheets/'
+          scope: '/sheets/', updateViaCache: 'none'
         });
 
         this.swRegistration = registration;
@@ -80,13 +80,8 @@ class PWAManager {
    * Set up install prompt handling
    */
   setupInstallPrompt() {
-    window.addEventListener('beforeinstallprompt', (e) => {
-      // Prevent the mini-infobar from appearing
-      e.preventDefault();
-
-      // Store the event for later use
-      this.deferredPrompt = e;
-    });
+    // Use the browser's install UI. There is no custom Install button, so
+    // suppressing beforeinstallprompt only hides the banner and logs a warning.
 
     // Handle successful installation
     window.addEventListener('appinstalled', () => {
@@ -267,7 +262,7 @@ class PWAManager {
     const updateThemeColor = () => {
       const isDark = document.documentElement.classList.contains('dark-theme') ||
                      document.documentElement.classList.contains('dark');
-      const themeColor = isDark ? '#1a1a1a' : '#4F46E5';
+      const themeColor = isDark ? '#1a1a1a' : '#22c55e';
 
       let metaTag = document.querySelector('meta[name="theme-color"]');
       if (!metaTag) {

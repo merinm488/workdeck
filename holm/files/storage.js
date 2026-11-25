@@ -7,7 +7,7 @@ class FileboxStorage {
   }
   async loadUserData() {
     try {
-      const response = await fetch(this.workdeckEndpoint, { credentials: 'same-origin', cache: 'no-store' });
+      const response = await (window.WDBoot?.fetch || fetch)(this.workdeckEndpoint, { credentials: 'same-origin', cache: 'no-store' });
       if (response.status === 401) { this.signIn(); return null; }
       const result = await response.json();
       return response.ok && result.success ? result.data : null;
@@ -16,7 +16,7 @@ class FileboxStorage {
   signIn() { location.assign('/auth/login?redirect=' + encodeURIComponent(location.pathname + location.search)); }
   async uploadFile(opts) {
     try {
-      const response = await fetch(this.apiEndpoint, { method: 'PUT', credentials: 'same-origin',
+      const response = await (window.WDBoot?.fetch || fetch)(this.apiEndpoint, { method: 'PUT', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'uploadFile', data: {
           name: opts.name, mime: opts.mime, base64: opts.base64,
@@ -36,7 +36,7 @@ class FileboxStorage {
   }
   async workdeckAction(action, data) {
     try {
-      const response = await fetch(this.workdeckEndpoint, { method: 'PUT', credentials: 'same-origin',
+      const response = await (window.WDBoot?.fetch || fetch)(this.workdeckEndpoint, { method: 'PUT', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, data }),
       });
       if (response.status === 401) { this.signIn(); return null; }

@@ -220,6 +220,9 @@ test('Holm Files retains original manager/viewers but removes key auth and uses 
     assert.equal(readFileSync(join(dir, 'web/files/styles.css'), 'utf8'),
       readFileSync(new URL('../files/styles.css', import.meta.url), 'utf8'));
     assert.doesNotMatch(html, /View My Key|Your Access Key|filebox_user_hash|sessionStorage|releases\.transloadit/);
+    assert.doesNotMatch(html, /id="fbSidebarClose"/);
+    assert.match(html, /id="fbSidebarToggle"/);
+    assert.match(html, /id="fbSidebarScrim"/);
     assert.match(html, /\/files\/vendor-uppy\.min\.css/);
     assert.match(html, /\/files\/js\/vendor-uppy\.min\.js/);
     assert.equal(readFileSync(join(dir, 'web/files/js/vendor-uppy.min.js'), 'utf8'),
@@ -228,7 +231,7 @@ test('Holm Files retains original manager/viewers but removes key auth and uses 
     assert.ok(readFileSync(join(dir, 'web/files/service-worker.js'), 'utf8').includes("key.startsWith('filebox-')"));
     const main = readFileSync(join(dir, 'web/files/js/main.js'), 'utf8');
     const viewer = readFileSync(join(dir, 'web/files/js/viewer.js'), 'utf8');
-    assert.doesNotMatch(main, /getFileboxUserHash|sessionStorage|fbViewKeyBtn|fbKeyModal/);
+    assert.doesNotMatch(main, /getFileboxUserHash|sessionStorage|fbViewKeyBtn|fbKeyModal|fbSidebarClose/);
     assert.ok(viewer.includes("params.set('id', fileId)"));
     const window = { location: { origin: 'https://workdeck.test', pathname: '/home', search: '' } };
     vm.runInNewContext(readFileSync(join(dir, 'web/js/wd-links.js'), 'utf8'), { window, URL, URLSearchParams });

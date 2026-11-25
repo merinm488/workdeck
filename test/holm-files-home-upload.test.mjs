@@ -75,8 +75,10 @@ for (const [app, code] of [['Holm', source], ['legacy', legacySource]]) {
   });
 }
 
-test('Files list matches Forms table width and left-aligns Updated timestamps', () => {
-  assert.match(css, /\.fb-list-head, #fbList \{[^}]*max-width:760px;/);
+test('Files list uses the shared Docs width and left-aligns Updated timestamps', () => {
+  const sharedCSS = readFileSync(new URL('../holm/auth/home-ui.css', import.meta.url), 'utf8');
+  assert.match(sharedCSS, /#fbList\) \{[^}]*max-width:var\(--wd-home-list-width\)/);
+  assert.match(sharedCSS, /max-width:calc\(var\(--wd-home-list-width\) \+ 2 \* var\(--fb-home-gutter\)\)/);
   assert.match(css, /#fbList \.fb-row-date \{[^}]*grid-column:3;[^}]*text-align:left;/);
   assert.match(css, /\.fb-list-head:has\(\+ #fbList:not\(\.hidden\)\) \{ display: grid; \}/);
 });

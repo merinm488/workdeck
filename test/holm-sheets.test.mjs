@@ -179,6 +179,20 @@ test('Holm Sheets ships same Univer UI, new member auth and reload-safe links', 
       readFileSync(new URL('../sheets/styles.css', import.meta.url), 'utf8'));
     assert.equal(readFileSync(join(dir, 'web/sheets/home.css'), 'utf8'),
       readFileSync(new URL('../sheets/home.css', import.meta.url), 'utf8'));
+    const manifest = JSON.parse(readFileSync(join(dir, 'web/sheets/manifest.json'), 'utf8'));
+    assert.equal(manifest.theme_color, '#22c55e');
+    assert.deepEqual(manifest.icons.map(icon => icon.src),
+      ['/icons/sheets192.png', '/icons/sheetspwa512.png']);
+    for (const icon of manifest.icons) assert.equal(icon.purpose, 'any');
+    assert.deepEqual(readFileSync(join(dir, 'web/icons/sheetspwa512.png')),
+      readFileSync(new URL('../holm/icons/sheets512.png', import.meta.url)));
+    assert.deepEqual(readFileSync(join(dir, 'web/sheets/icons/icon-512x512.png')),
+      readFileSync(new URL('../holm/icons/sheets512.png', import.meta.url)));
+    for (const filename of ['icon-192x192.png', 'apple-touch-icon.png', 'favicon-32x32.png']) {
+      assert.deepEqual(readFileSync(join(dir, 'web/sheets/icons', filename)),
+        readFileSync(new URL('../sheets/icons/' + filename, import.meta.url)));
+    }
+    assert.match(readFileSync(join(dir, 'web/sheets/service-worker.js'), 'utf8'), /sheets-static-holm-v3/);
     const editor = readFileSync(join(dir, 'web/sheets/editor.html'), 'utf8');
     assert.match(editor, /src="\/sheets\/js\/vendor-xlsx\.js"/);
     const storage = readFileSync(join(dir, 'web/sheets/js/storage.js'), 'utf8');

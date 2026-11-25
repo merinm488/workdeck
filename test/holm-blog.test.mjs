@@ -167,7 +167,7 @@ test('Blog header back link returns from the editor to Blog without losing a pen
   ui.handleHomeLinkClick(click);
   assert.equal(click.prevented, true);
   assert.equal(closed, 1);
-  assert.equal(link.href, '/'); // Posts home still returns to Workdeck
+  assert.equal(link.href, '/home'); // Workspace, not the public landing page
   assert.equal(history.url, '/blog/');
   ui.showEditorView();
   ui.handleHomeLinkClick({ button: 0, metaKey: true, preventDefault() { throw new Error('Modified click intercepted'); } });
@@ -191,7 +191,7 @@ test('Blog cards expose rename and delete to the shared list actions menu', asyn
   const ui = runInNewContext(`${render}; ({ renderPosts, renamePost, deletePostFromHome })`, {
     state, $: id => elements[id], document: { createElement: node }, window: { location: { reload() { reloads++; } } },
     prompt: () => 'Renamed', confirm: () => true, blogStorage: {
-      request: async (action, data) => { updated = { action, data }; return { success: true }; },
+      request: async (action, data) => { updated = { action, data }; return { success: true, data: { posts: [{ ...state.posts[0], title: data.title }] } }; },
       deletePost: async id => { deleted = id; return { posts: [] }; },
     }, showToast() {}, openPost() {},
   });
@@ -208,7 +208,9 @@ test('Blog cards expose rename and delete to the shared list actions menu', asyn
   assert.deepEqual({ ...updated.data }, { id: 'post-1', title: 'Renamed' });
   await ui.deletePostFromHome(state.posts[0]);
   assert.equal(deleted, 'post-1');
-  assert.equal(reloads, 2);
+  assert.equal(title.textContent, 'Renamed');
+  assert.equal(state.posts.length, 0);
+  assert.equal(reloads, 0, 'CRUD updates the view without a full-page navigation');
   const sidebar = readFileSync(new URL('../holm/auth/app-sidebar.js', import.meta.url), 'utf8');
   assert.match(sidebar, /blog: \{[^\n]+actions: '\.blog-post-row-actions'/);
   assert.match(readFileSync(new URL('../holm/auth/app-sidebar.css', import.meta.url), 'utf8'), /blog-posts:not\(\.as-list\).*display:grid/);

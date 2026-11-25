@@ -551,7 +551,7 @@ function getVisibleFiles() {
 // ================================================
 
 async function api(action, payload) {
-    const response = await fetch(WD_APP.apiEndpoint, {
+    const response = await (window.WDBoot?.fetch || fetch)(WD_APP.apiEndpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: action, data: payload }),
@@ -569,10 +569,10 @@ async function api(action, payload) {
  * Returns false (and clears the session) when the account is gone.
  */
 async function loadUserData() {
-    const url = WD_APP.apiEndpoint + '?_t=' + Date.now();
+    const url = WD_APP.apiEndpoint;
     let response;
     try {
-        response = await fetch(url, { cache: 'no-store' });
+        response = await (window.WDBoot?.fetch || fetch)(url, { cache: 'no-store' });
     } catch (err) {
         // Server unreachable (offline / dev server not running): keep the
         // session — this is a connectivity problem, not a deleted account —
@@ -582,7 +582,7 @@ async function loadUserData() {
         return false;
     }
     if (!response.ok) {
-        if (response.status === 401) { location.assign('/auth/login?redirect=%2F'); return false; }
+        if (response.status === 401) { location.assign('/auth/login?redirect=%2Fhome'); return false; }
         showNotification('Unable to load workspace.', 'error');
         return false;
     }
@@ -608,6 +608,8 @@ function applyUserData(data) {
     state.calendars = data.calendars || [];
     state.events = data.events || [];
     state.settings = data.settings || {};
+    if (['grid', 'list'].includes(state.settings.viewMode)) state.viewMode = state.settings.viewMode;
+    wdThemeManager.applyFromServer(state.settings.theme);
     render();
 }
 
@@ -713,7 +715,7 @@ function saveSettings(patch) {
 
 // Public landing for signed-out visitors; the legacy access-key form stays
 // in the DOM for a later auth migration, but is not offered as sign-in.
-function showLogin() { location.assign('/auth/login?redirect=%2F'); }
+function showLogin() { location.assign('/auth/login?redirect=%2Fhome'); }
 
 function showHome() { $('homeView').classList.remove('hidden'); }
 
@@ -770,6 +772,7 @@ function render() {
 // Sidebar rendering
 // ================================================
 
+let homeTagUI;
 function renderSidebar() {
     $('allFilesBtn').classList.toggle('active', state.activeTag === null);
 
@@ -781,45 +784,26 @@ function renderSidebar() {
         });
     });
 
-    const list = $('projectList');
-    list.innerHTML = '';
-    state.tags.forEach(function (tag) {
-        const active = state.activeTag === tag.id;
-        const row = $('wdSideTagRowTemplate').content.firstElementChild.cloneNode(true);
-        if (active) {
-            row.classList.add('active');
-            if (tag.color) row.style.background = hexToRgba(tag.color, 0.14);
-        }
-        row.dataset.tag = tag.id;
-        row.setAttribute('role', 'button');
-        row.tabIndex = 0;
-        row.querySelector('.wd-dot').style.background = tag.color;
-        row.querySelector('.wd-side-row-name').textContent = tag.name;
-        row.querySelector('.wd-side-count').textContent = counts[tag.id] || 0;
-
-        row.addEventListener('click', function (e) {
-            if (e.target.closest('.wd-side-action')) return;
-            selectTag(tag.id);
-        });
-        row.addEventListener('keydown', function (e) {
-            if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.wd-side-action')) {
-                e.preventDefault();
-                selectTag(tag.id);
-            }
-        });
-        row.querySelector('.edit').addEventListener('click', function (e) {
-            e.stopPropagation();
-            openProjectForm(tag);
-        });
-        row.querySelector('.danger').addEventListener('click', function (e) {
-            e.stopPropagation();
-            showDeleteProjectModal(tag);
-        });
-        makeDropTarget(row, tag.id);
-        list.appendChild(row);
-    });
-
-    $('projectEmpty').classList.toggle('hidden', state.tags.length > 0);
+    const options = {
+        tags: state.tags, active: state.activeTag, count: id => counts[id] || 0,
+        onSelect: selectTag, onRow: makeDropTarget,
+        onSave: async (id, values) => {
+            const data = await api(id ? 'updateTag' : 'createTag', id ? { tagId: id, updates: values } : values);
+            applyUserData(data);
+        },
+        onDelete: async id => {
+            const data = await api('deleteTag', { tagId: id });
+            if (state.activeTag === id) state.activeTag = null;
+            applyUserData(data);
+        },
+    };
+    if (homeTagUI) homeTagUI.update(options);
+    else {
+        $('newProjectBtn').closest('.wd-side-header').hidden = true;
+        $('projectForm').hidden = true;
+        $('projectEmpty').hidden = true;
+        homeTagUI = window.WDTagUI.mount($('projectList'), options);
+    }
 }
 
 function selectTag(tagId) {
@@ -855,9 +839,14 @@ function renderFooter() {
 }
 
 function renderViewToggle() {
-    document.querySelectorAll('.wd-view-btn').forEach(function (btn) {
-        btn.classList.toggle('active', btn.dataset.view === state.viewMode);
-    });
+    const btn = $('viewToggle');
+    const asList = state.viewMode === 'list';
+    btn.querySelector('.wd-layout-icon-list').classList.toggle('hidden', asList);
+    btn.querySelector('.wd-layout-icon-cards').classList.toggle('hidden', !asList);
+    const label = asList ? 'Switch to card view' : 'Switch to list view';
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    btn.setAttribute('aria-pressed', String(asList));
 }
 
 /**
@@ -1012,6 +1001,9 @@ function renderFiles() {
     }
 
     emptyState.classList.add('hidden');
+    // Both sides must be set on every render (search, tags and view changes).
+    gridView.classList.toggle('hidden', state.viewMode === 'list');
+    listView.classList.toggle('hidden', state.viewMode !== 'list');
 
     if (state.viewMode === 'list') {
         listView.classList.remove('hidden');
@@ -1059,6 +1051,7 @@ function buildCard(file) {
             e.stopPropagation();
             copyFileLink(file);
         });
+        wireCardActions(card);
         return card;
     }
     card.querySelector('.move').addEventListener('click', function (e) {
@@ -1078,6 +1071,7 @@ function buildCard(file) {
         showDeleteModal(file);
     });
     makeDraggable(card, file);
+    wireCardActions(card);
 
     return card;
 }
@@ -1091,6 +1085,7 @@ function buildFolderCard(folder) {
     const when = folder.lastOpened || folder.updatedAt;
     const color = (folder.raw && folder.raw.color) || '#FACC15';
 
+    card.querySelector('.wd-file-icon').append(wdIcon('filebox'));
     card.querySelector('.wd-file-title').textContent = folder.name;
     card.querySelector('.wd-folder-tile-glyph').append(folderArt(color));
     card.querySelector('.wd-folder-tile-count').textContent =
@@ -1119,55 +1114,40 @@ function buildFolderCard(folder) {
         showDeleteModal(folder);
     });
     makeDraggable(card, folder);
+    wireCardActions(card);
 
     return card;
 }
 
-let wdListStrip = null, wdListTrigger = null;
+function wireCardActions(card) {
+    const source = card.querySelector('.wd-file-actions');
+    source.classList.add('wd-card-action-source');
+    const trigger = WDActionMenu.createCardTrigger(() =>
+        [...source.querySelectorAll('button')].map(button => WDActionMenu.fromButton(button)));
+    card.querySelector('.wd-file-card-top').append(trigger);
+}
+
+let wdListMenu = null;
 function closeListActions() {
-    wdListStrip?.remove(); wdListStrip = null;
-    wdListTrigger?.setAttribute('aria-expanded', 'false'); wdListTrigger = null;
+    wdListMenu?.close(); wdListMenu = null;
 }
 function wireListRowActions(row) {
     const more = document.createElement('button');
     more.type = 'button'; more.className = 'wd-file-list-more';
     more.setAttribute('aria-label', 'More actions'); more.title = 'More actions';
-    more.setAttribute('aria-haspopup', 'true'); more.setAttribute('aria-expanded', 'false');
+    more.setAttribute('aria-haspopup', 'menu'); more.setAttribute('aria-expanded', 'false');
     more.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
-    more.onclick = function (e) {
-        e.preventDefault(); e.stopPropagation();
-        if (wdListTrigger === more) { closeListActions(); return; }
-        closeListActions(); wdListTrigger = more;
-        more.setAttribute('aria-expanded', 'true');
-        const strip = document.createElement('div'); strip.className = 'wd-file-action-strip';
-        strip.setAttribute('role', 'group'); strip.setAttribute('aria-label', 'File actions');
-        row.querySelectorAll('.wd-file-actions button').forEach(function (original) {
-            const button = document.createElement('button');
-            button.type = 'button'; button.title = original.title;
-            button.setAttribute('aria-label', original.title);
-            button.classList.toggle('danger', original.classList.contains('danger'));
-            button.innerHTML = original.innerHTML;
-            button.onclick = function (event) { event.stopPropagation(); closeListActions(); original.click(); };
-            strip.append(button);
-        });
-        document.body.append(strip);
-        const rect = more.getBoundingClientRect(), width = strip.offsetWidth, height = strip.offsetHeight;
-        const left = rect.left - width - 6, right = rect.right + 6;
-        strip.style.left = (left >= 8 ? left : right + width <= innerWidth - 8 ? right : Math.max(8, innerWidth - width - 8)) + 'px';
-        strip.style.top = Math.max(8, Math.min(rect.top + (rect.height - height) / 2, innerHeight - height - 8)) + 'px';
-        wdListStrip = strip;
+    const show = (focusLast = false) => {
+        const items = [...row.querySelectorAll('.wd-file-actions button')].map(button => WDActionMenu.fromButton(button));
+        wdListMenu = WDActionMenu.open(more, items, { focusLast, onClose: () => { wdListMenu = null; } });
     };
-    more.onkeydown = function (e) { e.stopPropagation(); };
+    more.onclick = event => { event.preventDefault(); event.stopPropagation(); show(); };
+    more.onkeydown = event => {
+        event.stopPropagation();
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); show(event.key === 'ArrowUp'); }
+    };
     row.append(more);
 }
-document.addEventListener('pointerdown', function (e) {
-    if (wdListStrip && !wdListStrip.contains(e.target) && !wdListTrigger?.contains(e.target)) closeListActions();
-});
-document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && wdListStrip) { const trigger = wdListTrigger; closeListActions(); trigger?.focus(); }
-});
-window.addEventListener('scroll', closeListActions, true);
-window.addEventListener('resize', closeListActions);
 
 function buildListRow(file) {
     if (file.kind === 'folder') return buildFolderRow(file);
@@ -2103,13 +2083,11 @@ function setupEventListeners() {
     }
 
     // ----- View toggle -----
-    document.querySelectorAll('.wd-view-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            state.viewMode = btn.dataset.view;
-            localStorage.setItem(WD_APP.viewKey, state.viewMode);
-            saveSettings({ viewMode: state.viewMode });
-            render();
-        });
+    $('viewToggle').addEventListener('click', function () {
+        state.viewMode = state.viewMode === 'list' ? 'grid' : 'list';
+        localStorage.setItem(WD_APP.viewKey, state.viewMode);
+        saveSettings({ viewMode: state.viewMode });
+        render();
     });
 
     // ----- Settings dropdown -----
@@ -2133,6 +2111,13 @@ function setupEventListeners() {
             $('themeSubmenu').classList.remove('active');
             const container = $('themeToggleBtn').closest('.wd-theme-container');
             if (container) container.classList.remove('active');
+        });
+    });
+
+    document.querySelectorAll('#settingsDropdown > .wd-theme-setting .wd-theme-choice').forEach(function (choice) {
+        choice.addEventListener('click', function (e) {
+            e.stopPropagation();
+            $('themeSubmenu').querySelector(`.wd-theme-option[data-theme="${choice.dataset.theme}"]`).click();
         });
     });
 
@@ -2217,6 +2202,9 @@ function updateThemeLabel() {
     document.querySelectorAll('.wd-theme-option').forEach(function (option) {
         option.classList.toggle('active', option.dataset.theme === saved);
     });
+    document.querySelectorAll('#settingsDropdown > .wd-theme-setting .wd-theme-choice').forEach(function (choice) {
+        choice.setAttribute('aria-pressed', String(choice.dataset.theme === saved));
+    });
 }
 
 // ================================================
@@ -2236,7 +2224,7 @@ async function init() {
     initSidebar();
 
     try {
-        const response = await fetch('/api/me', { credentials: 'same-origin', cache: 'no-store' });
+        const response = await (window.WDBoot?.fetch || fetch)('/api/me', { credentials: 'same-origin', cache: 'no-store' });
         if (!response.ok) throw new Error('Session check failed');
         window.workdeckSession = await response.json();
         if (!window.workdeckSession.member) { showLogin(); return; }

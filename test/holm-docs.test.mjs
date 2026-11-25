@@ -158,10 +158,16 @@ test('Holm React Docs build preserves editor/preview and has no access-key login
       { timeout: 150_000, maxBuffer: 500_000 });
     const index = readFileSync(join(dir, 'web/docs/index.html'), 'utf8');
     assert.match(index, /\/docs\/assets\/index-/);
+    for (const size of [192, 512]) {
+      const icon = readFileSync(join(dir, 'web/docs', `icon-${size}.png`));
+      assert.equal(icon.readUInt32BE(16), size, 'PWA icon width matches its manifest');
+      assert.equal(icon.readUInt32BE(20), size);
+      assert.ok(icon.length < 300_000, 'PWA install must not download megabyte-sized icons');
+    }
     assert.match(index, /Holm Docs: refreshed navigation precache/);
     const rootWorker = readFileSync(join(dir, 'web/sw.js'), 'utf8');
     assert.match(rootWorker, /k\.startsWith\('workdeck-landing-'\)/);
-    assert.match(rootWorker, /'\/docs\/', '\/sheets\/', '\/files\/'/);
+    assert.match(rootWorker, /'\/docs\/', '\/sheets\/', '\/files\/', '\/todo\/'/);
     // CacheStorage is shared by every service worker on this origin. A root
     // update must preserve Docs' precache and leave Docs navigations alone.
     const listeners = {};
@@ -173,14 +179,15 @@ test('Holm React Docs build preserves editor/preview and has no access-key login
     });
     await new Promise((resolve, reject) => listeners.activate({ waitUntil: promise => promise.then(resolve, reject) }));
     assert.deepEqual(deleted, ['workdeck-landing-v14', 'workdeck-landing-v15']);
-    for (const path of ['/docs/?doc=example', '/docs/assets/index.js', '/sheets/', '/files/']) {
+    for (const path of ['/docs/?doc=example', '/docs/assets/index.js', '/sheets/', '/files/', '/todo/', '/calendar/', '/kanban/', '/minutes/', '/forms/', '/slides/', '/draw/', '/blog/']) {
       let intercepted = false;
       listeners.fetch({ request: { url: 'https://workdeck.test' + path, method: 'GET' }, respondWith: () => { intercepted = true; } });
       assert.equal(intercepted, false, `root worker intercepted ${path}`);
     }
     const docsWorker = readFileSync(join(dir, 'web/docs/sw.js'), 'utf8');
     assert.match(docsWorker, /precacheAndRoute/);
-    assert.match(docsWorker, /NavigationRoute/);
+    assert.doesNotMatch(docsWorker, /NavigationRoute|url:"index.html"/);
+    assert.match(docsWorker, /workdeck-docs-hashed-v1/);
     assert.doesNotMatch(index, /docs-ecru-one\.vercel|node_modules\/|Enter your Key/);
     const editor = readFileSync(new URL('../docs-src/src/components/DocEditor.jsx', import.meta.url), 'utf8');
     const detail = readFileSync(new URL('../docs-src/src/components/DocDetailView.jsx', import.meta.url), 'utf8');

@@ -125,6 +125,7 @@ export async function handleMinutes(request, env) {
   const { ds, kv } = env.holm.app.member;
   if (request.method === 'GET') return json({ success: true, data: {
     minutes: ds.find(MINUTES, {}, { limit: 200, order: 'desc' }),
+    tags: ds.find('workspace_tags', {}, { limit: 200, order: 'desc' }),
     todo: ds.find(TODO, {}, { limit: 200, order: 'desc' }),
     events: ds.find(EVENTS, {}, { limit: 2000, order: 'desc' }),
     settings: { theme: 'dark', ...(kv.get(PREFS) || {}) },

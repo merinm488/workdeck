@@ -1,0 +1,321 @@
+/* Holm interface adapters. /home supplies shared NEUTRALS and component design;
+   each app's original stylesheet supplies its own light/dark accent palette.
+   Never recolor authored content, tags, priorities, calendar colors or charts. */
+:root {
+  --wd-control-on-accent: #fff;
+}
+:root, :root body {
+  --wd-control-accent: var(--accent-color, var(--accent));
+  --wd-control-soft: var(--accent-light, var(--accent-soft));
+  --wd-control-focus: var(--wd-control-accent);
+}
+/* Adapt the four apps whose token names/formats differ. Do not overwrite the
+   source accent variables: hover highlights and selected tools still use them. */
+html[data-wd-app="home"], html[data-wd-app="home"] body {
+  --wd-control-accent: var(--accent);
+  --wd-control-soft: var(--accent-soft);
+  --wd-control-focus: var(--wd-ui-focus);
+}
+html[data-wd-app="docs"], html[data-wd-app="docs"] body {
+  --wd-control-accent: rgb(var(--accent));
+  --wd-control-soft: rgba(66, 133, 244, .15);
+}
+html[data-wd-app="files"], html[data-wd-app="files"] body {
+  --wd-control-accent: var(--fb-accent);
+  --wd-control-soft: var(--fb-accent-soft);
+}
+html[data-wd-app="minutes"], html[data-wd-app="minutes"] body {
+  /* Minutes' original primary fill stays green in both themes; --green is
+     its separate, brighter dark-theme foreground/highlight color. */
+  --wd-control-accent: #276b53;
+  --wd-control-soft: var(--green-soft);
+  --wd-control-focus: var(--green);
+}
+/* Match the label to the actual fill, not to an assumption of universal yellow.
+   Light Draw/Forms/Todo/Kanban and Minutes need white; pastel dark accents and
+   brighter blue/green/orange/teal fills need dark text for readable contrast. */
+html[data-theme="dark"],
+html:is([data-wd-app="home"], [data-wd-app="docs"], [data-wd-app="sheets"],
+  [data-wd-app="slides"], [data-wd-app="calendar"], [data-wd-app="files"], [data-wd-app="blog"]) {
+  --wd-control-on-accent: #0a0a0a;
+}
+html[data-wd-app="minutes"] { --wd-control-on-accent: #fff; }
+
+:root, :root body {
+  --bg: var(--wd-ui-bg);
+  --bg-primary: var(--wd-ui-bg);
+  --bg-elevated: var(--wd-ui-bg-elevated);
+  --bg-secondary: var(--wd-ui-bg-elevated);
+  --bg-input: var(--wd-ui-bg-input);
+  --bg-tertiary: var(--wd-ui-bg-input);
+  --bg-sidebar: var(--wd-ui-bg);
+  --bg-nav: var(--wd-ui-bg);
+  --text: var(--wd-ui-text);
+  --text-primary: var(--wd-ui-text);
+  --text-secondary: var(--wd-ui-text-secondary);
+  --text-tertiary: var(--wd-ui-text-tertiary);
+  --border: var(--wd-ui-border);
+  --border-color: var(--wd-ui-border);
+  --border-strong: var(--wd-ui-border-strong);
+  --danger: var(--wd-ui-danger);
+  --danger-soft: var(--wd-ui-danger-soft);
+  --danger-light: var(--wd-ui-danger-soft);
+  --shadow: var(--wd-ui-shadow);
+  --shadow-sm: var(--wd-ui-shadow-sm);
+  --radius: var(--wd-ui-radius);
+  --radius-sm: var(--wd-ui-radius-sm);
+  /* Minutes */
+  --surface: var(--wd-ui-bg-elevated);
+  --ink: var(--wd-ui-text);
+  --muted: var(--wd-ui-text-secondary);
+  --line: var(--wd-ui-border);
+  /* Shared sidebar, table and settings adapters */
+  --wd-side-bg: var(--wd-ui-bg);
+  --wd-side-fg: var(--wd-ui-text);
+  --wd-side-muted: var(--wd-ui-text-secondary);
+  --wd-side-line: var(--wd-ui-border);
+  --wd-side-hover: var(--wd-ui-bg-input);
+  --wd-menu-surface: var(--wd-ui-bg-elevated);
+  --wd-menu-ink: var(--wd-ui-text);
+  --wd-menu-line: var(--wd-ui-border);
+  --wd-menu-hover: var(--wd-ui-bg-input);
+  --wd-menu-muted: var(--wd-ui-text-secondary);
+  /* Sheets editor chrome (not workbook cell styles) */
+  --toolbar-bg: var(--wd-ui-bg-elevated);
+  --formula-bar-bg: var(--wd-ui-bg);
+  --header-bg: var(--wd-ui-bg-elevated);
+  --header-text: var(--wd-ui-text);
+  --tab-bg: var(--wd-ui-bg-elevated);
+  --tab-active: var(--wd-ui-bg);
+  --scrollbar-bg: var(--wd-ui-bg);
+  --scrollbar-thumb: var(--wd-ui-border-strong);
+}
+
+/* Docs consumes space-separated RGB variables, unlike the other apps. Set
+   them on both the root and React's nested .dark scope to avoid legacy values. */
+html[data-wd-app="docs"], html[data-wd-app="docs"] :is(body, .dark) {
+  --bg-primary: var(--wd-ui-bg-rgb);
+  --bg-secondary: var(--wd-ui-bg-elevated-rgb);
+  --bg-tertiary: var(--wd-ui-bg-input-rgb);
+  --border-color: var(--wd-ui-border-rgb);
+  --text-primary: var(--wd-ui-text-rgb);
+  --text-secondary: var(--wd-ui-text-secondary-rgb);
+}
+
+/* Sidebar and header chrome are the same neutral canvas as Home, including
+   the Files/Calendar native sidebars and the React Docs sidebar. */
+html[data-wd-app] body {
+  background: var(--wd-ui-bg);
+  color: var(--wd-ui-text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+html[data-wd-app] :is(.wd-sidebar, .wd-app-sidebar, .fb-sidebar, .cal-sidebar, .wd-docs-sidebar) {
+  background: var(--wd-ui-bg);
+  color: var(--wd-ui-text);
+  border-color: var(--wd-ui-border);
+  box-shadow: none;
+}
+html[data-wd-app] :is(.top-nav, .home-header, .blog-header, .fb-header, .topbar) {
+  background: var(--wd-ui-bg);
+  border-color: var(--wd-ui-border);
+}
+html[data-wd-app] .wd-app-sidebar { font-family: inherit; }
+html[data-wd-app] :is(.wd-app-side-all.active, .wd-app-side-tag-name.active) {
+  background: var(--wd-control-soft);
+  color: var(--wd-ui-text);
+}
+html[data-wd-app] .wd-app-side-add:hover { background: var(--wd-ui-bg-input); }
+html[data-wd-app] :is(.wd-app-action-strip, .wd-app-items.as-list > [data-id]) {
+  background: var(--wd-ui-bg-elevated);
+}
+html[data-wd-app] .wd-app-items.as-list > [data-id]:hover { background: var(--wd-ui-bg-input); }
+
+/* Consistent geometry and interaction, NOT a universal brand color. Primary
+   fills, highlights and focus rings follow each app's original theme tokens.
+   :is() beats old per-theme button variants without flattening app identity. */
+html[data-wd-app] :is(
+  .wd-primary-btn, .wd-new-btn, .wd-key-copy-btn,
+  .btn-primary, .home-create-btn, .home-confirm-rename-btn,
+  .blog-btn-primary, .fb-primary-btn, .primary, button.bg-blue-600,
+  .present-btn, .share-modal-copy-btn, .share-modal-done-btn,
+  .rename-prompt-btn-primary, .wd-app-side-submit, .update-btn
+) {
+  background: var(--wd-control-accent);
+  color: var(--wd-control-on-accent);
+  border-color: var(--wd-control-accent);
+  border-radius: var(--wd-ui-radius-sm);
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: filter .15s ease, transform .15s ease;
+}
+html[data-wd-app] :is(
+  .wd-primary-btn, .wd-new-btn, .wd-key-copy-btn,
+  .btn-primary, .home-create-btn, .home-confirm-rename-btn,
+  .blog-btn-primary, .fb-primary-btn, .primary, button.bg-blue-600,
+  .present-btn, .share-modal-copy-btn, .share-modal-done-btn,
+  .rename-prompt-btn-primary, .wd-app-side-submit, .update-btn
+):hover:not(:disabled) {
+  background: var(--wd-control-accent);
+  color: var(--wd-control-on-accent);
+  border-color: var(--wd-control-accent);
+  filter: brightness(1.08);
+}
+html[data-wd-app] :is(.btn-primary, .home-create-btn, .blog-btn-primary, .fb-primary-btn, .primary):active:not(:disabled) {
+  transform: translateY(1px);
+}
+html[data-wd-app] :is(.wd-secondary-btn, .fb-secondary-btn, .btn-secondary, .blog-btn-secondary) {
+  background: var(--wd-ui-bg-elevated);
+  color: var(--wd-ui-text);
+  border-color: var(--wd-ui-border);
+  border-radius: var(--wd-ui-radius-sm);
+  box-shadow: none;
+}
+html[data-wd-app] :is(.wd-secondary-btn, .fb-secondary-btn, .btn-secondary, .blog-btn-secondary):hover:not(:disabled) {
+  background: var(--wd-ui-bg-input);
+}
+/* Destructive actions must not masquerade as a primary/success action. */
+html[data-wd-app] :is(.home-confirm-delete-btn, .wd-danger-btn, .fb-danger-btn, .btn-danger, .blog-btn-danger) {
+  background: var(--wd-ui-danger);
+  border-color: var(--wd-ui-danger);
+  color: #fff;
+  border-radius: var(--wd-ui-radius-sm);
+}
+html[data-wd-app] :is(.home-confirm-delete-btn, .wd-danger-btn, .fb-danger-btn, .btn-danger, .blog-btn-danger):hover:not(:disabled) {
+  background: var(--wd-ui-danger);
+  filter: brightness(1.08);
+}
+html[data-wd-app] :is(button, input, select, textarea, a, [tabindex]):focus-visible {
+  outline: 2px solid var(--wd-control-focus);
+  outline-offset: 3px;
+}
+html[data-wd-app] :is(button, input, select, textarea):disabled {
+  cursor: not-allowed;
+  opacity: .55;
+  filter: none;
+  transform: none;
+}
+html[data-wd-app] :is(input, textarea)::placeholder { color: var(--wd-ui-text-secondary); opacity: 1; }
+html[data-wd-app] :is(input, select, textarea) { accent-color: var(--wd-control-accent); }
+html[data-wd-app] :is(.wd-app-side-error, .wd-app-side-delete, .wd-app-action-strip button.danger) { color: var(--wd-ui-danger); }
+
+/* Icons and controls share the app palette, including its dark-mode variant. */
+html[data-wd-app] { --wd-app-color: var(--wd-control-accent); --wd-app-tint: var(--wd-control-soft); }
+html[data-wd-app] :is(.home-card-icon, .td-list-icon, .spreadsheet-icon, .blog-post-row-icon, .fb-brand-icon) {
+  background: var(--wd-app-tint);
+  color: var(--wd-app-color);
+}
+/* Remove decorative gradients on app chrome. Board covers and Draw's dot
+   grid are content/navigation aids and intentionally retain their colors. */
+html[data-wd-app="kanban"] { --board-canvas: var(--wd-ui-bg); --kb-column: var(--wd-ui-bg-elevated); --kb-column-border: var(--wd-ui-border); --kb-card-border: var(--wd-ui-border); }
+html[data-wd-app="kanban"] #boardsView { background: var(--wd-ui-bg); }
+html[data-wd-app="sheets"] .spreadsheet-card::before { background: var(--wd-app-color); }
+html[data-wd-app="sheets"] .home-bg-circle { background: var(--wd-app-color); }
+/* Filled selected controls need the same readable foreground as buttons. */
+html[data-wd-app] :is(.builder-add-btn, .thumb-card.active .thumb-num, .rb-day.selected,
+  .fc .fc-day-today .fc-daygrid-day-number, .fc .fc-button:not(:disabled).fc-button-active,
+  .btn-outline-primary:hover, .fb-pwa-banner button, #copyShareUrlBtn.copied) {
+  background: var(--wd-control-accent);
+  border-color: var(--wd-control-accent);
+  color: var(--wd-control-on-accent);
+}
+html[data-wd-app] :is(#formjs, #builder) .fjs-button[type="submit"] {
+  background: var(--wd-control-accent);
+  border-color: var(--wd-control-accent);
+  color: var(--wd-control-on-accent);
+}
+/* Success is semantic, not the interface accent. */
+html[data-wd-app] :is(.notification.success, .fb-notification.success, .pwa-success-notification, .connection-status.online) {
+  background: var(--wd-ui-sheet-accent);
+  border-color: var(--wd-ui-sheet-accent);
+  color: #052e16;
+}
+/* The third-party editors use the app's neutral tokens for their chrome.
+   Leave paper/canvas/cell backgrounds and exported content alone. */
+html[data-wd-app="minutes"] .ql-toolbar.ql-snow,
+html[data-wd-app="blog"] .ql-toolbar.ql-snow {
+  background: var(--wd-ui-bg-elevated);
+  border-color: var(--wd-ui-border);
+}
+html[data-wd-app="minutes"] .ql-snow .ql-stroke { stroke: var(--wd-ui-text-secondary); }
+html[data-wd-app="minutes"] .ql-snow .ql-fill { fill: var(--wd-ui-text-secondary); }
+html[data-wd-app="minutes"] .ql-snow .ql-picker { color: var(--wd-ui-text); }
+html[data-wd-app="minutes"] .ql-snow .ql-picker-options,
+html[data-wd-app="minutes"] .ql-snow .ql-tooltip {
+  background: var(--wd-ui-bg-elevated);
+  color: var(--wd-ui-text);
+  border-color: var(--wd-ui-border);
+}
+/* Markdown editor chrome uses GitHub-style tokens rather than Tailwind. */
+html[data-wd-app="docs"] .wmd-container,
+html[data-wd-app="docs"] .wmd-container .wmde-markdown-var {
+  --color-canvas-default: var(--wd-ui-bg);
+  --color-canvas-subtle: var(--wd-ui-bg-elevated);
+  --color-fg-default: var(--wd-ui-text);
+  --color-fg-muted: var(--wd-ui-text-secondary);
+  --color-border-default: var(--wd-ui-border);
+  --color-border-muted: var(--wd-ui-border);
+  --color-accent-fg: var(--wd-control-focus);
+}
+html[data-wd-app="docs"] .wmd-container .w-md-editor-toolbar { background: var(--wd-ui-bg-elevated); }
+html[data-wd-app="docs"] .wmd-container textarea.w-md-editor-text-input:focus-visible { outline: none; }
+/* Docs' utility-based dialogs, cards, fields and selections use the same
+   surfaces as the static apps. Authored Markdown is deliberately excluded. */
+html[data-wd-app="docs"] #root .bg-white:not(button, .wd-docs-sidebar, .prose *, .wmde-markdown *) {
+  background-color: var(--wd-ui-bg-elevated);
+}
+html[data-wd-app="docs"] #root .fixed.inset-0.bg-white {
+  background-color: var(--wd-ui-bg);
+}
+html[data-wd-app="docs"] :is(.wd-docs-sidebar .bg-blue-100, .wd-docs-sidebar .bg-blue-900\/20) {
+  background: var(--wd-control-soft);
+  color: var(--wd-ui-text);
+}
+html[data-wd-app="docs"] :is(input.input-base, #root input[type="text"], #root input[type="search"]) {
+  background: var(--wd-ui-bg-input);
+  color: var(--wd-ui-text);
+  border-color: var(--wd-ui-border);
+}
+html[data-wd-app="docs"] :is(button, input, textarea):focus-visible {
+  --tw-ring-color: var(--wd-control-focus);
+  --tw-ring-offset-color: var(--wd-ui-bg);
+}
+/* Univer's CSS variables style menus/toolbars, not cell data or exports.
+   Keep the ramp static: Univer's own dark classes select the appropriate stop. */
+html[data-wd-app="sheets"] :is(body, .univer-container) {
+  --univer-gray-50: var(--wd-ui-neutral-50);
+  --univer-gray-100: var(--wd-ui-neutral-100);
+  --univer-gray-200: var(--wd-ui-neutral-200);
+  --univer-gray-300: var(--wd-ui-neutral-300);
+  --univer-gray-400: var(--wd-ui-neutral-400);
+  --univer-gray-500: var(--wd-ui-neutral-500);
+  --univer-gray-600: var(--wd-ui-neutral-600);
+  --univer-gray-700: var(--wd-ui-neutral-700);
+  --univer-gray-800: var(--wd-ui-neutral-800);
+  --univer-gray-900: var(--wd-ui-neutral-950);
+  --univer-primary-50: var(--wd-control-soft);
+  --univer-primary-100: var(--wd-control-soft);
+  --univer-primary-200: var(--wd-control-accent);
+  --univer-primary-300: var(--wd-control-accent);
+  --univer-primary-400: var(--wd-control-accent);
+  --univer-primary-500: var(--wd-control-accent);
+  --univer-primary-600: var(--wd-control-focus);
+  --univer-primary-700: var(--wd-control-focus);
+  --univer-primary-900: var(--wd-control-soft);
+}
+html[data-wd-app="sheets"] [data-u-comp="workbench-layout"] { background: var(--wd-ui-bg-elevated); }
+/* Allow the Minutes search to shrink next to its fixed-width filter. */
+html[data-wd-app="minutes"] .home-controls input { min-width: 0; }
+html[data-wd-app="minutes"] .meeting-list { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 480px) {
+  html[data-wd-app="minutes"] .topbar { height: auto; min-height: 64px; flex-wrap: wrap; padding-block: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-wd-app] :is(button, .wd-app-sidebar, .wd-sidebar) { transition: none; }
+}
+/* Minutes' printable document remains paper, regardless of the UI theme. */
+@media print {
+  html[data-wd-app="minutes"], html[data-wd-app="minutes"] body { background: #fff; color: #000; }
+}

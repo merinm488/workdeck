@@ -297,7 +297,7 @@ function closeSettingsMenus() {
 
 function wireEvents() {
     homeBtn.addEventListener('click', () => {
-        window.location.href = '/';
+        window.location.href = '/home';
     });
 
     newDeckBtn.addEventListener('click', createNewDeck);

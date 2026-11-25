@@ -61,6 +61,7 @@ export async function handleKanban(request, env) {
   if (request.method === 'GET') return json({ success: true, data: {
     kanban: ds.find(COLLECTION, {}, { limit: MAX_BOARDS, order: 'desc' }).map(exposed),
     todo: ds.find(TODO, {}, { limit: 200, order: 'desc' }),
+    tags: ds.find('workspace_tags', {}, { limit: 200, order: 'desc' }),
     settings: { theme: 'dark', ...(kv.get(SETTINGS) || {}),
       kanbanCards: (kv.get('todo_settings') || {}).kanbanCards || [] },
   } });

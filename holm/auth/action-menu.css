@@ -1,0 +1,46 @@
+/* Shared Google-Docs-style action dropdown. Mounted on body to avoid clipping
+   by list scroll containers, sticky headers, or transformed preview cards. */
+html[data-wd-app] .wd-action-menu {
+  position: fixed; z-index: 1200; display: flex; flex-direction: column;
+  box-sizing: border-box; width: 232px; max-width: calc(100vw - 16px);
+  margin: 0; padding: 6px; overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid var(--wd-ui-border); border-radius: 10px;
+  background: var(--wd-ui-bg-elevated); color: var(--wd-ui-text);
+  box-shadow: var(--wd-ui-shadow); font: 14px/1.4 Inter, system-ui, sans-serif;
+}
+html[data-wd-app] .wd-action-menu .wd-action-menu-item {
+  display: flex; align-items: center; justify-content: flex-start; gap: 12px;
+  box-sizing: border-box; flex: none; width: 100%; min-height: 40px;
+  margin: 0; padding: 9px 12px; border: 0; border-radius: 6px;
+  background: transparent; color: inherit; font: inherit; text-align: left;
+  cursor: pointer; white-space: normal;
+}
+html[data-wd-app] .wd-action-menu .wd-action-menu-item:is(:hover, :focus-visible) {
+  background: var(--wd-ui-bg-input); outline: none;
+}
+html[data-wd-app] .wd-action-menu .wd-action-menu-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--wd-ui-border-strong);
+}
+html[data-wd-app] .wd-action-menu .wd-action-menu-item.danger { color: var(--wd-ui-danger); }
+html[data-wd-app] .wd-action-menu .wd-action-menu-item.danger:is(:hover, :focus-visible) { background: var(--wd-ui-danger-soft); }
+html[data-wd-app] .wd-action-menu .wd-action-menu-item:disabled { opacity: .5; cursor: default; }
+html[data-wd-app] .wd-action-menu-icon { display: grid; place-items: center; flex: 0 0 18px; width: 18px; height: 18px; }
+html[data-wd-app] .wd-action-menu-icon svg { width: 18px; height: 18px; }
+html[data-wd-app] .wd-action-menu-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+html[data-wd-app] .wd-action-menu-divider { flex: none; height: 1px; margin: 5px 6px; background: var(--wd-ui-border); }
+/* Cards have one always-visible entry point; their original action buttons
+   stay hidden as dispatch targets so all app-specific behavior is retained. */
+html[data-wd-app] :is(.wd-card-action-source, .wd-home-card-actions) { display: none !important; }
+html[data-wd-app] .wd-card-menu-slot { display: flex; align-items: center; flex: none; }
+html[data-wd-app] .wd-card-more {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  box-sizing: border-box; width: 36px; height: 36px; margin: 0; padding: 0;
+  border: 0; border-radius: 8px; background: transparent;
+  color: var(--wd-ui-text-tertiary); opacity: 1; cursor: pointer;
+}
+html[data-wd-app] .wd-card-more:is(:hover, :focus-visible, [aria-expanded="true"]) {
+  background: var(--wd-ui-bg-input); color: var(--wd-ui-text);
+}
+html[data-wd-app] .wd-card-more:focus-visible { outline: 2px solid var(--wd-control-focus); outline-offset: 2px; }
+html[data-wd-app] .wd-card-more > svg { width: 18px; height: 18px; }
+@media (hover: none) { html[data-wd-app] .wd-action-menu .wd-action-menu-item { min-height: 44px; } }

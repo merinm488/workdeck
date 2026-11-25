@@ -6,6 +6,12 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { operations as extraMcpOperations } from '../holm/auth/mcp-extra-contract.js';
+import { buildThemeTokens, withSuiteTheme } from '../holm/auth/theme-build.mjs';
+import { withSheetEditorTheme, withSharedSheetTheme } from '../holm/sheets/theme-build.mjs';
+import { withSheetAutosave } from '../holm/sheets/autosave-build.mjs';
+import { homeComponentCSS, homeIconsJS, withHomeUI } from '../holm/auth/home-ui-build.mjs';
+import { withoutDocPins } from '../holm/docs-src/pin-free-build.mjs';
+import { accountAvatar, withAccountAvatars, withDocsAccountAvatar } from '../holm/auth/account-build.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const output = resolve(process.argv[2] || '/tmp/workdeck-holm-landing');
@@ -21,10 +27,23 @@ const segment = (start, end) => {
 };
 // Reuse the original dashboard and card templates, not a new approximation.
 // Replace legacy account controls; Holm provides the consented MCP endpoint.
+const themeChoices = [
+  ['light', '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>'],
+  ['dark', '<path d="M20.5 15.5A9 9 0 0 1 8.5 3.5a9 9 0 1 0 12 12Z"/>'],
+  ['system', '<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8m-4-3v3"/>'],
+].map(([theme, icon]) => `<button type="button" class="wd-theme-choice" data-theme="${theme}" aria-label="${theme[0].toUpperCase() + theme.slice(1)} theme" aria-pressed="false" title="${theme[0].toUpperCase() + theme.slice(1)} theme"><svg viewBox="0 0 24 24" aria-hidden="true">${icon}</svg></button>`).join('');
+// Render the dashboard account menu in the HTML itself. Keep the old theme
+// controls hidden for the dashboard's existing theme persistence handlers, but
+// never depend on a second script to replace visible legacy controls at runtime.
+const legacyTheme = segment('                                <div class="wd-theme-container">', '                                <button class="wd-dropdown-item" id="viewKeyBtn">');
 const homeView = segment('    <!-- ===== HOME VIEW ===== -->', '    <!-- ===== MODALS ===== -->')
   .replace('class="wd-home-view hidden"', 'class="wd-home-view"')
+  .replace('id="settingsBtn" class="wd-icon-btn"', 'id="settingsBtn" class="wd-icon-btn wd-account-trigger"')
+  .replace('id="settingsDropdown" class="wd-dropdown wd-dropdown-right"', 'id="settingsDropdown" class="wd-dropdown wd-dropdown-right wd-account-panel"')
+  .replace(legacyTheme, `                                <div class="wd-theme-setting" aria-label="Theme"><span>Theme</span><div class="wd-theme-options" role="group" aria-label="Theme preference">${themeChoices}</div></div>\n                                <div class="wd-theme-container wd-legacy-theme" style="display:none">${legacyTheme.slice('                                <div class="wd-theme-container">'.length)}`)
   .replace(segment('                                <button class="wd-dropdown-item" id="viewKeyBtn">', '                                <button class="wd-dropdown-item" id="logoutBtn">'),
-    '                                <a class="wd-dropdown-item" href="/account">My account</a>\n                                <button class="wd-dropdown-item" id="connectAIBtn">Connect AI</button>\n');
+    '                                <a class="wd-dropdown-item wd-account-item" href="/auth/account?redirect=%2Fhome">Your sign-ins</a>\n                                <button class="wd-dropdown-item" id="connectAIBtn">Connect AI</button>\n')
+  .replace(/(<button class="wd-dropdown-item" id="logoutBtn">)[\s\S]*?(<span class="wd-item-text">Logout<\/span>)/, '$1$2');
 const connectAIModal = segment('    <!-- Connect AI modal (MCP) -->', '    <!-- Change key modal -->')
   .replace('                <button class="wd-modal-close" id="connectAIClose" aria-label="Close">&times;</button>\n', '')
   .replace('Enter your account key only on Workdeck’s authorization page, never in the AI client. Connections expire after 30 days and can be revoked here. Connecting a new client replaces the current connection.',
@@ -35,11 +54,15 @@ const homeMarkup = homeView
   + segment('    <!-- Rename modal -->', '    <!-- Key modal -->')
   + segment('    <!-- Add tag modal', '    <!-- Loading overlay -->')
   + connectAIModal
-  + segment('    <!-- Loading overlay -->', '    <!-- Offscreen fabric frame doc');
+  + segment('    <!-- Loading overlay -->', '    <!-- Offscreen fabric frame doc')
+  // The card renderer reads this template to render Slides and Draw in sandboxed
+  // iframes. Keep it alongside the card templates when assembling Holm's home.
+  + segment('    <!-- Offscreen fabric frame doc', '    <!-- Scripts -->');
 const homeHTML = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Workdeck — Your files</title>
 <link rel="stylesheet" href="/workdeck.css"><link rel="stylesheet" href="/js/wd-mentions.css">
+<style>${readFileSync(join(root, 'holm/auth/settings-menu.css'), 'utf8')}</style>
 <link rel="icon" href="/icons/favicon-32x32.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head><body><div class="wd-background"><div class="wd-bg-circle wd-bg-circle-top-right"></div><div class="wd-bg-circle wd-bg-circle-bottom-left"></div></div>
@@ -185,6 +208,8 @@ const cutFiles = (start, end) => {
   if (a < 0 || b < 0) throw new Error(`Files markup missing: ${start}`);
   filePage = filePage.slice(0, a) + filePage.slice(b);
 };
+// Keep the header toggle and mobile scrim, without a second sidebar close control.
+cutFiles('            <button id="fbSidebarClose"', '            <a href="/" class="fb-brand">');
 cutFiles('                                <button class="fb-dropdown-item" id="fbViewKeyBtn">',
   '                                <div class="fb-dropdown-divider"></div>');
 filePage = filePage.replace('                                <div class="fb-dropdown-divider"></div>',
@@ -223,8 +248,8 @@ let landing = source.slice(open, close).trim()
 // to say coming soon until the old app is retired.
 const authURL = '/auth/login?redirect=%2Fhome';
 const accountMenu = `<div class="lp-account-menu">
-                    <button type="button" id="landingMenuToggle" class="lp-account-toggle" aria-label="Settings" aria-haspopup="true" aria-expanded="false" aria-controls="landingMenu">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <button type="button" id="landingMenuToggle" class="lp-account-toggle" aria-label="Account menu" title="Account menu" aria-haspopup="true" aria-expanded="false" aria-controls="landingMenu">
+                        ${accountAvatar}
                     </button>
                     <div id="landingMenu" class="lp-account-panel" hidden>
                         <div class="lp-theme-setting" aria-label="Theme">
@@ -269,8 +294,16 @@ if (!ribbon) throw new Error('Missing landing ribbon.');
 landing = landing.replace(ribbon, '').replace('        </main>', `        </main>\n${ribbon}`);
 const pwaIcons = {
   docs: '/docs/icon-192.png',
-  sheets: '/sheets/icons/icon-192x192.png',
-  filebox: '/files/icons/icon-192x192.png',
+  sheets: '/icons/sheets512.png',
+  filebox: '/icons/files512.png',
+  forms: '/icons/forms512.png',
+  slides: '/icons/slides512.png',
+  draw: '/icons/draw512.png',
+  todo: '/icons/todo512.png',
+  calendar: '/icons/cal512.png',
+  kanban: '/icons/kanban512.png',
+  blog: '/icons/blog512.png',
+  minutes: '/icons/minutes512.png',
 };
 const icons = [...landing.matchAll(/<span class="lp-app-icon" data-icon="([a-z]+)">[^<]*<\/span>/g)];
 if (icons.length !== 11) throw new Error(`Expected 11 app cards; found ${icons.length}.`);
@@ -399,8 +432,36 @@ writeFileSync(join(output, 'holm.json'), JSON.stringify({
 // settings menu and send Holm back to the dashboard afterwards.
 // Apply the same account controls to every migrated signed-in page, without
 // altering the legacy/Vercel HTML used as build input.
+const appPwa = {
+  todo: { icon: 'todo', color: '#facc15' },
+  calendar: { icon: 'cal', color: '#4285f4' },
+  kanban: { icon: 'kanban', color: '#0d9488' },
+  minutes: { icon: 'minutes', color: '#276b53' },
+  forms: { icon: 'forms', color: '#7248b9' },
+  slides: { icon: 'slides', color: '#f59e0b' },
+  draw: { icon: 'draw', color: '#8b5cf6' },
+  blog: { icon: 'blog', color: '#f97316' },
+  sheets: { icon: 'sheets', color: '#22c55e' },
+  files: { icon: 'files', color: '#0d9488' },
+};
+// Manifest and worker URLs are scoped to each app, not the dashboard or the
+// other apps. Only static assets are cached; authenticated pages and API data
+// must always come from the network.
+const withAppPwa = (page, app) => {
+  const { icon, color } = appPwa[app];
+  const head = `<link rel="manifest" href="/${app}/manifest.json"><link rel="icon" type="image/png" sizes="32x32" href="/icons/${icon}32.png"><link rel="icon" type="image/png" sizes="192x192" href="/icons/${icon}192.png"><link rel="apple-touch-icon" href="/icons/${icon}192.png"><meta name="theme-color" content="${color}">`;
+  // Remove the original Workdeck favicon (or the app's old SVG) on every
+  // page. Otherwise browsers can pick it instead of the matching tab icon.
+  page = page.replace(/<link rel="(?:manifest|icon|apple-touch-icon)"[^>]*>/g, '');
+  page = page.replace(/<meta name="theme-color"[^>]*>/g, '');
+  page = page.replace('</head>', `${head}</head>`);
+  if (app !== 'sheets' && app !== 'files') {
+    page = page.replace('</body>', `<script src="/${app}/pwa.js" defer></script></body>`);
+  }
+  return withHomeUI(withSuiteTheme(page, app));
+};
 const withSignIns = html => {
-  const page = html.replaceAll('href="/account">My account</a>',
+  const page = withAccountAvatars(html).replaceAll('href="/account">My account</a>',
     'href="/auth/account?redirect=%2Fhome">Your sign-ins</a>');
   return page.replace('</head>', '<link rel="stylesheet" href="/settings-menu.css"></head>')
     .replace('</body>', '<script src="/js/settings-menu.js"></script></body>');
@@ -409,20 +470,22 @@ const withSidebar = (html, app) => html
   .replace('</head>', '<link rel="stylesheet" href="/app-sidebar.css"></head>')
   .replace('</body>', `<script src="/js/app-sidebar.js" data-app="${app}"></script></body>`);
 writeFileSync(join(web, 'index.html'), html());
-writeFileSync(join(web, 'home.html'), withSignIns(homeHTML));
-writeFileSync(join(web, 'kanban/index.html'), withSidebar(withSignIns(kanban), 'kanban'));
-writeFileSync(join(web, 'calendar/index.html'), withSignIns(calendar));
-writeFileSync(join(web, 'sheets/index.html'), withSidebar(withSignIns(sheetPage('index.html')), 'sheets'));
-writeFileSync(join(web, 'sheets/editor.html'), withSignIns(sheetPage('editor.html')));
-writeFileSync(join(web, 'sheets/shared.html'), sheetPage('shared.html'));
+writeFileSync(join(web, 'home.html'), withHomeUI(withSuiteTheme(withSignIns(homeHTML), 'home')));
+kanban = kanban.replace('<div id="boardsView">', '<div id="boardsView" class="hidden">')
+  .replace('id="loadingOverlay" class="loading-overlay hidden"', 'id="loadingOverlay" class="loading-overlay"');
+writeFileSync(join(web, 'kanban/index.html'), withAppPwa(withSidebar(withSignIns(kanban), 'kanban'), 'kanban'));
+writeFileSync(join(web, 'calendar/index.html'), withAppPwa(withSignIns(calendar), 'calendar'));
+writeFileSync(join(web, 'sheets/index.html'), withAppPwa(withSidebar(withSignIns(sheetPage('index.html')), 'sheets'), 'sheets'));
+writeFileSync(join(web, 'sheets/editor.html'), withAppPwa(withSignIns(sheetPage('editor.html')), 'sheets'));
+writeFileSync(join(web, 'sheets/shared.html'), withAppPwa(sheetPage('shared.html'), 'sheets'));
 for (const file of ['index.html', 'editor.html', 'shared.html'])
-  writeFileSync(join(web, 'forms', file), file === 'index.html' ? withSidebar(withSignIns(formPage(file)), 'forms') : withSignIns(formPage(file)));
+  writeFileSync(join(web, 'forms', file), withAppPwa(file === 'index.html' ? withSidebar(withSignIns(formPage(file)), 'forms') : withSignIns(formPage(file)), 'forms'));
 for (const file of ['index.html', 'editor.html', 'shared.html'])
-  writeFileSync(join(web, 'slides', file), file === 'index.html' ? withSidebar(withSignIns(slidePage(file)), 'slides') : withSignIns(slidePage(file)));
+  writeFileSync(join(web, 'slides', file), withAppPwa(file === 'index.html' ? withSidebar(withSignIns(slidePage(file)), 'slides') : withSignIns(slidePage(file)), 'slides'));
 for (const file of ['index.html', 'editor.html', 'shared.html'])
-  writeFileSync(join(web, 'draw', file), file === 'index.html' ? withSidebar(withSignIns(drawPage(file)), 'draw') : withSignIns(drawPage(file)));
-writeFileSync(join(web, 'files/index.html'), withSignIns(filePage));
-writeFileSync(join(web, 'blog/index.html'), withSidebar(withSignIns(blogPage), 'blog'));
+  writeFileSync(join(web, 'draw', file), withAppPwa(file === 'index.html' ? withSidebar(withSignIns(drawPage(file)), 'draw') : withSignIns(drawPage(file)), 'draw'));
+writeFileSync(join(web, 'files/index.html'), withAppPwa(withSignIns(filePage), 'files'));
+writeFileSync(join(web, 'blog/index.html'), withAppPwa(withSidebar(withSignIns(blogPage), 'blog'), 'blog'));
 cpSync(join(root, 'holm/blog/public.html'), join(web, 'blog-public.html'));
 cpSync(join(root, 'public/blog.css'), join(web, 'blog.css'));
 writeFileSync(join(web, 'apps.html'), html(true));
@@ -506,13 +569,10 @@ writeFileSync(join(web, 'landing.js'), `(() => {
         // The public catalogue needs a direct login link for guests, but a
         // signed-in member should open Docs rather than revisit Holm login.
         document.getElementById('lp-docs-open')?.setAttribute('href', '/docs/');
-        // Holm serves web/index.html directly before api/main.js, so the
-        // signed-in landing must navigate to the dashboard client-side.
-        if (location.pathname === '/') { location.replace('/home'); return; }
-        link.textContent = 'Your sign-ins';
-        link.href = session.accountURL;
+        // Keep the public UI in place for signed-in visitors. Replace only
+        // Sign in with Sign out; do not redirect or add account-only content.
+        link.hidden = true;
         signOut.hidden = false;
-        // The public /apps page keeps the account link in the menu.
         signOut.addEventListener('click', async () => {
           signOut.disabled = true;
           try {
@@ -531,8 +591,8 @@ writeFileSync(join(web, 'landing.js'), `(() => {
     } catch (_) { /* The sign-in link remains available if the session check fails. */ }
   });
 })();\n`);
-writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v24';
-const FILES = ['/', '/apps', '/todo/', '/todo/editor.js', '/todo/storage.js', '/todo/auth.js', '/todo/config.js', '/todo/themes.js', '/todo/styles.css', '/landing.css', '/landing-nav.css', '/landing.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
+writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v27';
+const FILES = ['/', '/apps', '/landing.css', '/landing-nav.css', '/landing.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('workdeck-landing-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
@@ -540,7 +600,7 @@ self.addEventListener('fetch', e => {
   // Nested apps own their own service workers and caches. Never intercept
   // their navigations or assets from the site-wide landing worker.
   if (url.origin !== self.location.origin || e.request.method !== 'GET' ||
-      ['/docs/', '/sheets/', '/files/'].some(path => url.pathname.startsWith(path)) ||
+      ['/docs/', '/sheets/', '/files/', '/todo/', '/calendar/', '/kanban/', '/minutes/', '/forms/', '/slides/', '/draw/', '/blog/'].some(path => url.pathname.startsWith(path)) ||
       url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || Response.error())));
 });\n`);
@@ -553,21 +613,84 @@ for (const [from, to] of [
   ['holm/auth/links.js', 'wd-links.js'],
   ['holm/auth/mentions.js', 'wd-mentions.js'],
   ['holm/auth/dashboard.js', 'workdeck.js'],
+  ['holm/auth/autosave.js', 'autosave.js'],
 ]) cpSync(join(root, from), join(web, 'js', to));
+writeFileSync(join(web, 'suite-tokens.css'), buildThemeTokens(readFileSync(join(root, 'public/workdeck.css'), 'utf8')));
+cpSync(join(root, 'holm/auth/suite-theme.css'), join(web, 'suite-theme.css'));
+cpSync(join(root, 'holm/auth/suite-theme.js'), join(web, 'js/suite-theme.js'));
+// Pinned Inter 4.1 (OFL) removes a cross-origin, render-blocking font stylesheet.
+cpSync(join(root, 'holm/fonts'), join(web, 'fonts'), { recursive: true });
 cpSync(join(root, 'holm/auth/settings-menu.css'), join(web, 'settings-menu.css'));
 cpSync(join(root, 'holm/auth/settings-menu.js'), join(web, 'js/settings-menu.js'));
 cpSync(join(root, 'holm/auth/app-sidebar.css'), join(web, 'app-sidebar.css'));
 cpSync(join(root, 'holm/auth/app-sidebar.js'), join(web, 'js/app-sidebar.js'));
+writeFileSync(join(web, 'home-components.css'), homeComponentCSS(readFileSync(join(root, 'public/workdeck.css'), 'utf8')));
+cpSync(join(root, 'holm/auth/home-ui.css'), join(web, 'home-ui.css'));
+cpSync(join(root, 'holm/auth/home-ui.js'), join(web, 'js/home-ui.js'));
+writeFileSync(join(web, 'js/home-icons.js'), homeIconsJS(source));
+cpSync(join(root, 'holm/auth/tag-ui.js'), join(web, 'js/tag-ui.js'));
+cpSync(join(root, 'holm/auth/action-menu.js'), join(web, 'js/action-menu.js'));
+cpSync(join(root, 'holm/auth/action-menu.css'), join(web, 'action-menu.css'));
 cpSync(join(root, 'holm/auth/landing-nav.css'), join(web, 'landing-nav.css'));
 cpSync(join(root, 'holm/auth/connect-ai.js'), join(web, 'js/connect-ai.js'));
 cpSync(join(root, 'public/icons'), join(web, 'icons'), { recursive: true });
+for (const [app, { icon, color }] of Object.entries(appPwa)) {
+  for (const size of [32, 192]) {
+    cpSync(join(root, 'holm/icons', `${icon}${size}.png`), join(web, 'icons', `${icon}${size}.png`));
+  }
+  const icon512 = icon === 'minutes' ? 'minutes 1.png' : icon === 'kanban' ? 'kanban-square512.png' : `${icon}512.png`;
+  cpSync(join(root, 'holm/icons', icon512), join(web, 'icons', `${icon}pwa512.png`));
+  writeFileSync(join(web, app, 'manifest.json'), JSON.stringify({
+    name: `Workdeck ${app[0].toUpperCase() + app.slice(1)}`,
+    short_name: app[0].toUpperCase() + app.slice(1),
+    start_url: `/${app}/`, scope: `/${app}/`, display: 'standalone',
+    background_color: '#ffffff', theme_color: color,
+    icons: [192, 512].map(size => ({
+      src: `/icons/${icon}${size === 192 ? '192' : 'pwa512'}.png`,
+      sizes: `${size}x${size}`, type: 'image/png', purpose: 'any',
+    })),
+  }, null, 2) + '\n');
+  if (app === 'sheets' || app === 'files') continue;
+  writeFileSync(join(web, app, 'pwa.js'), `if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('/${app}/service-worker.js', { scope: '/${app}/' }).catch(console.error);
+}\n`);
+  writeFileSync(join(web, app, 'service-worker.js'), `const CACHE = 'workdeck-${app}-static-v1';
+self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
+self.addEventListener('activate', event => event.waitUntil(
+  caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('workdeck-${app}-static-') && key !== CACHE).map(key => caches.delete(key))))
+    .then(() => self.clients.claim())
+));
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  const url = new URL(request.url);
+  if (request.method !== 'GET' || url.origin !== self.location.origin || !url.pathname.startsWith('/${app}/') ||
+      request.mode === 'navigate' || !/\\.(?:js|css|png|svg|webp|woff2?)$/.test(url.pathname)) return;
+  event.respondWith(fetch(request).then(response => {
+    if (response.ok && response.type === 'basic') {
+      const copy = response.clone();
+      event.waitUntil(caches.open(CACHE).then(cache => cache.put(request, copy)));
+    }
+    return response;
+  }).catch(() => caches.match(request)));
+});\n`);
+}
+cpSync(join(root, 'holm/icons/forms512.png'), join(web, 'icons/forms512.png'));
+cpSync(join(root, 'holm/icons/slides512.png'), join(web, 'icons/slides512.png'));
+cpSync(join(root, 'holm/icons/draw512.png'), join(web, 'icons/draw512.png'));
+cpSync(join(root, 'holm/icons/files512.png'), join(web, 'icons/files512.png'));
+cpSync(join(root, 'holm/icons/todo512.png'), join(web, 'icons/todo512.png'));
+cpSync(join(root, 'holm/icons/cal512.png'), join(web, 'icons/cal512.png'));
+cpSync(join(root, 'holm/icons/kanban512.png'), join(web, 'icons/kanban512.png'));
+cpSync(join(root, 'holm/icons/blog512.png'), join(web, 'icons/blog512.png'));
+cpSync(join(root, 'holm/icons/minutes 1.png'), join(web, 'icons/minutes512.png'));
+cpSync(join(root, 'holm/icons/sheets512.png'), join(web, 'icons/sheets512.png'));
 cpSync(join(root, 'public/og-image.jpg'), join(web, 'og-image.jpg'));
 cpSync(join(root, 'public/manifest.json'), join(web, 'manifest.json'));
 for (const file of ['account.html', 'account.css', 'account.js']) {
   cpSync(join(root, 'holm/auth', file), join(web, file));
 }
 for (const file of ['index.html', 'styles.css', 'editor.js', 'config.js', 'auth.js', 'storage.js']) {
-  if (file === 'index.html') writeFileSync(join(web, 'todo', file), withSidebar(withSignIns(readFileSync(join(root, 'holm/todo', file), 'utf8')), 'todo'));
+  if (file === 'index.html') writeFileSync(join(web, 'todo', file), withAppPwa(withSidebar(withSignIns(readFileSync(join(root, 'holm/todo', file), 'utf8')), 'todo'), 'todo'));
   else cpSync(join(root, 'holm/todo', file), join(web, 'todo', file));
 }
 // Keep Todo's existing light/dark/system theme implementation unchanged.
@@ -578,7 +701,7 @@ for (const file of ['auth.js', 'storage.js', 'app.js', 'board.js']) {
 cpSync(join(root, 'kanban/js/themes.js'), join(web, 'kanban/js/themes.js'));
 cpSync(join(root, 'kanban/styles.css'), join(web, 'kanban/styles.css'));
 cpSync(join(root, 'holm/kanban/config.js'), join(web, 'kanban/config/config.js'));
-writeFileSync(join(web, 'minutes/index.html'), withSidebar(readFileSync(join(root, 'minutes/index.html'), 'utf8'), 'minutes'));
+writeFileSync(join(web, 'minutes/index.html'), withAppPwa(withSidebar(readFileSync(join(root, 'minutes/index.html'), 'utf8'), 'minutes'), 'minutes'));
 cpSync(join(root, 'minutes/styles.css'), join(web, 'minutes/styles.css'));
 cpSync(join(root, 'holm/minutes/app.js'), join(web, 'minutes/app.js'));
 for (const file of ['auth.js', 'storage.js', 'config.js', 'editor.js']) {
@@ -589,14 +712,16 @@ for (const file of ['themes.js', 'snapshot.js', 'vendor-ical.js']) {
   cpSync(join(root, 'calendar/js', file), join(web, 'calendar/js', file));
 }
 cpSync(join(root, 'calendar/styles.css'), join(web, 'calendar/styles.css'));
-for (const file of ['styles.css', 'home.css', 'manifest.json'])
+for (const file of ['styles.css', 'home.css'])
   cpSync(join(root, 'sheets', file), join(web, 'sheets', file));
 cpSync(join(root, 'sheets/icons'), join(web, 'sheets/icons'), { recursive: true });
 cpSync(join(root, 'sheets/config/config.js'), join(web, 'sheets/config/config.js'));
 for (const file of ['app.js', 'home.js', 'auth.js', 'storage.js'])
   cpSync(join(root, 'holm/sheets', file), join(web, 'sheets/js', file));
-for (const file of ['themes.js', 'spreadsheet.js', 'shared.js', 'pwa.js'])
+for (const file of ['themes.js', 'pwa.js'])
   cpSync(join(root, 'sheets/js', file), join(web, 'sheets/js', file));
+writeFileSync(join(web, 'sheets/js/spreadsheet.js'), withSheetEditorTheme(withSheetAutosave(readFileSync(join(root, 'sheets/js/spreadsheet.js'), 'utf8'))));
+writeFileSync(join(web, 'sheets/js/shared.js'), withSharedSheetTheme(readFileSync(join(root, 'sheets/js/shared.js'), 'utf8')));
 cpSync(join(root, 'holm/sheets/vendor-xlsx.js'), join(web, 'sheets/js/vendor-xlsx.js'));
 cpSync(join(root, 'holm/sheets/SHEETJS-LICENSE.txt'), join(web, 'sheets/SHEETJS-LICENSE.txt'));
 cpSync(join(root, 'holm/sheets/service-worker.js'), join(web, 'sheets/service-worker.js'));
@@ -622,8 +747,7 @@ for (const file of ['home.js', 'editor.js', 'auth.js', 'storage.js'])
   cpSync(join(root, 'holm/draw', file), join(web, 'draw/js', file));
 for (const file of ['themes.js', 'shared.js'])
   cpSync(join(root, 'draw/js', file), join(web, 'draw/js', file));
-for (const file of ['styles.css', 'manifest.json'])
-  cpSync(join(root, 'files', file), join(web, 'files', file));
+cpSync(join(root, 'files/styles.css'), join(web, 'files/styles.css'));
 cpSync(join(root, 'files/icons'), join(web, 'files/icons'), { recursive: true });
 cpSync(join(root, 'holm/files/config.js'), join(web, 'files/config/config.js'));
 for (const file of ['auth.js', 'storage.js', 'main.js', 'viewer.js', 'uploads.js', 'vendor-esm.js'])
@@ -649,13 +773,38 @@ const docsBuild = mkdtempSync(join(tmpdir(), 'workdeck-holm-docs-'));
 try {
   cpSync(join(root, 'docs-src/src'), join(docsBuild, 'src'), { recursive: true });
   cpSync(join(root, 'docs-src/public'), join(docsBuild, 'public'), { recursive: true });
+  // The legacy "192"/"512" files are both 1254px, 1.3MB images. Use actual
+  // icon sizes so PWA installation doesn't compete with page navigation.
+  for (const size of [192, 512]) cpSync(join(root, 'holm/icons', `docs${size}.png`), join(docsBuild, 'public', `icon-${size}.png`));
   for (const file of ['vite.config.js', 'postcss.config.js', 'tailwind.config.js', 'package.json'])
     cpSync(join(root, 'docs-src', file), join(docsBuild, file));
+  // Docs must never serve yesterday's home shell for a new deep link. Only
+  // content-hashed assets use cache-first; no HTML or private API is cached.
+  const vitePath = join(docsBuild, 'vite.config.js');
+  writeFileSync(vitePath, readFileSync(vitePath, 'utf8')
+    .replace("globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],", "navigateFallback: null,\n        globPatterns: ['**/*.{css,ico,png,svg,woff2}'],")
+    .replace('urlPattern: /^(?!.*\\/api\\/).*\\.(?:js|css|html|ico|png|svg|woff2)$/i,',
+      'urlPattern: /\\/docs\\/assets\\/[^/]+-[\\w-]{8,}\\.(?:js|css)$/i,')
+    .replace("cacheName: 'static-assets-cache'", "cacheName: 'workdeck-docs-hashed-v1'"));
+  // Neutral Tailwind utilities in Docs must match the Home palette too. Keep
+  // the legacy config untouched; these are Holm-only compiled utility colors.
+  const tailwind = readFileSync(join(docsBuild, 'tailwind.config.js'), 'utf8');
+  const neutralUtilities = Object.fromEntries([50,100,200,300,400,500,600,700,800,900,950]
+    .map(step => [step, `rgb(var(--wd-ui-neutral-${step}-rgb) / <alpha-value>)`]));
+  writeFileSync(join(docsBuild, 'tailwind.config.js'), tailwind.replace('colors: {',
+    `colors: { gray: ${JSON.stringify(neutralUtilities)},`));
   symlinkSync(join(root, 'docs-src/node_modules'), join(docsBuild, 'node_modules'), 'dir');
-  for (const file of ['App.jsx', 'main.jsx', 'hooks/useAuth.js', 'hooks/useDocs.js',
-    'hooks/useTheme.js', 'lib/db.js', 'components/Login.jsx', 'components/UserDisplay.jsx']) {
+  for (const file of ['App.jsx', 'main.jsx', 'docs-ui.css', 'components/DocTags.jsx', 'hooks/useAuth.js', 'hooks/useDocs.js',
+    'hooks/useTheme.js', 'lib/db.js', 'components/Login.jsx', 'components/UserDisplay.jsx',
+    'components/TagList.jsx', 'components/DocCard.jsx', 'components/SearchBar.jsx', 'components/DocActions.jsx', 'components/DocDetailView.jsx']) {
     cpSync(join(root, 'holm/docs-src/src', file), join(docsBuild, 'src', file));
   }
+  for (const component of ['DocListView', 'DocDetailView']) {
+    const path = join(docsBuild, 'src/components', component + '.jsx');
+    writeFileSync(path, withoutDocPins(readFileSync(path, 'utf8'), component));
+  }
+  const settingsPath = join(docsBuild, 'src/components/SettingsDropdown.jsx');
+  writeFileSync(settingsPath, withDocsAccountAvatar(readFileSync(settingsPath, 'utf8')));
   const index = readFileSync(join(root, 'docs-src/index.html'), 'utf8')
     .replaceAll('https://docs-ecru-one.vercel.app/', 'https://mer-workdeck.fazt.sh/docs/')
     .replaceAll('passwordless authentication using custom keys', 'Holm sign-in')
@@ -666,9 +815,9 @@ try {
   // Changing the Docs HTML also changes Workbox's precache revision. On
   // upgrade, clients whose Docs cache was erased by the old root worker get
   // a fresh copy of the navigation shell.
-  writeFileSync(join(docsBuild, 'index.html'), index.replace('    <link rel="stylesheet" href="/docs/assets/markdown-editor.css" />\n', '')
+  writeFileSync(join(docsBuild, 'index.html'), withHomeUI(withSuiteTheme(index.replace('    <link rel="stylesheet" href="/docs/assets/markdown-editor.css" />\n', '')
     .replace('</head>', '<link rel="stylesheet" href="/settings-menu.css"></head>')
-    .replace('  <body>', '  <body>\n    <!-- Holm Docs: refreshed navigation precache -->'));
+    .replace('  <body>', '  <body>\n    <!-- Holm Docs: refreshed navigation precache -->'), 'docs')));
   execFileSync(join(root, 'docs-src/node_modules/.bin/vite'), ['build'], {
     cwd: docsBuild, timeout: 120_000, maxBuffer: 10_000_000,
   });

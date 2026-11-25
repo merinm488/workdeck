@@ -11,6 +11,9 @@ const state = {
     userHash: null,
     boards: [],
     settings: {},
+    userDoc: null,
+    creating: false,
+    navigation: 0,
     searchQuery: ''
 };
 
@@ -23,39 +26,30 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
     kanbanThemeManager.init();
     wireChrome();
-
-    if (!(await kanbanAuth.verifySession())) {
-        window.location.href = '/auth/login?redirect=%2Fkanban%2F';
-        return;
-    }
-
     showLoading(true);
-    const doc = await kanbanStorage.loadUserData();
-    showLoading(false);
-
+    document.getElementById('newBoardBtn').disabled = true;
+    // /api/kanban authenticates the member itself. Share this one request with
+    // the home sidebar instead of verifying then fetching the entire workspace.
+    window.WDKanbanData = kanbanStorage.loadUserData();
+    const doc = await window.WDKanbanData;
     if (!doc) {
+        showBoardsView(); // The shared sidebar shows a persistent Retry state.
+        showLoading(false);
         showNotification('Could not load boards. Please refresh to retry.', 'error');
         return;
     }
-
     kanbanThemeManager.applyFromServer(doc.settings && doc.settings.theme);
+    state.userDoc = doc;
     state.settings = doc.settings || {};
     state.boards = doc.kanban || [];
+    document.getElementById('newBoardBtn').disabled = false;
+    await openBoard(requestedBoardId(), { historyMode: 'replace' });
+    showLoading(false);
+}
 
+function requestedBoardId() {
     const pathId = (/^\/kanban\/([a-zA-Z0-9_-]{8,128})\/?$/.exec(window.location.pathname) || [])[1];
-    const boardId = pathId ||
-        new URLSearchParams(window.location.search).get('board');
-    if (boardId) {
-        showBoardView();
-        const opened = await KanbanBoard.open(boardId, doc);
-        if (!opened) {
-            showNotification('Board not found', 'error');
-            window.location.href = '/kanban/';
-        }
-    } else {
-        showBoardsView();
-        renderBoards();
-    }
+    return pathId || new URLSearchParams(window.location.search).get('board') || null;
 }
 
 // ================================================
@@ -161,22 +155,67 @@ function renderBoards() {
     const cards = state.boards.reduce((n, b) => n + (Array.isArray(b.cards) ? b.cards.length : 0), 0);
     document.getElementById('kanbanFooterStats').textContent =
         `${state.boards.length} board${state.boards.length === 1 ? '' : 's'} · ${cards} card${cards === 1 ? '' : 's'}`;
+    if (state.userDoc) {
+        state.userDoc.kanban = state.boards;
+        document.dispatchEvent(new CustomEvent('wd:home-data', { detail: { app: 'kanban', data: state.userDoc } }));
+    }
 }
 
-function openBoard(boardId) {
-    window.location.href = '/kanban/?board=' + encodeURIComponent(boardId);
+async function openBoard(boardId, { historyMode = 'push' } = {}) {
+    if (!state.userDoc) return;
+    const navigation = ++state.navigation;
+    const previousId = KanbanBoard.currentBoard()?.id;
+    const url = id => id ? '/kanban/?board=' + encodeURIComponent(id) : '/kanban/';
+    const waitingForSave = KanbanBoard.dirty || KanbanBoard.saving;
+    if (waitingForSave) showLoading(true);
+    try {
+        if (!(await KanbanBoard.flush())) {
+            if (navigation === state.navigation) history.replaceState({}, '', url(previousId));
+            return; // Never leave unsaved edits behind on a failed request.
+        }
+        if (navigation !== state.navigation) return;
+        closeAllPopovers();
+        KanbanBoard.destroy();
+        if (boardId && !state.boards.some(board => board.id === boardId)) {
+            showNotification('Board not found', 'error');
+            boardId = null;
+            historyMode = 'replace';
+        }
+        state.userDoc.kanban = state.boards;
+        if (boardId) {
+            KanbanBoard.open(boardId, state.userDoc);
+            showBoardView();
+        } else {
+            renderBoards();
+            showBoardsView();
+        }
+        if (historyMode === 'replace') history.replaceState({}, '', url(boardId));
+        else if (historyMode === 'push' && requestedBoardId() !== boardId) history.pushState({}, '', url(boardId));
+    } finally {
+        if (waitingForSave && navigation === state.navigation) showLoading(false);
+    }
 }
 
 async function createBoard(name) {
+    if (state.creating || !state.userDoc) return;
+    state.creating = true;
+    const navigation = state.navigation;
     showLoading(true);
-    const board = await kanbanStorage.createBoard(name);
-    showLoading(false);
-    if (!board) {
-        showNotification('Failed to create board', 'error');
-        return;
+    try {
+        const board = await kanbanStorage.createBoard(name);
+        if (!board) {
+            showNotification('Failed to create board. Please try again.', 'error');
+            return;
+        }
+        state.boards.unshift(board);
+        // The creation response is the authoritative board. Render it directly;
+        // no navigation reload, repeat sign-in check, or second boards request.
+        if (navigation === state.navigation) await openBoard(board.id);
+        else renderBoards(); // A browser-back during creation keeps its destination.
+    } finally {
+        state.creating = false;
+        showLoading(false);
     }
-    state.boards.unshift(board);
-    openBoard(board.id);
 }
 
 // ================================================
@@ -188,6 +227,7 @@ let nameModalAction = null;
 function openNameModal(title, initial, onConfirm) {
     const modal = document.getElementById('nameModal');
     document.getElementById('nameModalTitle').textContent = title;
+    document.getElementById('confirmNameModal').textContent = initial ? 'Rename' : 'Create';
     const input = document.getElementById('nameModalInput');
     input.value = initial || '';
     nameModalAction = onConfirm;
@@ -247,10 +287,17 @@ function closeAllPopovers() {
 
 function wireChrome() {
     document.getElementById('homeBtn').addEventListener('click', () => {
-        if (new URLSearchParams(window.location.search).get('board')) {
-            window.location.href = '/kanban/';
+        if (KanbanBoard.currentBoard()) {
+            openBoard(null);
         } else {
-            window.location.href = '/';
+            window.location.href = '/home';
+        }
+    });
+    window.addEventListener('popstate', () => openBoard(requestedBoardId(), { historyMode: 'none' }));
+    window.addEventListener('beforeunload', event => {
+        if (KanbanBoard.dirty || KanbanBoard.saving || state.creating) {
+            event.preventDefault();
+            event.returnValue = '';
         }
     });
 
