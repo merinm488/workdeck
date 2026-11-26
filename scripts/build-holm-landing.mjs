@@ -372,12 +372,29 @@ const html = (apps = false) => `<!doctype html>
   <title>${apps ? 'Explore the apps — Workdeck' : 'Workdeck — Your work, in one place'}</title>
   <meta name="description" content="Meet Workdeck: a thoughtful home for your documents, ideas, plans and everyday tools. Explore all the apps before you sign in.">
   <link rel="canonical" href="https://mer-workdeck.fazt.sh/${apps ? 'apps' : ''}">
+  <meta name="image" content="https://mer-workdeck.fazt.sh/icons/workdeck_preview.jpg">
+  <link rel="image_src" href="https://mer-workdeck.fazt.sh/icons/workdeck_preview.jpg">
+  <script type="application/ld+json">
+  ${JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: apps ? 'Explore the apps — Workdeck' : 'Workdeck — Your work, in one place',
+    url: `https://mer-workdeck.fazt.sh/${apps ? 'apps' : ''}`,
+    image: 'https://mer-workdeck.fazt.sh/icons/workdeck_preview.jpg',
+  })}
+  </script>
   <meta property="og:type" content="website">
   <meta property="og:title" content="Workdeck — Your work, in one place">
   <meta property="og:description" content="A thoughtful home for your documents, ideas, plans and everyday tools.">
   <meta property="og:url" content="https://mer-workdeck.fazt.sh/${apps ? 'apps' : ''}">
-  <meta property="og:image" content="https://mer-workdeck.fazt.sh/og-image.jpg">
+  <meta property="og:image" content="https://mer-workdeck.fazt.sh/icons/workdeck_preview.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Workdeck — Your everyday tools, all in one place">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://mer-workdeck.fazt.sh/icons/workdeck_preview.jpg">
+  <meta name="twitter:image:alt" content="Workdeck — Your everyday tools, all in one place">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">

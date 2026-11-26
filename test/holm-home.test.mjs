@@ -54,6 +54,35 @@ test('Holm serves the original signed-in dashboard markup without legacy access 
     assert.match(html, /<style>[\s\S]*?text-decoration:none!important;[\s\S]*?<\/style>/);
     assert.match(script, /#settingsDropdown > \.wd-theme-setting \.wd-theme-choice/);
     assert.doesNotMatch(html, /href="\/account"|My account/);
+    const preview = readFileSync(join(root, 'public/icons/workdeck_preview.jpg'));
+    assert.ok(preview.length < 300_000, 'Keep the shared preview under 300 KB for messaging clients');
+    assert.equal(preview.readUInt16BE(0), 0xffd8, 'The preview must be a JPEG');
+    assert.deepEqual(readFileSync(join(dir, 'web/icons/workdeck_preview.jpg')), preview);
+    for (const page of [join(root, 'public/index.html'), join(dir, 'api/landing.html'), join(dir, 'web/apps.html')]) {
+      const markup = readFileSync(page, 'utf8');
+      const meta = key => {
+        const tags = [...markup.matchAll(/<meta\s+(?:property|name)="([^"]+)"\s+content="([^"]*)"\s*>/g)]
+          .filter(match => match[1] === key);
+        assert.equal(tags.length, 1, `${page}: ${key} must appear exactly once`);
+        return tags[0][2];
+      };
+      const imageURL = 'https://mer-workdeck.fazt.sh/icons/workdeck_preview.jpg';
+      assert.equal(meta('image'), imageURL);
+      assert.ok(markup.includes(`<link rel="image_src" href="${imageURL}">`));
+      const structuredData = JSON.parse(markup.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+      assert.equal(structuredData['@context'], 'https://schema.org');
+      assert.equal(structuredData['@type'], 'WebPage');
+      assert.equal(structuredData.image, imageURL);
+      assert.equal(structuredData.url, meta('og:url'));
+      assert.equal(meta('og:image'), imageURL);
+      assert.equal(meta('twitter:image'), imageURL);
+      assert.equal(meta('og:image:type'), 'image/jpeg');
+      assert.equal(Number(meta('og:image:width')), 1200);
+      assert.equal(Number(meta('og:image:height')), 630);
+      assert.ok(meta('og:image:alt'));
+      assert.equal(meta('twitter:image:alt'), meta('og:image:alt'));
+      assert.equal(meta('twitter:card'), 'summary_large_image');
+    }
     const appsHTML = readFileSync(join(dir, 'web/apps.html'), 'utf8');
     assert.match(appsHTML, /data-icon="forms"><img src="\/icons\/forms512\.png"[^>]*alt=""/);
     assert.deepEqual(readFileSync(join(dir, 'web/icons/forms512.png')),
