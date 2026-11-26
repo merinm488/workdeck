@@ -437,14 +437,14 @@ writeFileSync(join(output, 'holm.json'), JSON.stringify({
 // Apply the same account controls to every migrated signed-in page, without
 // altering the legacy/Vercel HTML used as build input.
 const appPwa = {
-  todo: { icon: 'todo', color: '#facc15' },
-  calendar: { icon: 'cal', color: '#4285f4' },
-  kanban: { icon: 'kanban', color: '#0d9488' },
+  todo: { icon: 'todo', color: '#188038' },
+  calendar: { icon: 'cal', color: '#0284c7' },
+  kanban: { icon: 'kanban', color: '#a21caf' },
   minutes: { icon: 'minutes', color: '#276b53' },
   forms: { icon: 'forms', color: '#7248b9' },
-  slides: { icon: 'slides', color: '#f59e0b' },
-  draw: { icon: 'draw', color: '#8b5cf6' },
-  blog: { icon: 'blog', color: '#f97316' },
+  slides: { icon: 'slides', color: '#ea580c' },
+  draw: { icon: 'draw', color: '#e11d48' },
+  blog: { icon: 'blog', color: '#0d9488' },
   sheets: { icon: 'sheets', color: '#22c55e' },
   files: { icon: 'files', color: '#0d9488' },
 };
@@ -467,8 +467,12 @@ const withAppPwa = (page, app) => {
 const withSignIns = html => {
   const page = withAccountAvatars(html).replaceAll('href="/account">My account</a>',
     'href="/auth/account?redirect=%2Fhome">Your sign-ins</a>');
-  return page.replace('</head>', '<link rel="stylesheet" href="/settings-menu.css"></head>')
-    .replace('</body>', '<script src="/js/settings-menu.js"></script></body>');
+  const styled = page.replace('</head>', '<link rel="stylesheet" href="/settings-menu.css"></head>');
+  // Home embeds a complete preview document in a textarea. Wire the real
+  // outer page, not the inert preview template's closing body.
+  const end = styled.lastIndexOf('</body>');
+  if (end < 0) throw new Error('Missing outer body for account controls');
+  return styled.slice(0, end) + '<script src="/js/settings-menu.js"></script>' + styled.slice(end);
 };
 const withSidebar = (html, app) => html
   .replace('</head>', '<link rel="stylesheet" href="/app-sidebar.css"></head>')
@@ -632,6 +636,7 @@ cpSync(join(root, 'holm/auth/app-sidebar.css'), join(web, 'app-sidebar.css'));
 cpSync(join(root, 'holm/auth/app-sidebar.js'), join(web, 'js/app-sidebar.js'));
 writeFileSync(join(web, 'home-components.css'), homeComponentCSS(readFileSync(join(root, 'public/workdeck.css'), 'utf8')));
 cpSync(join(root, 'holm/auth/home-ui.css'), join(web, 'home-ui.css'));
+cpSync(join(root, 'holm/auth/dialogs.js'), join(web, 'js/dialogs.js'));
 cpSync(join(root, 'holm/auth/home-ui.js'), join(web, 'js/home-ui.js'));
 writeFileSync(join(web, 'js/home-icons.js'), homeIconsJS(source));
 cpSync(join(root, 'holm/auth/tag-ui.js'), join(web, 'js/tag-ui.js'));
@@ -707,7 +712,12 @@ for (const file of ['auth.js', 'storage.js', 'app.js', 'board.js']) {
 cpSync(join(root, 'kanban/js/themes.js'), join(web, 'kanban/js/themes.js'));
 cpSync(join(root, 'kanban/styles.css'), join(web, 'kanban/styles.css'));
 cpSync(join(root, 'holm/kanban/config.js'), join(web, 'kanban/config/config.js'));
-writeFileSync(join(web, 'minutes/index.html'), withAppPwa(withSidebar(readFileSync(join(root, 'minutes/index.html'), 'utf8'), 'minutes'), 'minutes'));
+const minutesPage = readFileSync(join(root, 'minutes/index.html'), 'utf8').replace(
+  '<button id="themeBtn" class="icon-button" title="Switch theme" aria-label="Switch theme">◐</button>',
+  '<div class="wd-minutes-account"><button id="settingsBtn" type="button" aria-expanded="false">Account menu</button><div id="settingsDropdown" class="hidden"><div class="theme-dropdown-container"><button data-theme="light">Light</button><button data-theme="dark">Dark</button><button data-theme="system">System</button></div><p id="accountError" class="wd-dialog-error" role="alert" hidden></p><button id="logoutBtn" class="wd-account-item">Logout</button></div></div>'
+);
+if (!minutesPage.includes('id="settingsBtn"')) throw new Error('Minutes account header no longer matches');
+writeFileSync(join(web, 'minutes/index.html'), withAppPwa(withSidebar(withSignIns(minutesPage), 'minutes'), 'minutes'));
 cpSync(join(root, 'minutes/styles.css'), join(web, 'minutes/styles.css'));
 cpSync(join(root, 'holm/minutes/app.js'), join(web, 'minutes/app.js'));
 for (const file of ['auth.js', 'storage.js', 'config.js', 'editor.js']) {
@@ -806,7 +816,7 @@ try {
     `colors: { gray: ${JSON.stringify(neutralUtilities)},`));
   symlinkSync(join(root, 'docs-src/node_modules'), join(docsBuild, 'node_modules'), 'dir');
   for (const file of ['App.jsx', 'main.jsx', 'docs-ui.css', 'components/DocTags.jsx', 'hooks/useAuth.js', 'hooks/useDocs.js',
-    'hooks/useTheme.js', 'lib/db.js', 'components/Login.jsx', 'components/UserDisplay.jsx',
+    'hooks/useTheme.js', 'hooks/useAccountMenu.js', 'lib/db.js', 'components/Login.jsx', 'components/UserDisplay.jsx',
     'components/TagList.jsx', 'components/DocCard.jsx', 'components/SearchBar.jsx', 'components/DocActions.jsx', 'components/DocDetailView.jsx']) {
     cpSync(join(root, 'holm/docs-src/src', file), join(docsBuild, 'src', file));
   }
@@ -815,7 +825,11 @@ try {
     writeFileSync(path, withoutDocPins(readFileSync(path, 'utf8'), component));
   }
   const settingsPath = join(docsBuild, 'src/components/SettingsDropdown.jsx');
-  writeFileSync(settingsPath, withDocsAccountAvatar(readFileSync(settingsPath, 'utf8')));
+  const settingsSource = withDocsAccountAvatar(readFileSync(settingsPath, 'utf8'));
+  const menuHookAnchor = '  const buttonRef = useRef(null);';
+  if (!settingsSource.includes(menuHookAnchor)) throw new Error('Docs account keyboard hook no longer matches');
+  writeFileSync(settingsPath, "import { useAccountMenu } from '../hooks/useAccountMenu';\n" +
+    settingsSource.replace(menuHookAnchor, menuHookAnchor + '\n  useAccountMenu(isOpen, setIsOpen, buttonRef, dropdownRef);'));
   const index = readFileSync(join(root, 'docs-src/index.html'), 'utf8')
     .replaceAll('https://docs-ecru-one.vercel.app/', 'https://mer-workdeck.fazt.sh/docs/')
     .replaceAll('passwordless authentication using custom keys', 'Holm sign-in')

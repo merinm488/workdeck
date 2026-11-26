@@ -484,10 +484,13 @@ function syncSidebarToggle() {
     toggle?.setAttribute('aria-expanded', String(expanded));
     toggle?.setAttribute('aria-label', expanded ? 'Close sidebar' : 'Open sidebar');
     if (toggle) toggle.title = expanded ? 'Close sidebar' : 'Open sidebar';
+    $('fbSidebar').inert = !expanded;
 }
 function applySidebarDrawer(open) {
+    const restoreFocus = !open && $('fbSidebar').contains(document.activeElement);
     document.body.classList.toggle('fb-sidebar-open', open);
     syncSidebarToggle();
+    if (restoreFocus) $('fbSidebarToggle').focus({ preventScroll: true });
 }
 
 function openFolder(folderId) {

@@ -150,7 +150,10 @@ try {
       assert.equal(member, true);
       assert.equal(page.url(), origin + '/');
       await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-      await page.waitForFunction(() => !document.querySelector('#landingAccountLink').hidden);
+      await page.waitForFunction(() => {
+        const link = document.querySelector('#landingAccountLink');
+        return link && !link.hidden; // sign-out reloads; the new document may not be parsed yet
+      });
       await page.locator('#landingMenuToggle').click();
       await page.getByRole('link', { name: 'Sign in', exact: true }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Sign out', exact: true }).count(), 0);

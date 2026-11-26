@@ -177,22 +177,29 @@ function renderPosts() {
     });
 }
 
-async function renamePost(post) {
-    const name = prompt('Rename post', post.title || 'Untitled');
-    if (name === null || !name.trim() || name.trim() === post.title) return;
-    if (name.trim().length > 200) { showToast('Post title must be 200 characters or less', true); return; }
-    const result = await blogStorage.request('updatePost', { id: post.id, title: name.trim() });
-    if (!result.success) { showToast(result.error || 'Could not rename the post', true); return; }
-    state.posts = result.data.posts || [];
-    renderPosts();
+function renamePost(post) {
+    WDDialog.open({ title: 'Rename post', confirmLabel: 'Rename',
+        field: { label: 'Post title', value: post.title || 'Untitled', maxLength: 200 },
+        onSubmit: async title => {
+            if (title === post.title) return;
+            const result = await blogStorage.request('updatePost', { id: post.id, title });
+            if (!result.success) throw new Error(result.error || 'Could not rename the post. Please try again.');
+            state.posts = result.data.posts || [];
+            renderPosts();
+        },
+    });
 }
 
-async function deletePostFromHome(post) {
-    if (!confirm(`Delete "${post.title || 'Untitled'}"? This cannot be undone.`)) return;
-    const result = await blogStorage.deletePost(post.id);
-    if (!result) { showToast('Could not delete the post', true); return; }
-    state.posts = result.posts || [];
-    renderPosts();
+function deletePostFromHome(post) {
+    WDDialog.open({ title: 'Delete post', message: `Delete “${post.title || 'Untitled'}”? This cannot be undone.`,
+        confirmLabel: 'Delete', danger: true,
+        onSubmit: async () => {
+            const result = await blogStorage.deletePost(post.id);
+            if (!result) throw new Error('Could not delete the post. Please try again.');
+            state.posts = result.posts || [];
+            renderPosts();
+        },
+    });
 }
 
 function formatWhen(updatedAt, lastOpenedAt) {

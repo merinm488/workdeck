@@ -77,7 +77,25 @@
     input.classList.add('wd-search-input'); input.placeholder = 'Search';
     if (!input.hasAttribute('aria-label')) input.setAttribute('aria-label', `Search ${app}`);
     box.querySelector(':scope > svg')?.classList.add('wd-search-icon');
-    box.querySelector('button')?.classList.add('wd-search-clear');
+    let clear = box.querySelector('button');
+    if (!clear) {
+      clear = document.createElement('button'); clear.type = 'button';
+      clear.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>';
+      box.append(clear);
+    }
+    clear.classList.add('wd-search-clear');
+    clear.setAttribute('aria-label', 'Clear search'); clear.title = 'Clear search';
+    const syncClear = () => { clear.hidden = !input.value; clear.classList.toggle('hidden', !input.value); };
+    const clearSearch = () => {
+      input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); input.focus(); syncClear();
+    };
+    clear.addEventListener('click', clearSearch);
+    input.addEventListener('input', syncClear);
+    input.addEventListener('focus', syncClear);
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && input.value) { event.preventDefault(); event.stopImmediatePropagation(); clearSearch(); }
+    }, true);
+    syncClear();
     const nav = document.querySelector(config[1]);
     if (nav && app !== 'calendar') {
       const home = document.querySelector({ todo: '#listsView', kanban: '#boardsView', blog: '#postsView', minutes: '#home' }[app] || '.home-main');

@@ -133,13 +133,17 @@ test('Holm package preserves Minutes UI but removes legacy hash auth and uses re
     const html = readFileSync(join(dir, 'web/minutes/index.html'), 'utf8');
     assert.match(html, /<link rel="stylesheet" href="\/app-sidebar\.css">/);
     assert.match(html, /<script defer src="\/js\/app-sidebar\.js" data-app="minutes"><\/script>/);
-    // Holm adds suite styling and PWA metadata, but retains the meeting UI.
-    const body = page => page.slice(page.indexOf('<body>'))
+    // The header gains suite account controls; retain the complete meeting UI.
+    assert.match(html, /id="settingsBtn"[^>]*class="wd-account-trigger"/);
+    assert.match(html, /data-theme="system"/);
+    assert.match(html, /id="logoutBtn"/);
+    assert.doesNotMatch(html, /id="themeBtn"/);
+    const body = page => page.slice(page.indexOf('<main'))
       .replaceAll('<script defer ', '<script ')
       .replace('id="home" class="home hidden"', 'id="home" class="home"')
       .replace('<script src="/js/app-sidebar.js" data-app="minutes"></script>', '')
       .replace('<script src="/minutes/pwa.js" defer></script>', '')
-      .replace(/<script src="\/js\/(?:previews|tag-ui|home-ui|home-icons|action-menu)\.js"><\/script>/g, '');
+      .replace(/<script src="\/js\/(?:previews|tag-ui|home-ui|home-icons|action-menu|dialogs|settings-menu)\.js"><\/script>/g, '');
     assert.equal(body(html), body(original).replace('href="/" class="home-link"', 'href="/home" class="home-link"').replace('>Save status<', '>Apply status<'));
     assert.match(html, /data-wd-app="minutes"/);
     assert.match(html, /href="\/suite-theme\.css"/);

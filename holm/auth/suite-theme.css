@@ -1,6 +1,8 @@
 /* Holm interface adapters. /home supplies shared NEUTRALS and component design;
    each app's original stylesheet supplies its own light/dark accent palette.
    Never recolor authored content, tags, priorities, calendar colors or charts. */
+html[data-wd-app][data-theme="dark"] { color-scheme: dark; }
+html[data-wd-app][data-theme="light"] { color-scheme: light; }
 :root {
   --wd-control-on-accent: #fff;
 }
@@ -331,7 +333,35 @@ html[data-wd-app="minutes"] .meeting-list { grid-template-columns: minmax(0, 1fr
 @media (prefers-reduced-motion: reduce) {
   html[data-wd-app] :is(button, .wd-app-sidebar, .wd-sidebar) { transition: none; }
 }
+/* Native suite dialogs share the same geometry, semantics and error states.
+   Their backdrop traps focus without making editor content itself inert. */
+html[data-wd-app] dialog.wd-dialog {
+  box-sizing:border-box; position:fixed; inset:0; margin:auto;
+  width:min(440px,calc(100% - 32px)); max-height:calc(100dvh - 32px); overflow:auto;
+  padding:24px; border:1px solid var(--wd-ui-border); border-radius:var(--wd-ui-radius);
+  background:var(--wd-ui-bg-elevated); color:var(--wd-ui-text); box-shadow:var(--wd-ui-shadow);
+  font:14px/1.5 Inter,system-ui,sans-serif;
+}
+.wd-dialog::backdrop { background:rgba(0,0,0,.55); }
+.wd-dialog-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.wd-dialog-heading h2 { margin:0; font-size:18px; font-weight:600; }
+.wd-dialog-close { display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--wd-ui-text-secondary); font-size:24px; cursor:pointer; }
+.wd-dialog-close:hover { background:var(--wd-ui-bg-input); }
+.wd-dialog-message { margin:16px 0; color:var(--wd-ui-text-secondary); overflow-wrap:anywhere; }
+.wd-dialog-field label { display:block; margin:16px 0 8px; font-weight:500; }
+.wd-dialog-field :is(input,select) { box-sizing:border-box; width:100%; min-width:0; padding:10px 12px; border:1px solid var(--wd-ui-border); border-radius:8px; background:var(--wd-ui-bg-input); color:var(--wd-ui-text); font:inherit; }
+.wd-dialog-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:10px; margin-top:24px; }
+.wd-dialog-actions button { padding:10px 18px; border:1px solid var(--wd-ui-border); font:600 14px/1.4 Inter,system-ui,sans-serif; cursor:pointer; }
+.wd-dialog-status { color:var(--wd-ui-text-secondary); font-size:12px; }
+.wd-dialog-status:empty, .wd-dialog [hidden] { display:none!important; }
+.wd-dialog-error { color:var(--wd-ui-danger); font-size:13px; overflow-wrap:anywhere; }
+.wd-minutes-account { position:relative; margin-left:auto; order:2; }
+.wd-minutes-account .wd-account-panel { position:absolute; right:0; top:calc(100% + 8px); z-index:100; }
+html[data-wd-app="minutes"] .wd-home-header .wd-minutes-account { order:2; }
+@media (max-width:700px) {
+  html[data-wd-app="minutes"] .wd-home-header .wd-minutes-account { order:1; }
+}
 /* Minutes' printable document remains paper, regardless of the UI theme. */
 @media print {
-  html[data-wd-app="minutes"], html[data-wd-app="minutes"] body { background: #fff; color: #000; }
+  html[data-wd-app="minutes"], html[data-wd-app="minutes"] body { background: #fff; color: #000; color-scheme: light; }
 }

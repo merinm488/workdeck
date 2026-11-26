@@ -104,12 +104,18 @@ function renderHome() {
   }).join('') || (app.meetings.length ? '<p class="no-results">No meetings match your search.</p>' : '');
   $('meetingList').querySelectorAll('.meeting-card').forEach(card => {
     card.onclick = event => { if (!event.target.closest('[data-delete]')) openMeeting(app.meetings.find(item => item.id === card.dataset.id)); };
-    card.onkeydown = event => { if (event.key === 'Enter' && !event.target.closest('button')) openMeeting(app.meetings.find(item => item.id === card.dataset.id)); };
+    card.onkeydown = event => {
+      if (event.target !== card || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault(); openMeeting(app.meetings.find(item => item.id === card.dataset.id));
+    };
   });
-  $('meetingList').querySelectorAll('[data-delete]').forEach(button => button.onclick = async () => {
+  $('meetingList').querySelectorAll('[data-delete]').forEach(button => button.onclick = () => {
     const meeting = app.meetings.find(item => item.id === button.dataset.delete);
-    if (!meeting || !confirm(`Delete “${meeting.title}”? Its Todo tasks will remain.`)) return;
-    try { await request('delete', { id: meeting.id }); app.meetings = app.meetings.filter(item => item !== meeting); renderHome(); } catch (error) { alert(error.message); }
+    if (!meeting) return;
+    WDDialog.open({ title: 'Delete meeting', message: `Delete “${meeting.title || 'Untitled meeting'}”? Its linked Todo tasks will remain. This cannot be undone.`,
+      confirmLabel: 'Delete', danger: true,
+      onSubmit: async () => { await request('delete', { id: meeting.id }); app.meetings = app.meetings.filter(item => item !== meeting); renderHome(); },
+    });
   });
 }
 function renderMeeting() {
@@ -280,16 +286,32 @@ function init() {
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (localStorage.getItem('workdeck_theme') === 'system') applyTheme();
   });
-  applyTheme(); $('themeBtn').onclick = async () => {
-    const theme = document.body.classList.contains('dark') ? 'light' : 'dark';
+  applyTheme();
+  $('settingsBtn').onclick = event => {
+    event.stopPropagation(); $('settingsDropdown').classList.toggle('hidden');
+  };
+  document.querySelectorAll('#settingsDropdown [data-theme]').forEach(button => button.onclick = async () => {
+    const theme = button.dataset.theme;
     localStorage.setItem('workdeck_theme', theme); applyTheme();
+    $('accountError').hidden = true;
     try {
       const response = await (window.WDBoot?.fetch || fetch)('/api/workdeck', { method: 'PUT', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'updateSettings', data: { settings: { theme } } }),
       });
-      if (!response.ok) throw new Error('Unable to save theme');
-    } catch (_) { alert('Theme could not be saved. Please try again.'); }
+      if (!response.ok) throw new Error('Theme could not be saved. Please try again.');
+    } catch (error) { $('accountError').textContent = error.message; $('accountError').hidden = false; }
+  });
+  $('logoutBtn').onclick = async () => {
+    await save();
+    if (app.dirty || app.conflict) return;
+    $('logoutBtn').disabled = true;
+    try {
+      const response = await (window.WDBoot?.fetch || fetch)('/auth/logout', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error('Could not sign out. Please try again.');
+      location.assign('/');
+    } catch (error) { $('accountError').textContent = error.message; $('accountError').hidden = false; }
+    finally { $('logoutBtn').disabled = false; }
   };
   app.quill = new Quill('#notesEditor', { theme: 'snow', placeholder: 'Why was this decided? Add context or a link…', modules: { toolbar: [['bold','italic'], [{ list: 'bullet' }, { list: 'ordered' }], ['link','clean']] } });
   app.quill.on('text-change', (_delta, _old, source) => { if (source !== 'user' || !editing() || !app.detailId) return; const point = findPoint(app.detailId)?.point; if (point) { point.notes = app.quill.root.innerHTML; changed(); renderPrint(); } });

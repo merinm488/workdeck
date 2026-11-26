@@ -17,8 +17,57 @@
     trigger.setAttribute('aria-haspopup', 'true');
     trigger.setAttribute('aria-controls', menu.id);
     const positionMenu = () => menu.style.setProperty('--wd-menu-top', `${Math.round(trigger.getBoundingClientRect().bottom + 8)}px`);
-    trigger.addEventListener('click', positionMenu);
     window.addEventListener('resize', positionMenu);
+    let focusLastOnOpen = false;
+    menu.setAttribute('role', 'group');
+    menu.setAttribute('aria-label', 'Account menu');
+    const isOpen = () => !menu.hidden && !menu.classList.contains('hidden') &&
+      (menu.matches('.wd-dropdown, .settings-dropdown, .fb-dropdown')
+        ? menu.classList.contains('active') || menu.classList.contains('open')
+        : getComputedStyle(menu).display !== 'none');
+    const controls = () => [...menu.querySelectorAll('button:not(:disabled), a[href]')]
+      .filter(control => control.getClientRects().length && getComputedStyle(control).visibility !== 'hidden');
+    const syncExpanded = () => trigger.setAttribute('aria-expanded', String(isOpen()));
+    new MutationObserver(syncExpanded).observe(menu, { attributes: true, attributeFilter: ['class', 'hidden'] });
+    syncExpanded();
+    const close = (restoreFocus = false) => {
+      if (isOpen()) trigger.click(); // retain app-owned toggle and persistence handlers
+      syncExpanded();
+      if (restoreFocus) trigger.focus({ preventScroll: true });
+    };
+    trigger.addEventListener('keydown', event => {
+      if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+      event.preventDefault(); event.stopPropagation();
+      if (!isOpen()) { focusLastOnOpen = event.key === 'ArrowUp'; trigger.click(); }
+      const items = controls();
+      (event.key === 'ArrowUp' ? items.at(-1) : items[0])?.focus();
+    });
+    trigger.addEventListener('click', event => {
+      positionMenu();
+      const focusLast = focusLastOnOpen; focusLastOnOpen = false;
+      queueMicrotask(() => {
+        syncExpanded();
+        if (event.detail === 0 && isOpen()) (focusLast ? controls().at(-1) : controls()[0])?.focus();
+      });
+    });
+    document.addEventListener('keydown', event => {
+      if (!isOpen()) return;
+      if (event.key === 'Escape') {
+        event.preventDefault(); event.stopPropagation(); close(true);
+      } else if (menu.contains(event.target) && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        event.preventDefault(); event.stopPropagation();
+        const items = controls(), index = items.indexOf(document.activeElement);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 :
+          (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+        items[next]?.focus();
+      }
+    }, true);
+    document.addEventListener('pointerdown', event => {
+      if (!menu.contains(event.target) && !trigger.contains(event.target)) close();
+    });
+    menu.addEventListener('focusout', () => queueMicrotask(() => {
+      if (!menu.contains(document.activeElement) && document.activeElement !== trigger) close();
+    }));
 
     // Only hide the original controls; their JS listeners still handle persistence
     // and server-side preference updates when the new choices forward a click.
@@ -65,7 +114,8 @@
       account.href = '/auth/account?redirect=%2Fhome';
       account.textContent = 'Your sign-ins';
       account.className = 'wd-account-item';
-      (menu.querySelector('#logoutBtn, #fbLogoutBtn') || menu).before(account);
+      const logout = menu.querySelector('#logoutBtn, #fbLogoutBtn');
+      if (logout) logout.before(account); else menu.append(account);
     }
     menu.querySelectorAll('a[href^="/auth/account"]').forEach(link => link.classList.add('wd-account-item'));
   };

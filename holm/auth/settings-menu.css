@@ -15,6 +15,8 @@ body { --wd-menu-surface:var(--wd-ui-bg-elevated); --wd-menu-ink:var(--wd-ui-tex
   border-radius:10px!important; background:var(--wd-menu-surface)!important;
   color:var(--wd-menu-ink)!important; box-shadow:var(--wd-ui-shadow)!important;
   font-family:Inter,system-ui,sans-serif!important;
+  /* Visibility must change synchronously for keyboard focus and aria-expanded. */
+  transition:opacity .15s ease,transform .15s ease!important;
 }
 .wd-account-panel .wd-account-item, .wd-account-panel .wd-dropdown-item, .wd-account-panel .settings-dropdown-item,
 .wd-account-panel .fb-dropdown-item, .wd-account-panel .blog-menu-item:not(.theme-option) {
@@ -71,4 +73,5 @@ body { --wd-menu-surface:var(--wd-ui-bg-elevated); --wd-menu-ink:var(--wd-ui-tex
     max-height:calc(100dvh - var(--wd-menu-top,60px) - 12px); overflow-y:auto;
   }
 }
+@media(prefers-reduced-motion:reduce) { .wd-account-panel { transition:none!important; } }
 @media(max-width:470px) { .wd-account-trigger, #settingsBtn.wd-account-trigger, #fbSettingsBtn.wd-account-trigger { width:38px!important; height:38px!important; } }

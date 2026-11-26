@@ -96,10 +96,21 @@
       toggle.setAttribute('aria-expanded', String(expanded));
       toggle.setAttribute('aria-label', expanded ? 'Close sidebar' : 'Open sidebar');
       toggle.title = expanded ? 'Close sidebar' : 'Open sidebar';
+      aside.inert = !expanded;
     };
-    const setOpen = value => { open = value; sync(); };
+    const setOpen = value => {
+      const restoreFocus = document.activeElement === toggle || (open && !value && aside.contains(document.activeElement));
+      open = value; sync();
+      if (restoreFocus) toggle.focus({ preventScroll: true });
+    };
     toggle.onclick = () => setOpen(!open);
     scrim.onclick = () => setOpen(false);
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || !open || matchMedia('(min-width: 1024px)').matches ||
+          document.querySelector('dialog[open], .wd-action-menu')) return;
+      if (aside.querySelector('form:not([hidden])')) return;
+      event.preventDefault(); setOpen(false); toggle.focus({ preventScroll: true });
+    });
     const choose = id => {
       active = id;
       try { if (id) sessionStorage.setItem(storageKey, id); else sessionStorage.removeItem(storageKey); } catch (_) { /* private mode */ }
@@ -234,17 +245,24 @@
         button.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 20 2 10V2h8l10 10Z"/><circle cx="7" cy="7" r="1"/></svg>';
         button.addEventListener('keydown', event => event.stopPropagation());
         // Keep the parent card's open/keyboard handlers from firing.
-        button.addEventListener('click', async event => {
+        button.addEventListener('click', event => {
           event.preventDefault(); event.stopPropagation();
-          const selected = prompt(`Tag for this ${app} item (enter a tag name, or leave blank to remove):`,
-            tags.find(tag => tag.id === byId.get(card.dataset.id)?.tagId)?.name || '');
-          if (selected === null) return;
-          const tag = tags.find(t => t.name.toLowerCase() === selected.trim().toLowerCase());
-          if (selected.trim() && !tag) { alert('Choose an existing tag in the sidebar first.'); return; }
-          try {
-            await request('setFileTag', { app: app === 'draw' ? 'draw' : app === 'blog' ? 'blog' : app, fileId: card.dataset.id, tagId: tag?.id || null });
-            location.reload(); // versioned editors must fetch the new revision
-          } catch (error) { alert(error.message); }
+          const current = records.find(item => item.id === card.dataset.id);
+          let changed = false;
+          WDDialog.open({
+            title: 'Edit Tags',
+            message: tags.length ? 'Choose a tag for this item. Changes are saved automatically.' : 'No tags yet. Create one in the sidebar to group your files.',
+            field: { label: 'Tag', value: current?.tagId || '', choices: [
+              { value: '', label: 'No tags' }, ...tags.map(tag => ({ value: tag.id, label: tag.name })),
+            ] },
+            autosave: true,
+            onSubmit: async value => {
+              await request('setFileTag', { app, fileId: card.dataset.id, tagId: value || null });
+              changed = true;
+            },
+            // Fetch the new revision before entering any versioned editor.
+            onClose: () => { if (changed) location.reload(); },
+          });
         });
         (card.querySelector(config.actions) || card).append(button);
         decorateRow(card, assignedTag, record);

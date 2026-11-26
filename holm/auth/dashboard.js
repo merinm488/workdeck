@@ -725,6 +725,7 @@ function showHome() { $('homeView').classList.remove('hidden'); }
 
 function applySidebar() {
     document.body.classList.toggle('wd-sidebar-open', state.sidebarOpen);
+    $('sidebar').inert = !state.sidebarOpen;
     const toggle = $('sidebarToggle');
     if (toggle) {
         toggle.setAttribute('aria-expanded', String(state.sidebarOpen));
@@ -752,8 +753,10 @@ function toggleSidebar() {
 
 function closeSidebarDrawer() {
     if (!WD_SIDEBAR.desktopQuery.matches && state.sidebarOpen) {
+        const restoreFocus = $('sidebar').contains(document.activeElement);
         state.sidebarOpen = false;
         applySidebar();
+        if (restoreFocus) $('sidebarToggle').focus({ preventScroll: true });
     }
 }
 
@@ -1920,13 +1923,13 @@ function setupEventListeners() {
     });
 
     searchInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' && searchInput.value) {
+            e.preventDefault(); e.stopPropagation();
             searchInput.value = '';
             state.searchQuery = '';
             $('clearSearch').classList.add('hidden');
             renderFiles();
             hideSearchSuggestion();
-            searchInput.blur();
         } else if (e.key === 'Tab' && searchSuggestion && !e.shiftKey && !e.isComposing) {
             e.preventDefault();
             searchInput.value = searchSuggestion;

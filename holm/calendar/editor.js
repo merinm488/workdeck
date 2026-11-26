@@ -1344,6 +1344,7 @@ function syncSidebarToggle() {
     toggle.setAttribute('aria-expanded', String(expanded));
     toggle.setAttribute('aria-label', expanded ? 'Close sidebar' : 'Open sidebar');
     toggle.title = expanded ? 'Close sidebar' : 'Open sidebar';
+    $('calSidebar').inert = !expanded;
 }
 
 function openSidebarDrawer() {
@@ -1353,9 +1354,11 @@ function openSidebarDrawer() {
 }
 
 function closeSidebarDrawer() {
+    const restoreFocus = $('calSidebar').contains(document.activeElement);
     $('calSidebar').classList.remove('open');
     $('sidebarScrim').classList.remove('show');
     syncSidebarToggle();
+    if (restoreFocus) $('sidebarToggleBtn').focus({ preventScroll: true });
 }
 
 function initSidebarDrawer() {

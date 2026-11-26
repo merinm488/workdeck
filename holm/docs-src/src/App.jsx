@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense, Component } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, Component } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useDocs } from './hooks/useDocs';
 import { useTheme } from './hooks/useTheme';
@@ -127,6 +127,22 @@ function App() {
   useEffect(() => {
     try { localStorage.setItem('docs_view_mode', viewMode); } catch (_) { /* private mode */ }
   }, [viewMode]);
+
+  const sidebarOpener = useRef(null);
+  const closeSidebar = useCallback(() => {
+    setShowSidebar(false);
+    sidebarOpener.current?.focus({ preventScroll: true });
+  }, []);
+  useEffect(() => {
+    if (!showSidebar) return;
+    const escape = event => {
+      if (event.key !== 'Escape' || event.defaultPrevented || window.innerWidth >= 1024 ||
+          document.querySelector('dialog[open], .wd-action-menu')) return;
+      event.preventDefault(); closeSidebar();
+    };
+    document.addEventListener('keydown', escape);
+    return () => document.removeEventListener('keydown', escape);
+  }, [showSidebar, closeSidebar]);
 
   // Keep the user's collapsed state during desktop resizes; reset only when
   // crossing between a desktop sidebar and a mobile drawer.
@@ -401,10 +417,14 @@ function App() {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-400/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative min-h-screen flex">
+      <div className="relative min-h-screen flex"
+        inert={editLinkDoc || (isDocViewOpen && activeDoc) ? '' : undefined}
+        aria-hidden={!!(editLinkDoc || (isDocViewOpen && activeDoc))}>
         {/* ===== SIDEBAR ===== */}
         <aside
           id="docsSidebar"
+          inert={showSidebar ? undefined : ''}
+          aria-hidden={!showSidebar}
           className={`wd-docs-sidebar fixed inset-y-0 left-0 z-30 w-[280px] bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out ${
             showSidebar ? 'translate-x-0' : '-translate-x-full'
           }`}
@@ -417,7 +437,7 @@ function App() {
               </a>
               {/* On mobile the header toggle is covered by the drawer; keep its close action here. */}
               <button
-                onClick={() => setShowSidebar(false)}
+                onClick={closeSidebar}
                 className="lg:hidden w-[38px] h-[38px] flex items-center justify-center rounded-lg hover:bg-gray-100 dark:bg-gray-700 transition-colors"
                 aria-label="Close sidebar"
                 aria-controls="docsSidebar"
@@ -500,7 +520,7 @@ function App() {
           <div
             className="fixed inset-y-0 right-0 left-0 bg-black/50 z-20 lg:hidden"
             style={{ left: '280px' }} // Match the sidebar width so its drawer overlay starts at the edge
-            onClick={() => setShowSidebar(false)}
+            onClick={closeSidebar}
           />
         )}
 
@@ -511,6 +531,7 @@ function App() {
             <div className="wd-home-header">
                   {/* Mobile menu button */}
                   <button
+                    ref={sidebarOpener}
                     onClick={() => setShowSidebar(true)}
                     className="w-[38px] h-[38px] p-0 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:bg-gray-700 lg:hidden"
                     aria-label="Open sidebar"

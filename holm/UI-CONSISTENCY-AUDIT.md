@@ -1,8 +1,11 @@
 # Holm UI consistency audit
 
-## Current release: app colors restored
+For the latest cross-app interaction and accessibility review, see
+[CONSISTENCY-REVIEW.md](CONSISTENCY-REVIEW.md).
 
-**Generation 88** is deployed at `https://mer-workdeck.fazt.sh` on the existing
+## Earlier audit: app colors restored
+
+**Generation 88** was deployed at `https://mer-workdeck.fazt.sh` on the existing
 `holm_app_ZZNXL3c5t1ER` installation.
 
 The first consistency pass (generation 87) incorrectly made all apps' primary

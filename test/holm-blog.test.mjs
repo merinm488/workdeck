@@ -187,10 +187,10 @@ test('Blog cards expose rename and delete to the shared list actions menu', asyn
   const list = node(), template = { content: { firstElementChild: { cloneNode: () => row } } };
   const elements = { postsList: list, blogPostRowTemplate: template, postsEmpty: node(), postsEmptySearch: node(), kanbanFooterStats: node() };
   const state = { posts: [{ id: 'post-1', title: 'First', excerpt: 'An excerpt', createdAt: '2026-01-01' }], searchQuery: '', settings: {} };
-  let updated, deleted, reloads = 0;
+  let updated, deleted, dialog, reloads = 0;
   const ui = runInNewContext(`${render}; ({ renderPosts, renamePost, deletePostFromHome })`, {
     state, $: id => elements[id], document: { createElement: node }, window: { location: { reload() { reloads++; } } },
-    prompt: () => 'Renamed', confirm: () => true, blogStorage: {
+    WDDialog: { open(options) { dialog = options; } }, blogStorage: {
       request: async (action, data) => { updated = { action, data }; return { success: true, data: { posts: [{ ...state.posts[0], title: data.title }] } }; },
       deletePost: async id => { deleted = id; return { posts: [] }; },
     }, showToast() {}, openPost() {},
@@ -203,10 +203,18 @@ test('Blog cards expose rename and delete to the shared list actions menu', asyn
   assert.equal(actions.children.length, 2);
   assert.equal(actions.children[0].getAttribute?.('aria-label') || actions.children[0]['aria-label'], 'Rename');
   assert.equal(actions.children[1]['aria-label'], 'Delete');
-  await ui.renamePost(state.posts[0]);
+  ui.renamePost(state.posts[0]);
+  assert.equal(dialog.title, 'Rename post');
+  assert.equal(dialog.field.value, 'First');
+  assert.equal(dialog.field.maxLength, 200);
+  assert.equal(updated, undefined, 'Opening is not a mutation');
+  await dialog.onSubmit('Renamed');
   assert.equal(updated.action, 'updatePost');
   assert.deepEqual({ ...updated.data }, { id: 'post-1', title: 'Renamed' });
-  await ui.deletePostFromHome(state.posts[0]);
+  ui.deletePostFromHome(state.posts[0]);
+  assert.equal(dialog.danger, true);
+  assert.equal(deleted, undefined, 'Opening is not deletion');
+  await dialog.onSubmit();
   assert.equal(deleted, 'post-1');
   assert.equal(title.textContent, 'Renamed');
   assert.equal(state.posts.length, 0);

@@ -60,6 +60,6 @@ export function withHomeUI(page) {
   // closing body. Append to the OUTER document, never that inert template.
   const end = page.lastIndexOf('</body>');
   const preview = page.includes('src="/js/previews.js"') ? '' : '<script src="/js/previews.js"></script>';
-  page = page.slice(0, end) + preview + '<script src="/js/home-icons.js"></script><script src="/js/action-menu.js"></script><script src="/js/tag-ui.js"></script><script src="/js/home-ui.js"></script>' + page.slice(end);
+  page = page.slice(0, end) + preview + '<script src="/js/home-icons.js"></script><script src="/js/action-menu.js"></script><script src="/js/dialogs.js"></script><script src="/js/tag-ui.js"></script><script src="/js/home-ui.js"></script>' + page.slice(end);
   return withPageBoot(page.replace('</head>', '<link rel="stylesheet" href="/home-components.css"><link rel="stylesheet" href="/home-ui.css"><link rel="stylesheet" href="/action-menu.css"></head>'));
 }

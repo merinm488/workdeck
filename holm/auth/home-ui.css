@@ -91,6 +91,8 @@ html[data-wd-app] .wd-home-header :is(.home-search-toggle,.blog-search-toggle,#b
 html[data-wd-app] .wd-home-search { display:flex; align-items:center; flex:1 1 220px; min-width:0; max-width:520px; margin:0; padding:0; border:0; border-radius:0; background:none; order:0; box-shadow:none; }
 html[data-wd-app] .wd-home-search-box { position:relative; width:100%; display:flex; align-items:center; }
 html[data-wd-app] .wd-home-search .wd-search-input { box-sizing:border-box; width:100%; height:42px; margin:0; padding:11px 40px 11px 42px; border:1px solid var(--wd-ui-border); border-radius:999px; background:var(--wd-ui-bg-input); color:var(--wd-ui-text); font:14px/18px Inter,system-ui,sans-serif; text-align:center; outline:none; }
+html[data-wd-app] .wd-home-search input::-webkit-search-cancel-button,
+html[data-wd-app] .wd-home-search input::-webkit-search-decoration { -webkit-appearance:none; }
 html[data-wd-app] .wd-home-search .wd-search-input:focus { border-color:var(--wd-control-focus); box-shadow:0 0 0 3px var(--wd-control-soft); }
 html[data-wd-app] .wd-home-search .wd-search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--wd-ui-text-tertiary); pointer-events:none; }
 html[data-wd-app] .wd-home-search .wd-search-clear { position:absolute; right:10px; top:50%; transform:translateY(-50%); display:flex; align-items:center; justify-content:center; width:26px; height:26px; padding:0; border:0; border-radius:50%; color:var(--wd-ui-text-tertiary); background:none; }
