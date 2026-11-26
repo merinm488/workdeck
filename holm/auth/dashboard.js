@@ -172,9 +172,8 @@ const WD_APPS = [
     },
     {
         id: 'minutes', name: 'Minutes', label: 'Minutes', accent: 'minutes', icon: 'minutes',
-        launcherIcon: '/icons/minutes192.png',
         route: '/minutes/', editorParam: 'meeting',
-        create: { action: 'createMinutes', payload: {}, pickNewest: function (data) { return data.minutes && data.minutes[0]; } },
+        create: { route: '/minutes/?new=1' },
         contentSearch: true
     },
     {
@@ -294,8 +293,6 @@ const state = {
     viewMode: 'grid',    // 'grid' | 'list'
     fileToRename: null,
     fileToDelete: null,
-    fileToMove: null,
-    moveTarget: null,    // selected tag id (or null for no tag)
     projectToDelete: null
 };
 
@@ -626,7 +623,7 @@ const MOBILE_MQ = window.matchMedia('(max-width: 480px)');
 
 function placeDropdownSheet(dd) {
     const trigger = dd._wdTrigger;
-    if (!dd.classList.contains('active') || !trigger || !MOBILE_MQ.matches) {
+    if (!dd.classList.contains('active') || !trigger) {
         dd.style.top = '';
         dd.style.bottom = '';
         dd.style.maxHeight = '';
@@ -635,6 +632,16 @@ function placeDropdownSheet(dd) {
     const rect = trigger.getBoundingClientRect();
     const opensUp = dd.classList.contains('wd-dropdown-up');
     const minGap = 12;
+    if (!MOBILE_MQ.matches) {
+        dd.style.top = '';
+        dd.style.bottom = '';
+        // The upward empty-state launcher can have less room than 60vh.
+        // Keep every app reachable instead of clipping its first row offscreen.
+        const available = opensUp ? rect.top - 8 - minGap : window.innerHeight - rect.bottom - 8 - minGap;
+        dd.style.maxHeight = ['newDropdown', 'emptyNewDropdown', 'filterDropdown'].includes(dd.id)
+            ? Math.max(140, Math.min(420, window.innerHeight * .6, available)) + 'px' : '';
+        return;
+    }
     if (opensUp) {
         // Anchor the sheet's bottom just above the trigger, clamped so the
         // sheet stays fully on-screen even if the trigger is scrolled
@@ -857,30 +864,30 @@ function renderViewToggle() {
  * Shared item for the app dropdowns ("+ New" menus and the filter chooser):
  * icon chip + app name.
  */
-function buildAppMenuItem(app, selected, launcher = false) {
+function appArtworkIcon(app, size = 48) {
+    const image = document.createElement('img');
+    image.src = window.WDAppArtwork[app.id];
+    image.alt = ''; // The adjacent app name already labels this control.
+    image.width = size;
+    image.height = size;
+    return image;
+}
+
+function buildAppMenuItem(app, selected) {
     const btn = $('wdDropdownItemTemplate').content.firstElementChild.cloneNode(true);
     btn.dataset.app = app.id;
     if (selected) btn.dataset.selected = 'true';
     const chip = btn.querySelector('.wd-app-icon');
     chip.classList.add('wd-app-icon-' + app.accent);
-    if (launcher && app.launcherIcon) {
-        const image = document.createElement('img');
-        image.src = app.launcherIcon;
-        image.alt = ''; // The adjacent app name already labels this button.
-        image.width = 48;
-        image.height = 48;
-        chip.classList.add('wd-app-icon-artwork');
-        chip.append(image);
-    } else {
-        chip.append(wdIcon(app.icon));
-    }
+    chip.classList.add('wd-app-icon-artwork');
+    chip.append(appArtworkIcon(app));
     btn.querySelector('.wd-dropdown-item-title').textContent = app.name;
     return btn;
 }
 
 
 function renderNewMenus() {
-    const items = WD_APPS.filter(function (app) { return ['todo', 'kanban', 'minutes', 'calendar', 'docs', 'sheets', 'forms', 'slides', 'draw', 'filebox', 'blog'].includes(app.id); }).map(function (app) { return buildAppMenuItem(app, false, true); });
+    const items = WD_APPS.filter(function (app) { return ['todo', 'kanban', 'minutes', 'calendar', 'docs', 'sheets', 'forms', 'slides', 'draw', 'filebox', 'blog'].includes(app.id); }).map(function (app) { return buildAppMenuItem(app, false); });
     $('newDropdown').replaceChildren(...items);
     $('emptyNewDropdown').replaceChildren(...items.map(function (item) { return item.cloneNode(true); }));
 }
@@ -919,7 +926,7 @@ function renderFilterMenu() {
         btn.style.background = '';
         btn.style.color = '';
     }
-    iconSlot.replaceChildren(...(activeApp ? [wdIcon(activeApp.icon)] : []));
+    iconSlot.replaceChildren(...(activeApp ? [appArtworkIcon(activeApp, 20)] : []));
     iconSlot.classList.toggle('hidden', !activeApp);
     label.textContent = activeApp ? activeApp.name : 'Apps';
 }
@@ -1346,12 +1353,18 @@ function copyFileLink(file) {
 }
 
 /**
- * Create a new file server-side, then open it in the app's editor (new tab).
+ * Open an app-owned creation flow, or create a file and open its editor (new tab).
  * Newly created files get &edit=1 so Docs skips the preview and opens the
  * editor directly — a fresh file is opened to be written in.
  */
 async function createFile(appId) {
     const app = getApp(appId);
+    if (app.create?.route) {
+        // Let Minutes show its own starting-point picker before creating a file.
+        const tagQs = state.activeTag ? '&tag=' + encodeURIComponent(state.activeTag) : '';
+        openInNewTab(app.create.route + tagQs);
+        return;
+    }
     if (!app.create) {
         // No server-side create (Files upload, Calendar): open the app.
         const uploadQs = app.id === 'filebox' ? '?upload=1' : '';
@@ -1672,98 +1685,12 @@ async function confirmDeleteProject() {
 // ================================================
 
 function showMoveModal(file) {
-    state.fileToMove = file;
-    $('moveFileName').textContent = file.name;
-    // Filebox stores tags as an array, but the home page assigns one tag
-    // per item, just like the other apps.
-    state.moveTarget = isMultiTagItem(file) ? (file.tags || [])[0] || null : file.tagId || null;
-    $('moveSelect').classList.remove('wd-move-multi');
-    renderMoveOptions();
-    closeMoveDropdown();
-    $('moveModal').classList.add('active');
-}
-
-function hideMoveModal() {
-    state.fileToMove = null;
-    state.moveTarget = null;
-    closeMoveDropdown();
-    $('moveModal').classList.remove('active');
-}
-
-function closeMoveDropdown() {
-    $('moveDropdown').classList.remove('active');
-    $('moveSelect').classList.remove('active');
-    $('moveSelectBtn').setAttribute('aria-expanded', 'false');
-}
-
-function setMoveTriggerValue(option) {
-    const el = $('moveSelectValue');
-    if (option && option.color) {
-        const name = document.createElement('span');
-        name.className = 'wd-move-select-name';
-        name.textContent = option.name;
-        el.replaceChildren(wdDot(option.color), name);
-    } else {
-        const placeholder = document.createElement('span');
-        placeholder.className = 'wd-move-select-placeholder';
-        placeholder.textContent = option ? option.name : 'Choose tags';
-        el.replaceChildren(placeholder);
-    }
-}
-
-function moveEmptyDiv() {
-    const el = document.createElement('div');
-    el.className = 'wd-move-empty';
-    el.textContent = 'No tags yet — create one in the sidebar.';
-    return el;
-}
-
-function moveOptionRow(selected) {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'wd-move-option' + (selected ? ' selected' : '');
-    row.setAttribute('role', 'option');
-    row.setAttribute('aria-selected', String(selected));
-    return row;
-}
-
-function renderMoveOptions() {
-    const dd = $('moveDropdown');
-    dd.replaceChildren();
-
-    if (state.tags.length === 0) {
-        dd.replaceChildren(moveEmptyDiv());
-        setMoveTriggerValue(null);
-        return;
-    }
-
-    const options = [{ id: null, name: 'No tags', color: null }].concat(state.tags);
-    options.forEach(function (option) {
-        const selected = (state.moveTarget || null) === option.id;
-        const row = moveOptionRow(selected);
-        const dot = wdDot(option.color);
-        if (!option.color) dot.classList.add('wd-dot-none');
-        const name = document.createElement('span');
-        name.className = 'wd-move-option-name';
-        name.textContent = option.name;
-        row.append(dot, name, wdIcon('check'));
-        row.addEventListener('click', function () {
-            state.moveTarget = option.id;
-            renderMoveOptions();
-            closeMoveDropdown();
-        });
-        dd.appendChild(row);
+    return WDTagUI.editTags({
+        name: file.name,
+        tags: state.tags,
+        tagId: isMultiTagItem(file) ? (file.tags || [])[0] || null : file.tagId || null,
+        onSave: target => applyFileMove(file, target),
     });
-
-    setMoveTriggerValue(options.find(function (option) { return (state.moveTarget || null) === option.id; }));
-}
-
-async function confirmMove() {
-    const file = state.fileToMove;
-    if (!file) return;
-    const target = state.moveTarget || null;
-    hideMoveModal();
-    applyFileMove(file, target);
 }
 
 // Optimistic tag write for Filebox items, shared by the modal and drag-and-drop.
@@ -1784,10 +1711,12 @@ async function applyFileTags(file, tagIds) {
         }
         showNotification('Tags updated', 'success');
         loadUserData();
+        return true;
     } catch (error) {
         file.tags = original;
         render();
         showNotification(error.message || 'Failed to update tags', 'error');
+        return false;
     }
 }
 
@@ -1795,8 +1724,7 @@ async function applyFileTags(file, tagIds) {
 async function applyFileMove(file, target) {
     if (isMultiTagItem(file)) {
         // A drop replaces the previous tag; dropping on All files clears it.
-        applyFileTags(file, target ? [target] : []);
-        return;
+        return applyFileTags(file, target ? [target] : []);
     }
 
     const original = file.tagId || null;
@@ -1806,12 +1734,14 @@ async function applyFileMove(file, target) {
     render();
     try {
         await api('setFileTag', { fileId: file.id, app: file.app, tagId: target });
-        showNotification(target ? 'Tag added' : 'Tag removed', 'success');
+        showNotification(target ? 'Tag updated' : 'Tag removed', 'success');
         loadUserData();
+        return true;
     } catch (error) {
         file.tagId = original;
         render();
-        showNotification(error.message || 'Failed to move file', 'error');
+        showNotification(error.message || 'Failed to update tags', 'error');
+        return false;
     }
 }
 
@@ -2041,25 +1971,6 @@ function setupEventListeners() {
         if (e.key === 'Escape') closeSidebarDrawer();
     });
 
-    // ----- Move-to-project modal -----
-    $('moveModalClose').addEventListener('click', hideMoveModal);
-    $('cancelMove').addEventListener('click', hideMoveModal);
-    $('confirmMove').addEventListener('click', confirmMove);
-    $('moveSelectBtn').addEventListener('click', function (e) {
-        e.stopPropagation();
-        const open = $('moveDropdown').classList.toggle('active');
-        $('moveSelect').classList.toggle('active', open);
-        this.setAttribute('aria-expanded', String(open));
-    });
-    document.addEventListener('keydown', function (e) {
-        if (e.key !== 'Escape' || !$('moveModal').classList.contains('active')) return;
-        if ($('moveDropdown').classList.contains('active')) {
-            closeMoveDropdown();
-            return;
-        }
-        hideMoveModal();
-    });
-
     // ----- Delete project modal -----
     $('deleteProjectModalClose').addEventListener('click', hideDeleteProjectModal);
     $('cancelDeleteProject').addEventListener('click', hideDeleteProjectModal);
@@ -2179,15 +2090,11 @@ function setupEventListeners() {
             const themeContainer = $('themeToggleBtn').closest('.wd-theme-container');
             if (themeContainer) themeContainer.classList.remove('active');
         }
-        if (!e.target.closest('#moveSelect')) {
-            closeMoveDropdown();
-        }
         document.querySelectorAll('.wd-modal.active').forEach(function (modal) {
             if (e.target === modal) {
                 modal.classList.remove('active');
                 state.fileToRename = null;
                 state.fileToDelete = null;
-                state.fileToMove = null;
                 state.projectToDelete = null;
             }
         });

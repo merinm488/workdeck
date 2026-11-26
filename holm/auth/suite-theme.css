@@ -27,11 +27,11 @@ html[data-wd-app="files"], html[data-wd-app="files"] body {
   --wd-control-soft: var(--fb-accent-soft);
 }
 html[data-wd-app="minutes"], html[data-wd-app="minutes"] body {
-  /* Minutes' original primary fill stays green in both themes; --green is
-     its separate, brighter dark-theme foreground/highlight color. */
-  --wd-control-accent: #276b53;
-  --wd-control-soft: var(--green-soft);
-  --wd-control-focus: var(--green);
+  /* Use Home's Minutes purple for primary fills, with a brighter purple
+     foreground/focus color for readable dark-mode editor accents. */
+  --wd-control-accent: var(--minutes-primary);
+  --wd-control-soft: var(--minutes-accent-soft);
+  --wd-control-focus: var(--minutes-accent);
 }
 /* Match the label to the actual fill, not to an assumption of universal yellow.
    Light Draw/Forms/Todo/Kanban and Minutes need white; pastel dark accents and

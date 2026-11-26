@@ -51,12 +51,16 @@ try {
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
     const dialog = page.getByRole('dialog', { name: 'Edit tags', exact: true });
+    const selectTag = async label => {
+      await dialog.locator('.wd-move-select-trigger').click();
+      await dialog.getByRole('option', { name: label, exact: true }).click();
+    };
     const avatar = () => page.getByRole('button', { name: 'Account menu', exact: true }).last();
     const more = () => page.locator('.wd-doc-card .wd-card-more, .docs-list-grid [aria-label="More options"]').first();
     const openTags = async (trigger = more()) => {
       const url = page.url();
       await trigger.click();
-      await page.getByRole('menuitem', { name: 'Edit Tags', exact: true }).click();
+      await page.getByRole('menuitem', { name: 'Edit tags', exact: true }).click();
       await dialog.waitFor();
       assert.equal(page.url(), url, 'menu action does not open the doc');
       assert.equal(await dialog.evaluate(el => el.contains(document.activeElement)), true, 'focus enters modal');
@@ -98,14 +102,15 @@ try {
 
       // Card assignment updates the badge and survives a full reload.
       await openTags();
-      await dialog.getByLabel('Tag', { exact: true }).selectOption('tag1');
-      await dialog.getByRole('status').filter({ hasText: 'All changes saved' }).waitFor();
-      await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+      await selectTag('Planning');
+      assert.equal(updates, 0, 'selection stays local until Save');
+      await checkBlue(dialog.getByRole('button', { name: 'Save', exact: true }));
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
       await dialog.waitFor({ state: 'detached' });
       await page.locator('.wd-doc-card .wd-file-project-name').getByText('Planning', { exact: true }).waitFor();
       await page.reload();
       await openTags();
-      assert.equal(await dialog.getByLabel('Tag', { exact: true }).inputValue(), 'tag1');
+      assert.equal(await dialog.locator('.wd-move-select-value').textContent(), 'Planning');
       await page.keyboard.press('Escape');
 
       // Selecting a tag deselects All items; All items restores the full list.
@@ -124,31 +129,32 @@ try {
       // List menu clears a tag via null, not a made-up tag ID.
       await page.getByRole('button', { name: 'Switch to list view', exact: true }).click();
       await openTags();
-      await dialog.getByLabel('Tag', { exact: true }).selectOption('');
-      await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+      await selectTag('No tags');
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
       await dialog.waitFor({ state: 'detached' });
       assert.equal(doc.tagId, null);
 
-      // Empty tag pool: create + assign. Failed assignment stays open and a
-      // retry reuses the new tag instead of creating a duplicate.
+      // Empty tag pool matches Workdeck home and points to sidebar creation.
       tags = [];
       await page.reload();
       await openTags();
-      assert.match(await dialog.textContent(), /No tags yet/);
-      await dialog.getByRole('button', { name: 'Create new tag', exact: true }).click();
-      await dialog.getByLabel('Tag name', { exact: true }).fill('New project');
-      failUpdate = true;
-      await checkBlue(dialog.getByRole('button', { name: 'Create tag', exact: true }));
-      await dialog.getByRole('button', { name: 'Create tag', exact: true }).click();
-      await dialog.getByRole('alert').waitFor();
-      assert.equal(creates, 1);
-      assert.equal(doc.tagId, null);
-      assert.equal(await dialog.getByLabel('Tag', { exact: true }).inputValue(), tags[0].id);
-      await page.evaluate(() => dispatchEvent(new Event('online')));
-      await dialog.getByRole('status').filter({ hasText: 'All changes saved' }).waitFor();
-      await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+      await dialog.locator('.wd-move-select-trigger').click();
+      assert.match(await dialog.textContent(), /No tags yet — create one in the sidebar/);
+      assert.equal(await dialog.getByRole('option').count(), 1);
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
       await dialog.waitFor({ state: 'detached' });
-      assert.equal(creates, 1);
+      tags = [{ id: 'new-tag', name: 'New project', color: '#3b82f6' }];
+      await page.reload();
+      await openTags();
+      await selectTag('New project');
+      failUpdate = true;
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+      await dialog.getByRole('alert').waitFor();
+      assert.equal(doc.tagId, null);
+      assert.equal(await dialog.locator('.wd-move-select-value').textContent(), 'New project');
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+      await dialog.waitFor({ state: 'detached' });
+      assert.equal(creates, 0, 'editing does not create duplicate tags');
       assert.equal(doc.tagId, tags[0].id);
       assert.equal(doc.content, 'Keep this content unchanged.');
 
@@ -159,8 +165,8 @@ try {
       if (width < 1024) await toggle.click();
       const sidebarMore = page.locator('#docsSidebar [aria-label="More options"]');
       await openTags(sidebarMore);
-      await dialog.getByLabel('Tag', { exact: true }).selectOption('');
-      await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+      await selectTag('No tags');
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
       await dialog.waitFor({ state: 'detached' });
       await sidebarMore.waitFor({ state: 'detached' });
       assert.equal(doc.tagId, null);

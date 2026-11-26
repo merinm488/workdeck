@@ -113,32 +113,37 @@ try {
         assert.equal(await sidebar.evaluate(el => el.inert), true);
         assert.equal(await toggle.evaluate(el => el === document.activeElement), true);
         const more = page.locator('.wd-card-more:visible').first();
+        const dialog = page.getByRole('dialog', { name: 'Edit tags', exact: true });
+        const selectTag = async label => {
+          await dialog.locator('.wd-move-select-trigger').click();
+          await dialog.getByRole('option', { name: label, exact: true }).click();
+        };
         const openTags = async () => {
-          await more.click(); await page.getByRole('menuitem', { name: 'Edit Tags', exact: true }).click();
-          await page.getByRole('dialog', { name: 'Edit Tags', exact: true }).waitFor();
+          await more.click(); await page.getByRole('menuitem', { name: 'Edit tags', exact: true }).click();
+          await dialog.waitFor();
         };
         await openTags();
-        const dialog = page.getByRole('dialog', { name: 'Edit Tags', exact: true });
-        assert.equal(await dialog.getByLabel('Tag', { exact: true }).inputValue(), 'tag1');
+        assert.equal(await dialog.locator('.wd-move-select-value').textContent(), 'Planning');
         const before = mutations.length;
+        await selectTag('<Next> & review');
         await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
-        assert.equal(mutations.length, before, 'Cancel does not write');
+        assert.equal(mutations.length, before, 'Cancel discards the draft without writing');
         assert.equal(await more.evaluate(el => el === document.activeElement), true);
         await openTags(); failNext = true;
-        await dialog.getByLabel('Tag', { exact: true }).selectOption('tag2');
+        await selectTag('<Next> & review');
+        await dialog.getByRole('button', { name: 'Save', exact: true }).click();
         await dialog.getByRole('alert').waitFor();
         assert.match(await dialog.getByRole('alert').textContent(), /Test save failed/);
-        assert.equal(await dialog.getByLabel('Tag', { exact: true }).inputValue(), 'tag2', 'Failed selection retained');
+        assert.equal(await dialog.locator('.wd-move-select-value').textContent(), '<Next> & review', 'Failed selection retained');
         await page.screenshot({ path: `${output}/${theme}-${app}-tag-error.png` });
-        await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Save', exact: true }).click();
         await dialog.waitFor({ state: 'detached' });
         await more.waitFor();
         assert.equal(mutations.filter(change => change.action === 'setFileTag').length, 2, 'One failed write and one retry');
-        await openTags(); assert.equal(await dialog.getByLabel('Tag', { exact: true }).inputValue(), 'tag2');
-        await dialog.getByLabel('Tag', { exact: true }).selectOption('');
-        await dialog.getByRole('status').getByText('All changes saved').waitFor();
+        await openTags(); assert.equal(await dialog.locator('.wd-move-select-value').textContent(), '<Next> & review');
+        await selectTag('No tags');
         await page.screenshot({ path: `${output}/${theme}-${app}-tag-saved.png` });
-        await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Save', exact: true }).click();
         await dialog.waitFor({ state: 'detached' }); await more.waitFor();
         // Long user text must not cause horizontal overflow or inject markup.
         if (['blog', 'minutes'].includes(app)) {

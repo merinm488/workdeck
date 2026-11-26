@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { operations as extraMcpOperations } from '../holm/auth/mcp-extra-contract.js';
 import { buildThemeTokens, withSuiteTheme } from '../holm/auth/theme-build.mjs';
+import { appArtwork } from '../holm/auth/app-artwork.mjs';
 import { withSheetEditorTheme, withSharedSheetTheme } from '../holm/sheets/theme-build.mjs';
 import { withSheetAutosave } from '../holm/sheets/autosave-build.mjs';
 import { withSheetEditorChrome } from '../holm/sheets/editor-build.mjs';
@@ -51,14 +52,14 @@ const connectAIModal = segment('    <!-- Connect AI modal (MCP) -->', '    <!-- 
     'Sign in with your Holm account in the browser and review the requested tools before allowing access.')
   .replace('                <p class="wd-modal-text" id="connectAIStatus" role="status">Loading connection…</p>\n                <div class="wd-modal-actions"><button class="wd-danger-btn" id="connectAIRevoke" hidden>Revoke connection</button><button class="wd-secondary-btn" id="connectAICloseBtn">Close</button></div>',
     '                <div class="wd-modal-actions"><a class="wd-secondary-btn" id="connectAIManage" href="/_holm/connect/connections" target="_blank" rel="noopener noreferrer">Manage Connections</a><button class="wd-secondary-btn" id="connectAICloseBtn">Close</button></div>');
-const homeMarkup = homeView
+const homeMarkup = (homeView
   + segment('    <!-- Rename modal -->', '    <!-- Key modal -->')
-  + segment('    <!-- Add tag modal', '    <!-- Loading overlay -->')
+  + segment('    <!-- Delete tag modal', '    <!-- Loading overlay -->')
   + connectAIModal
   + segment('    <!-- Loading overlay -->', '    <!-- Offscreen fabric frame doc')
   // The card renderer reads this template to render Slides and Draw in sandboxed
   // iframes. Keep it alongside the card templates when assembling Holm's home.
-  + segment('    <!-- Offscreen fabric frame doc', '    <!-- Scripts -->');
+  + segment('    <!-- Offscreen fabric frame doc', '    <!-- Scripts -->')).replaceAll('title="Add tag"', 'title="Edit tags"');
 const homeHTML = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Workdeck — Your files</title>
@@ -225,10 +226,8 @@ filePage = filePage.replace('                                <div class="fb-drop
   '                                <a class="fb-dropdown-item" href="/account">My account</a>\n                                <div class="fb-dropdown-divider"></div>');
 cutFiles('    <!-- Access key -->', '    <!-- Entry guard —');
 cutFiles('    <!-- Entry guard —', '    <!-- ===== TEMPLATES');
+cutFiles('    <!-- Edit tags (multi-select over the shared suite tag pool) -->', '    <!-- Viewer (?id= deep link) -->');
 filePage = filePage
-  .replace('<!-- Edit tags (multi-select over the shared suite tag pool) -->', '<!-- Edit one tag from the shared suite tag pool -->')
-  .replace('<h3>Edit tags</h3>', '<h3>Edit tag</h3>')
-  .replace('Tags for "<span id="fbTagsItemName"', 'Tag for "<span id="fbTagsItemName"')
   .replaceAll('https://releases.transloadit.com/uppy/v4.18.3/uppy.min.css', '/files/vendor-uppy.min.css')
   .replaceAll('https://releases.transloadit.com/uppy/v4.18.3/uppy.min.js', '/files/js/vendor-uppy.min.js')
   .replaceAll('[a-z0-9]{14,}', '[A-Za-z0-9_-]{8,128}');
@@ -301,19 +300,6 @@ for (const [start, end] of [
 const ribbon = landing.match(/^            <div class="lp-marquee"[^\n]+/m)?.[0];
 if (!ribbon) throw new Error('Missing landing ribbon.');
 landing = landing.replace(ribbon, '').replace('        </main>', `        </main>\n${ribbon}`);
-const pwaIcons = {
-  docs: '/docs/icon-192.png',
-  sheets: '/icons/sheets512.png',
-  filebox: '/icons/files512.png',
-  forms: '/icons/forms512.png',
-  slides: '/icons/slides512.png',
-  draw: '/icons/draw512.png',
-  todo: '/icons/todo512.png',
-  calendar: '/icons/cal512.png',
-  kanban: '/icons/kanban512.png',
-  blog: '/icons/blog512.png',
-  minutes: '/icons/minutes512.png',
-};
 const icons = [...landing.matchAll(/<span class="lp-app-icon" data-icon="([a-z]+)">[^<]*<\/span>/g)];
 if (icons.length !== 11) throw new Error(`Expected 11 app cards; found ${icons.length}.`);
 for (const match of icons) {
@@ -324,7 +310,7 @@ for (const match of icons) {
     ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8m-8 4h5"/></svg>'
     : null;
   if (!template && !fallback) throw new Error(`Missing icon for ${match[1]}`);
-  const pwaIcon = pwaIcons[match[1]];
+  const pwaIcon = appArtwork[match[1]];
   const icon = pwaIcon
     ? `<span class="lp-app-icon lp-app-icon--pwa" data-icon="${match[1]}"><img src="${pwaIcon}" width="192" height="192" alt="" loading="lazy" decoding="async"></span>`
     : `<span class="lp-app-icon" data-icon="${match[1]}">${template ? template[1].trim() : fallback}</span>`;
@@ -445,7 +431,7 @@ const appPwa = {
   todo: { icon: 'todo', color: '#188038' },
   calendar: { icon: 'cal', color: '#0284c7' },
   kanban: { icon: 'kanban', color: '#a21caf' },
-  minutes: { icon: 'minutes', color: '#276b53' },
+  minutes: { icon: 'minutes', color: '#5451a6' },
   forms: { icon: 'forms', color: '#7248b9' },
   slides: { icon: 'slides', color: '#ea580c' },
   draw: { icon: 'draw', color: '#e11d48' },
@@ -659,7 +645,7 @@ for (const [app, { icon, color }] of Object.entries(appPwa)) {
   for (const size of [32, 192]) {
     cpSync(join(root, 'holm/icons', `${icon}${size}.png`), join(web, 'icons', `${icon}${size}.png`));
   }
-  const icon512 = icon === 'minutes' ? 'minutes 1.png' : icon === 'kanban' ? 'kanban-square512.png' : `${icon}512.png`;
+  const icon512 = icon === 'minutes' ? 'minutes.png' : icon === 'kanban' ? 'kanban-square512.png' : `${icon}512.png`;
   cpSync(join(root, 'holm/icons', icon512), join(web, 'icons', `${icon}pwa512.png`));
   writeFileSync(join(web, app, 'manifest.json'), JSON.stringify({
     name: `Workdeck ${app[0].toUpperCase() + app.slice(1)}`,
@@ -703,7 +689,7 @@ cpSync(join(root, 'holm/icons/todo512.png'), join(web, 'icons/todo512.png'));
 cpSync(join(root, 'holm/icons/cal512.png'), join(web, 'icons/cal512.png'));
 cpSync(join(root, 'holm/icons/kanban512.png'), join(web, 'icons/kanban512.png'));
 cpSync(join(root, 'holm/icons/blog512.png'), join(web, 'icons/blog512.png'));
-cpSync(join(root, 'holm/icons/minutes 1.png'), join(web, 'icons/minutes512.png'));
+cpSync(join(root, 'holm/icons/minutes.png'), join(web, 'icons/minutes512.png'));
 cpSync(join(root, 'holm/icons/sheets512.png'), join(web, 'icons/sheets512.png'));
 cpSync(join(root, 'public/og-image.jpg'), join(web, 'og-image.jpg'));
 cpSync(join(root, 'public/manifest.json'), join(web, 'manifest.json'));

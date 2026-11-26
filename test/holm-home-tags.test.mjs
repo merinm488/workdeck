@@ -2,56 +2,65 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
+import { homeComponentCSS } from '../holm/auth/home-ui-build.mjs';
 
-const source = readFileSync(new URL('../holm/auth/dashboard.js', import.meta.url), 'utf8');
+const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+const source = read('holm/auth/dashboard.js');
 const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
 
-function element() {
-  return {
-    children: [], classList: { add() {}, remove() {} },
-    append(...nodes) { this.children.push(...nodes); },
-    appendChild(node) { this.children.push(node); },
-    replaceChildren(...nodes) { this.children = nodes; },
-    setAttribute() {},
-    addEventListener(event, callback) { this[event] = callback; },
-  };
-}
-
-test('Holm home chooser has one selection and replaces options when reopened', async () => {
-  const elements = new Map();
-  const $ = id => {
-    if (!elements.has(id)) elements.set(id, element());
-    return elements.get(id);
-  };
-  const tags = [{ id: 'first', name: 'First', color: '#123456' }, { id: 'second', name: 'Second', color: '#654321' }];
-  const state = { tags, moveTarget: null };
+test('home item actions use the shared tag picker and replace or clear one tag', async () => {
+  const tags = [{ id: 'first', name: 'First' }, { id: 'second', name: 'Second' }];
+  let picker;
   const assignments = [];
-  const ui = runInNewContext(`${section('function showMoveModal(', 'function hideMoveModal(')}
-    ${section('function moveEmptyDiv()', 'async function confirmMove()')}
+  const ui = runInNewContext(`${section('function showMoveModal(', '// Optimistic tag write')}
     ${section('async function applyFileMove(', '// ================================================\n// Drag a file')}
-    ({ showMoveModal, renderMoveOptions, applyFileMove })`, {
-    state, $, document: { createElement: () => element() },
-    wdDot: () => element(), wdIcon: () => element(),
-    setMoveTriggerValue: () => {}, closeMoveDropdown: () => {},
+    ({ showMoveModal, applyFileMove })`, {
+    state: { tags }, WDTagUI: { editTags: options => { picker = options; } },
     isMultiTagItem: file => Array.isArray(file.tags),
-    applyFileTags: (file, tagIds) => assignments.push({ file, tagIds }),
+    applyFileTags: (file, tagIds) => { assignments.push({ file, tagIds }); return false; },
   });
-  const dropdown = $('moveDropdown');
-  const file = { id: 'file', tags: ['first'] }; // Filebox stores tags as an array
+  const file = { id: 'file', name: 'Report', tags: ['first'] };
   ui.showMoveModal(file);
-  assert.equal(state.moveTarget, 'first');
-  assert.equal(dropdown.children.length, 3); // No tags + two tags
-  dropdown.children[2].click();
-  assert.equal(state.moveTarget, 'second');
-  assert.equal(dropdown.children.length, 3);
-  ui.showMoveModal(file);
-  assert.equal(dropdown.children.length, 3);
-
-  await ui.applyFileMove(file, 'second');
-  assert.deepEqual(Array.from(assignments[0].tagIds), ['second']); // replaces, not adds
-  await ui.applyFileMove(file, null);
+  assert.equal(picker.name, 'Report');
+  assert.equal(picker.tags, tags);
+  assert.equal(picker.tagId, 'first');
+  assert.equal(await picker.onSave('second'), false, 'failed writes keep the shared dialog open');
+  assert.deepEqual(Array.from(assignments[0].tagIds), ['second']);
+  await picker.onSave(null);
   assert.deepEqual(Array.from(assignments[1].tagIds), []);
-  state.tags = [];
-  ui.renderMoveOptions();
-  assert.equal(dropdown.children.length, 1);
+});
+
+test('home tag write failures restore the record and report failure to the picker', async () => {
+  let fails = true;
+  const ui = runInNewContext(`${section('async function applyFileTags(', '// ================================================\n// Drag a file')}
+    ({ applyFileTags, applyFileMove })`, {
+    isMultiTagItem: file => Array.isArray(file.tags),
+    api: async () => { if (fails) throw Error('Offline'); },
+    render() {}, loadUserData() {}, showNotification() {},
+  });
+  for (const file of [{ id: 'file', tags: ['first'] }, { id: 'doc', app: 'docs', tagId: 'first' }]) {
+    fails = true;
+    assert.equal(await ui.applyFileMove(file, 'second'), false);
+    assert.equal(file.tags?.[0] || file.tagId, 'first');
+    fails = false;
+    assert.equal(await ui.applyFileMove(file, 'second'), true);
+    assert.equal(file.tags?.[0] || file.tagId, 'second');
+  }
+});
+
+test('all item tag modals use one component and the original home dropdown styles', () => {
+  for (const path of ['holm/auth/dashboard.js', 'holm/auth/app-sidebar.js', 'holm/files/main.js', 'holm/docs-src/src/components/DocTags.jsx']) {
+    assert.match(read(path), /WDTagUI\.editTags\(/, path);
+  }
+  const picker = read('holm/auth/tag-ui.js');
+  assert.match(picker, />Edit tags<\/h3>/);
+  assert.match(picker, /role="listbox"/);
+  assert.match(picker, /name: 'No tags'/);
+  assert.match(picker, /button.disabled = true/);
+  assert.match(picker, /await onSave\(selected\) === false/);
+  const css = homeComponentCSS(read('public/workdeck.css'));
+  assert.match(css, /\.wd-move-select-trigger \{/);
+  assert.match(css, /\.wd-move-menu\.active \{/);
+  assert.match(css, /\.wd-move-option\.selected \{/);
+  assert.doesNotMatch(read('holm/docs-src/src/docs-ui.css'), /wd-doc-tags/);
 });

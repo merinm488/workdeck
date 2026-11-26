@@ -89,6 +89,23 @@ test('Minutes member-only CRUD, revisions, Todo links and finalized/reopen flow'
   assert.equal((await call(handleTodo, alice)).body.lists.length, 1); // Actions survive deletion.
 });
 
+test('Minutes modal creation preserves a member-owned launcher tag without accepting foreign tags', async () => {
+  const { member, put } = fixture();
+  const alice = member('alice'), bob = member('bob');
+  const tag = (await put(handleWorkspace, alice, 'createTag', { name: 'Planning', color: '#3B82F6' })).body.data.tags[0];
+  const created = await put(handleMinutes, alice, 'create', { title: 'Tagged meeting', tagId: tag.id });
+  assert.equal(created.status, 200);
+  assert.equal(created.body.meeting.tagId, tag.id);
+  const saved = await put(handleMinutes, alice, 'save', { ...created.body.meeting, agenda: [section] });
+  assert.equal(saved.body.meeting.tagId, tag.id, 'template save preserves the assigned tag');
+  const foreign = await put(handleMinutes, bob, 'create', { tagId: tag.id });
+  assert.equal(foreign.status, 200);
+  assert.equal(foreign.body.meeting.tagId, null);
+  assert.equal((await put(handleMinutes, alice, 'create', { tagId: 'missing_tag_001' })).body.meeting.tagId, null);
+  for (const tagId of [123, {}, [], 'bad']) assert.equal((await put(handleMinutes, alice, 'create', { tagId })).status, 400);
+  assert.equal((await put(handleMinutes, alice, 'create', { tagId: null })).body.meeting.tagId, null);
+});
+
 test('Minutes updates multiple existing actions and adds a new one without losing Todo edits', async () => {
   const { member, put } = fixture();
   const alice = member('alice');
@@ -227,6 +244,7 @@ test('Holm package ships the document-first Minutes UI with shared home and self
     assert.doesNotMatch(html, /id="themeBtn"/);
     assert.match(html, /id="overviewToggle"[^>]*aria-controls="meetingOverview"[^>]*aria-expanded="true"/);
     assert.match(html, /id="meetingOverview" class="agenda-rail"/);
+    assert.doesNotMatch(html, /rail-hint|Made for the conversation.|to add the next note|for a new line/);
     assert.match(html, /id="documentName"[^>]*aria-haspopup="dialog"[^>]*>Untitled meeting<\/button><span id="saveState"/);
     assert.doesNotMatch(html, /breadcrumb-divider|id="returnBtn"|editor-app-icon/);
     const header = html.slice(html.indexOf('<header class="topbar">'), html.indexOf('<main'));

@@ -234,7 +234,7 @@
         syncCardDot(card, assignedTag);
         const existingButton = card.querySelector('.wd-app-card-tag');
         if (existingButton) {
-          const label = assignedTag ? `Set tag (currently ${assignedTag.name})` : 'Set tag';
+          const label = 'Edit tags';
           existingButton.setAttribute('aria-label', label);
           existingButton.title = label;
           decorateRow(card, assignedTag, record);
@@ -243,7 +243,7 @@
         }
         const button = document.createElement('button');
         button.type = 'button'; button.className = 'wd-app-card-tag';
-        const label = assignedTag ? `Set tag (currently ${assignedTag.name})` : 'Set tag';
+        const label = 'Edit tags';
         button.setAttribute('aria-label', label); button.title = label;
         button.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 20 2 10V2h8l10 10Z"/><circle cx="7" cy="7" r="1"/></svg>';
         button.addEventListener('keydown', event => event.stopPropagation());
@@ -251,20 +251,13 @@
         button.addEventListener('click', event => {
           event.preventDefault(); event.stopPropagation();
           const current = records.find(item => item.id === card.dataset.id);
-          let changed = false;
-          WDDialog.open({
-            title: 'Edit Tags',
-            message: tags.length ? 'Choose a tag for this item. Changes are saved automatically.' : 'No tags yet. Create one in the sidebar to group your files.',
-            field: { label: 'Tag', value: current?.tagId || '', choices: [
-              { value: '', label: 'No tags' }, ...tags.map(tag => ({ value: tag.id, label: tag.name })),
-            ] },
-            autosave: true,
-            onSubmit: async value => {
-              await request('setFileTag', { app, fileId: card.dataset.id, tagId: value || null });
-              changed = true;
-            },
+          WDTagUI.editTags({
+            name: current?.name || current?.title,
+            tags,
+            tagId: current?.tagId || null,
+            onSave: value => request('setFileTag', { app, fileId: card.dataset.id, tagId: value }),
             // Fetch the new revision before entering any versioned editor.
-            onClose: () => { if (changed) location.reload(); },
+            onClose: saved => { if (saved) location.reload(); },
           });
         });
         (card.querySelector(config.actions) || card).append(button);

@@ -141,12 +141,13 @@ export async function handleMinutes(request, env) {
   const { action, data } = body;
   if (action === 'create') {
     if (data.title !== undefined && typeof data.title !== 'string') return fail('Invalid title.', 400);
+    if (data.tagId != null && (typeof data.tagId !== 'string' || !ID.test(data.tagId))) return fail('Invalid tag.', 400);
     const meeting = ds.transaction(tx => {
       if (tx.count(MINUTES, {}) >= 200) return null;
       const timestamp = stamp();
       const base = { title: clean(data.title, 200) || 'Untitled meeting',
         date: day(data.date) || timestamp.slice(0, 10), state: 'draft',
-        revision: 0, agenda: [], tagId: null, createdAt: timestamp, updatedAt: timestamp };
+        revision: 0, agenda: [], tagId: data.tagId && tx.findOne('workspace_tags', data.tagId) ? data.tagId : null, createdAt: timestamp, updatedAt: timestamp };
       const newId = tx.insert(MINUTES, base);
       return { id: newId, ...base };
     });

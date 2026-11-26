@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-const colors = { todo: '#188038', calendar: '#0284c7', kanban: '#a21caf', minutes: '#276b53',
+const colors = { todo: '#188038', calendar: '#0284c7', kanban: '#a21caf', minutes: '#5451a6',
   forms: '#7248b9', slides: '#ea580c', draw: '#e11d48', blog: '#0d9488', sheets: '#22c55e', files: '#0d9488' };
 
 const apps = {
@@ -38,6 +38,13 @@ test('Holm installs each app independently using its catalogue artwork', () => {
       assert.ok(page.includes(`<meta name="theme-color" content="${colors[app]}">`));
       assert.match(page, /src="\/js\/dialogs\.js"/);
       if (app === 'minutes') {
+        const artwork = readFileSync(new URL('../holm/icons/minutes.png', import.meta.url));
+        assert.deepEqual(readFileSync(join(dir, 'web/icons/minutes512.png')), artwork, 'catalogue uses the supplied Minutes artwork');
+        assert.deepEqual(readFileSync(join(dir, 'web/icons/minutespwa512.png')), artwork, 'installed app uses the supplied Minutes artwork');
+        for (const size of [32, 192]) {
+          assert.deepEqual(readFileSync(join(dir, `web/icons/minutes${size}.png`)),
+            readFileSync(new URL(`../holm/icons/minutes${size}.png`, import.meta.url)));
+        }
         assert.match(page, /id="settingsBtn"/);
         assert.match(page, /src="\/js\/settings-menu\.js"/);
         assert.doesNotMatch(page, /id="themeBtn"/);

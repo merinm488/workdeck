@@ -101,7 +101,7 @@
   }
   function fromButton(button, overrides = {}) {
     return {
-      label: button.classList.contains('wd-app-card-tag') ? 'Edit Tags' : button.classList.contains('delete-meeting') ? 'Delete' : (button.title || button.getAttribute('aria-label') || button.textContent.trim()),
+      label: button.classList.contains('wd-app-card-tag') ? 'Edit tags' : button.classList.contains('delete-meeting') ? 'Delete' : (button.title || button.getAttribute('aria-label') || button.textContent.trim()),
       icon: button.querySelector('svg'), disabled: button.disabled,
       danger: button.classList.contains('danger') || button.classList.contains('delete-meeting') || /delete/i.test(button.title || button.getAttribute('aria-label') || ''),
       onSelect: () => button.click(), ...overrides,

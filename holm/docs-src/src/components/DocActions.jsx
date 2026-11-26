@@ -52,7 +52,7 @@ export function DocActions({ doc, onDelete, onRename, onShare, card = false }) {
     const icon = (path, fill = 'none') => '<svg viewBox="0 0 24 24" fill="' + fill + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' + path + '"/></svg>';
     const items = [
       { label: 'Rename', icon: icon('M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z'), onSelect: () => handleAction('rename') },
-      { label: 'Edit Tags', icon: icon('M20 13l-7 7a2 2 0 0 1-3 0l-8-8V2h10l8 8a2 2 0 0 1 0 3zM7 7h.01'), onSelect: () => editTags(doc, buttonRef.current) },
+      { label: 'Edit tags', icon: icon('M20 13l-7 7a2 2 0 0 1-3 0l-8-8V2h10l8 8a2 2 0 0 1 0 3zM7 7h.01'), onSelect: () => editTags(doc, buttonRef.current) },
       { label: 'Share', icon: icon('M12 16V3m-5 5 5-5 5 5M5 13v7h14v-7'), onSelect: () => handleAction('share') },
       { label: 'Delete', icon: icon('M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'), danger: true, onSelect: () => handleAction('delete') },
     ];

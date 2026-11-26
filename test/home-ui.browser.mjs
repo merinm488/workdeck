@@ -42,11 +42,11 @@ async function checkHomeRibbons(page, app) {
   }
 }
 function checkMenuLabels(labels, app) {
-  assert.ok(!labels.some(label => /change tags?/i.test(label)), `${app}: no old Change tag label`);
-  if (['docs', 'sheets', 'forms', 'slides', 'draw', 'todo', 'kanban', 'blog', 'minutes', 'files'].includes(app)) {
-    assert.ok(labels.includes('Edit Tags'), `${app}: exact Edit Tags label`);
+  assert.ok(!labels.some(label => /(?:change|add) tags?/i.test(label)), `${app}: no old tag action label`);
+  if (app !== 'home' || labels.some(label => /^Delete/.test(label))) {
+    assert.ok(labels.includes('Edit tags'), `${app}: exact Edit tags label`);
   }
-  if (app === 'files') assert.ok(!labels.some(label => /^(Edit Tags|Move to folder)[.…]/i.test(label)), 'Files: no trailing ellipses');
+  if (app === 'files') assert.ok(!labels.some(label => /^(Edit tags|Move to folder)[.…]/i.test(label)), 'Files: no trailing ellipses');
 }
 async function checkFilesLayout(page) {
   assert.equal(await page.locator('#fbSidebarClose').count(), 0, 'Files: sidebar X removed from markup');
@@ -93,12 +93,12 @@ async function checkFilesLayout(page) {
   // Renamed labels retain the same dialogs and cancelling changes no data.
   const more = page.locator('#fbGrid .fb-item-menu');
   const menu = page.getByRole('menu', { name: 'File actions', exact: true });
-  for (const [label, modal] of [['Edit Tags', '#fbTagsModal'], ['Move to folder', '#fbMoveModal']]) {
+  for (const [label, modal] of [['Edit tags', '.wd-tag-picker[open]'], ['Move to folder', '#fbMoveModal.active']]) {
     await more.click();
     await menu.getByRole('menuitem', { name: label, exact: true }).click();
-    await page.locator(modal + '.active').waitFor();
+    await page.locator(modal).waitFor();
     await page.locator(modal).getByRole('button', { name: 'Cancel', exact: true }).click();
-    await page.locator(modal + '.active').waitFor({ state: 'hidden' });
+    await page.locator(modal).waitFor({ state: 'hidden' });
   }
   await breadcrumb.getByRole('button', { name: 'All folders', exact: true }).click();
 }

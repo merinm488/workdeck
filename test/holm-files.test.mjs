@@ -173,38 +173,31 @@ test('Files links, thumbs and metadata operations work without exposing other ac
   assert.equal((await json(handleFilebox, a, 'GET', undefined, `/api/filebox?fileId=${first.id}`)).status, 404);
 });
 
-test('Holm Files tag modal rerenders without duplicates and selects only one tag', async () => {
+test('Files uses the shared picker for files/folders and replaces only one tag', async () => {
   const source = readFileSync(new URL('../holm/files/main.js', import.meta.url), 'utf8');
   const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
-  const node = () => ({ children: [], className: '', classList: { add() {}, remove() {} },
-    append(...items) { this.children.push(...items); }, appendChild(item) { this.children.push(item); },
-    replaceChildren(...items) { this.children = items; },
-    addEventListener(event, callback) { this[event] = callback; } });
-  const els = new Map(), $ = id => {
-    if (!els.has(id)) els.set(id, node());
-    return els.get(id);
-  };
   const record = { id: 'file', name: 'report', tags: ['first'] };
   const state = { tags: [{ id: 'first', name: 'First' }, { id: 'second', name: 'Second' }], folders: [] };
+  let picker;
   const calls = [];
-  const ui = vm.runInNewContext(`${section('function openTagsModal(', 'async function createTagInline(')}
-    ${section('async function confirmTags(', '// ================================================\n// Drag & drop:')}
+  const ui = vm.runInNewContext(`${section('function openTagsModal(', 'async function applyRecordTags(')}
     ${section('async function addTagToRecord(', 'async function moveFileToFolder(')}
-    ({ openTagsModal, renderTagChecks, confirmTags, addTagToRecord })`, {
-    state, $, document: { createElement: node }, fbDot: node, fbIcon: node,
-    fileboxTags: () => state.tags, openModal() {}, closeModal() {},
+    ({ openTagsModal, addTagToRecord })`, {
+    state, WDTagUI: { editTags: options => { picker = options; } },
     getFile: () => record, getFolder: () => null, getTag: id => state.tags.find(t => t.id === id),
-    applyRecordTags: (file, kind, ids) => { calls.push(Array.from(ids)); file.tags = Array.from(ids); },
+    applyRecordTags: (file, kind, ids) => { calls.push({ kind, ids: Array.from(ids) }); return false; },
   });
-  ui.openTagsModal(record, 'file');
-  assert.equal($('fbTagChecks').children.length, 3); // No tag + two choices
-  $('fbTagChecks').children[2].click();
-  assert.equal($('fbTagChecks').children.length, 3);
-  assert.equal(state.tagSelection, 'second');
-  await ui.confirmTags();
-  assert.deepEqual(calls[0], ['second']);
+  for (const kind of ['file', 'folder']) {
+    ui.openTagsModal(record, kind);
+    assert.equal(picker.tagId, 'first');
+    assert.equal(picker.tags, state.tags, 'same shared tag pool as Workdeck home');
+    assert.equal(await picker.onSave('second'), false);
+    assert.deepEqual(calls.at(-1), { kind, ids: ['second'] });
+    await picker.onSave(null);
+    assert.deepEqual(calls.at(-1), { kind, ids: [] });
+  }
   await ui.addTagToRecord(record.id, 'first');
-  assert.deepEqual(calls[1], ['first']); // drag-and-drop replaces the tag
+  assert.deepEqual(calls.at(-1), { kind: 'file', ids: ['first'] });
 });
 
 test('Holm Files retains original manager/viewers but removes key auth and uses reload-safe URLs', () => {

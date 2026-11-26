@@ -28,6 +28,8 @@
     --draw-accent-soft: rgba(225, 29, 72, 0.12);
     --todo-accent: #188038;       /* Todo green */
     --todo-accent-soft: rgba(24, 128, 56, 0.15);
+    --minutes-accent: #5451a6;    /* Minutes purple */
+    --minutes-accent-soft: rgba(84, 81, 166, .12);
     --calendar-accent: #0284c7;   /* Calendar sky */
     --calendar-accent-soft: rgba(2, 132, 199, 0.13);
     --kanban-accent: #a21caf;     /* Kanban fuchsia */
@@ -2632,7 +2634,6 @@ body.wd-sidebar-open .wd-sidebar-scrim {
 }
 
 /* Minutes app identity */
-:root { --minutes-accent: #5451a6; --minutes-accent-soft: rgba(84, 81, 166, .12); }
 .wd-app-icon-minutes, .wd-file-icon-minutes, .wd-file-app-badge.minutes {
     background: var(--minutes-accent-soft);
     color: var(--minutes-accent);

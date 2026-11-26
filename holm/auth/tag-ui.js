@@ -41,6 +41,121 @@
     return dialog;
   }
 
+  // The Workdeck home picker is the single item-tag editor for every app.
+  // Keep draft selection local until Save; a failed write never dismisses it.
+  function editTags({ name, tags = [], tagId = null, onSave, onClose, trigger = document.activeElement }) {
+    const previousRecord = trigger?.closest('[data-id]')?.dataset.id;
+    const dialog = document.createElement('dialog');
+    const id = `wd-tag-edit-${++dialogId}`;
+    dialog.className = 'wd-tag-ui wd-tag-dialog wd-tag-picker wd-modal-content';
+    dialog.setAttribute('aria-labelledby', `${id}-title`);
+    dialog.setAttribute('aria-describedby', `${id}-description`);
+    dialog.innerHTML = `<form><div class="wd-modal-header"><h3 class="wd-modal-title" id="${id}-title">Edit tags</h3><button type="button" class="wd-modal-close" aria-label="Close">×</button></div><div class="wd-modal-body"><p class="wd-modal-text" id="${id}-description">Choose a tag for “<span class="wd-strong"></span>”.</p><div class="wd-move-select"><span class="wd-move-label" id="${id}-label">Tag</span><button type="button" class="wd-move-select-trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="${id}-label ${id}-value" aria-controls="${id}-options"><span class="wd-move-select-value" id="${id}-value"></span><svg class="wd-move-select-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="wd-move-menu" id="${id}-options" role="listbox" aria-label="Tags"></div></div><p class="wd-tag-error" role="alert" hidden></p><div class="wd-modal-actions"><button type="button" class="wd-secondary-btn">Cancel</button><button type="submit" class="wd-primary-btn">Save</button></div></div></form>`;
+    dialog.querySelector('.wd-strong').textContent = name || 'Untitled';
+    const form = dialog.querySelector('form'), select = form.querySelector('.wd-move-select');
+    const toggle = form.querySelector('.wd-move-select-trigger'), value = form.querySelector('.wd-move-select-value');
+    const menu = form.querySelector('.wd-move-menu'), error = form.querySelector('.wd-tag-error');
+    const submit = form.querySelector('[type=submit]');
+    const options = [{ id: null, name: 'No tags', color: null }, ...tags];
+    let selected = tagId || null, expanded = false, busy = false, saved = false;
+    const dot = color => {
+      const node = document.createElement('span');
+      node.className = 'wd-dot' + (color ? '' : ' wd-dot-none');
+      if (color) node.style.backgroundColor = color;
+      return node;
+    };
+    function expand(open, index) {
+      expanded = open;
+      menu.classList.toggle('active', open); select.classList.toggle('active', open);
+      toggle.setAttribute('aria-expanded', String(open));
+      if (open) {
+        const rows = [...menu.querySelectorAll('[role=option]')];
+        const target = rows[index ?? Math.max(0, options.findIndex(option => option.id === selected))];
+        target?.focus(); target?.scrollIntoView({ block: 'nearest' });
+      }
+    }
+    function render() {
+      menu.replaceChildren();
+      const current = options.find(option => option.id === selected) || options[0];
+      const label = document.createElement('span');
+      label.className = current.color ? 'wd-move-select-name' : 'wd-move-select-placeholder';
+      label.textContent = current.name;
+      value.replaceChildren(dot(current.color), label);
+      for (const option of options) {
+        const row = document.createElement('button');
+        row.type = 'button'; row.tabIndex = -1;
+        row.className = 'wd-move-option' + (option.id === selected ? ' selected' : '');
+        row.setAttribute('role', 'option'); row.setAttribute('aria-selected', String(option.id === selected));
+        const label = document.createElement('span'); label.className = 'wd-move-option-name'; label.textContent = option.name;
+        row.innerHTML = '<svg class="wd-move-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 7 3 3 5-6"/></svg>';
+        row.prepend(dot(option.color), label);
+        row.onclick = () => { selected = option.id; render(); expand(false); toggle.focus(); };
+        menu.append(row);
+      }
+      if (!tags.length) {
+        const empty = document.createElement('p'); empty.className = 'wd-move-empty';
+        empty.textContent = 'No tags yet — create one in the sidebar.'; menu.append(empty);
+      }
+    }
+    toggle.onclick = () => expand(!expanded);
+    toggle.onkeydown = event => {
+      if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
+        event.preventDefault(); expand(true, event.key === 'ArrowUp' ? options.length - 1 : undefined);
+      }
+    };
+    menu.onkeydown = event => {
+      const rows = [...menu.querySelectorAll('[role=option]')], index = rows.indexOf(document.activeElement);
+      if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        event.preventDefault();
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
+        rows[next].focus(); rows[next].scrollIntoView({ block: 'nearest' });
+      }
+      if (event.key === 'Tab') expand(false);
+    };
+    const close = () => { if (!busy) dialog.close(); };
+    form.querySelector('.wd-modal-close').onclick = close;
+    form.querySelector('.wd-secondary-btn').onclick = close;
+    dialog.oncancel = event => { event.preventDefault(); close(); };
+    dialog.onkeydown = event => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault(); event.stopPropagation();
+      if (expanded) { expand(false); toggle.focus(); } else close();
+    };
+    dialog.onclick = event => {
+      if (expanded && !select.contains(event.target)) expand(false);
+      if (event.target !== dialog) return;
+      const r = dialog.getBoundingClientRect();
+      if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close();
+    };
+    dialog.onclose = () => {
+      const restore = document.activeElement === trigger || document.activeElement === document.body || dialog.contains(document.activeElement);
+      dialog.remove();
+      const replacement = previousRecord && [...document.querySelectorAll(`[data-id="${CSS.escape(previousRecord)}"] :is(.wd-card-more,.wd-app-list-more,.fb-item-menu)`)].find(el => el.getClientRects().length);
+      if (restore) (trigger?.isConnected ? trigger : replacement)?.focus({ preventScroll: true });
+      onClose?.(saved);
+    };
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (busy) return;
+      if (selected === (tagId || null)) { close(); return; }
+      busy = true; expand(false); error.hidden = true; dialog.setAttribute('aria-busy', 'true');
+      submit.textContent = 'Saving…';
+      form.querySelectorAll('button').forEach(button => { button.disabled = true; });
+      try {
+        if (await onSave(selected) === false) throw new Error('Could not save tags. Please try again.');
+        saved = true; busy = false; dialog.close();
+      } catch (err) {
+        error.textContent = err.message || 'Could not save tags. Please try again.'; error.hidden = false;
+      } finally {
+        busy = false; dialog.setAttribute('aria-busy', 'false'); submit.textContent = 'Save';
+        form.querySelectorAll('button').forEach(button => { button.disabled = false; });
+        if (dialog.open) toggle.focus();
+      }
+    };
+    render(); document.body.append(dialog); dialog.showModal(); toggle.focus();
+    return dialog;
+  }
+
   function mount(root, options) {
     root.classList.add('wd-tag-ui');
     root.innerHTML = '<div class="wd-side-header"><h2 class="wd-side-title">Tags</h2><button type="button" class="wd-side-add" aria-label="New tag" title="New tag"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4v16m8-8H4"/></svg></button></div><form class="wd-project-form" hidden><input class="wd-input wd-project-input" type="text" maxlength="60" required placeholder="Tag name" aria-label="Tag name" autocomplete="off"><div class="wd-color-picker" role="group" aria-label="Tag color"></div><p class="wd-tag-error" role="alert" hidden></p><div class="wd-project-form-actions"><button type="submit" class="wd-primary-btn">Create</button><button type="button" class="wd-secondary-btn">Cancel</button></div></form><div class="wd-tag-rows"></div><p class="wd-side-empty" hidden>No tags yet. Create one to group your files.</p>';
@@ -134,5 +249,5 @@
     render();
     return { update(next) { props = next; render(); }, open, destroy() { autosave?.flush().then(() => autosave?.dispose()); root.replaceChildren(); } };
   }
-  window.WDTagUI = { mount, confirmDelete };
+  window.WDTagUI = { mount, confirmDelete, editTags };
 })();

@@ -37,6 +37,8 @@ export async function assertMinutesSidebarLikeKanban(context, page, origin, them
       }
       // Wait for the drawer's final geometry rather than hover animations, which can cancel.
       await reference.waitForFunction(()=>Math.abs(document.querySelector('#kbSidebar').getBoundingClientRect().x)<1);
+      assert.equal(await page.locator("#meetingOverview .rail-hint").count(),0,"sidebar hint block is removed");
+      assert.doesNotMatch(await page.locator("#meetingOverview").textContent(),/Made for the conversation\.|to add the next note|for a new line/);
       const a=await geometry(minutes),b=await geometry(kanban);
       assert.deepEqual(a.padding,b.padding,`${theme}: sidebar padding ${width}`);
       assert.equal(a.background,b.background,`${theme}: sidebar surface ${width}`);

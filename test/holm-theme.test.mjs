@@ -72,7 +72,7 @@ test('shared design preserves app accents instead of assigning Home yellow to ev
   assert.match(css, /--wd-control-accent: var\(--accent-color, var\(--accent\)\)/);
   assert.match(css, /--wd-control-accent: var\(--fb-accent\)/);
   assert.match(css, /--wd-control-accent: rgb\(var\(--accent\)\)/);
-  assert.match(css, /--wd-control-accent: #276b53/);
+  assert.match(css, /--wd-control-accent: var\(--minutes-primary\)/);
   // Shared neutrals must not redefine the apps' color/highlight variables.
   assert.doesNotMatch(css, /(?:^|\n)\s*--(?:accent(?:-color|-hover|-light|-soft)?|fb-accent(?:-soft)?|green(?:-soft)?):/);
   assert.doesNotMatch(css, /(?:background|color|border-color|accent-color): var\(--wd-ui-(?:accent|focus|on-accent)/);
@@ -80,6 +80,33 @@ test('shared design preserves app accents instead of assigning Home yellow to ev
   assert.match(css, /background: var\(--wd-control-soft\)/);
   assert.match(read('draw/styles.css'), /--accent-color: #e11d48/);
   assert.match(read('draw/styles.css'), /--accent-color: #fb7185/);
+});
+
+test('Minutes editor and shared controls derive their purple identity from Home', () => {
+  const minutes = read('holm/minutes/styles.css');
+  const tokens = buildThemeTokens(home);
+  assert.match(tokens, /--wd-ui-minutes-accent: #5451a6;/);
+  assert.match(tokens, /--wd-ui-minutes-accent-soft: rgba\(84, 81, 166, \.12\);/);
+  assert.match(minutes, /--minutes-primary:var\(--wd-ui-minutes-accent,#5451a6\)/);
+  assert.match(minutes, /--minutes-accent-soft:var\(--wd-ui-minutes-accent-soft,/);
+  assert.match(minutes, /:root\[data-theme="dark"\],body\.dark\{--minutes-accent:#b5b2ef;/);
+  assert.match(css, /--wd-control-soft: var\(--minutes-accent-soft\)/);
+  assert.match(css, /--wd-control-focus: var\(--minutes-accent\)/);
+  assert.doesNotMatch(minutes + css, /#(?:276b53|98d4b5|e9f3ee|203c30)|var\(--green/);
+  const changed = buildThemeTokens(home.replace('--minutes-accent: #5451a6;', '--minutes-accent: #5552a7;'));
+  assert.match(changed, /--wd-ui-minutes-accent: #5552a7;/, 'Home palette changes propagate to Minutes');
+});
+
+test('Minutes purple labels meet normal-text contrast in light and dark themes', () => {
+  const luminance = hex => {
+    const rgb = hex.match(/\w\w/g).map(h => parseInt(h, 16) / 255)
+      .map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4);
+    return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
+  };
+  for (const [foreground, background] of [['ffffff', '5451a6'], ['5451a6', 'ffffff'], ['b5b2ef', '141414']]) {
+    const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+    assert.ok((values[0] + .05) / (values[1] + .05) >= 4.5, foreground + ' on ' + background);
+  }
 });
 
 test('Univer dark-mode adapter passes a boolean and shared views follow theme changes without writes', () => {

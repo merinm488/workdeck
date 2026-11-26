@@ -409,7 +409,7 @@ function App() {
   const effectiveTheme = getEffectiveTheme();
 
   return (
-    <DocTagsProvider tags={tags} onUpdateDoc={updateDoc} onCreateTag={createTag}>
+    <DocTagsProvider tags={tags} onUpdateDoc={updateDoc}>
     <div className={`min-h-screen ${effectiveTheme === 'dark' ? 'dark' : ''}`}>
       {/* Background decoration */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">

@@ -79,9 +79,9 @@ test('Holm serves the original signed-in dashboard markup without legacy access 
     assert.match(appsHTML, /--lp-color:#0d9488;--lp-tint:rgba\(13,148,136,\.12\)[^>]*><span class="lp-app-icon lp-app-icon--pwa" data-icon="blog"><img src="\/icons\/blog512\.png"[^>]*alt=""/);
     assert.deepEqual(readFileSync(join(dir, 'web/icons/blog512.png')),
       readFileSync(join(root, 'holm/icons/blog512.png')));
-    assert.match(appsHTML, /--lp-color:#276b53;--lp-tint:rgba\(39,107,83,\.12\)[^>]*><span class="lp-app-icon lp-app-icon--pwa" data-icon="minutes"><img src="\/icons\/minutes512\.png"[^>]*alt=""/);
+    assert.match(appsHTML, /--lp-color:#5451a6;--lp-tint:rgba\(84,81,166,\.12\)[^>]*><span class="lp-app-icon lp-app-icon--pwa" data-icon="minutes"><img src="\/icons\/minutes512\.png"[^>]*alt=""/);
     assert.deepEqual(readFileSync(join(dir, 'web/icons/minutes512.png')),
-      readFileSync(join(root, 'holm/icons/minutes 1.png')));
+      readFileSync(join(root, 'holm/icons/minutes.png')));
     assert.match(appsHTML, /data-icon="sheets"><img src="\/icons\/sheets512\.png"[^>]*alt=""/);
     assert.deepEqual(readFileSync(join(dir, 'web/icons/sheets512.png')),
       readFileSync(join(root, 'holm/icons/sheets512.png')));

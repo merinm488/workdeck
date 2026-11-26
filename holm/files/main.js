@@ -140,8 +140,6 @@ const state = {
     tagFormColor: APP_CONFIG.folderColors[0],
     moveFileId: null,
     moveTarget: null,
-    tagsTarget: null,               // {kind: 'file'|'folder', id}
-    tagSelection: null,             // selected tag id, or null to remove it
     deleteTarget: null,             // {kind, id}
     renameTarget: null              // {kind, id}
 };
@@ -1006,7 +1004,7 @@ function openItemMenu(anchor, record, kind, focusLast = false) {
     if (kind === 'file') {
         actions.push({ action: 'move', label: 'Move to folder', icon: 'move' });
     }
-    actions.push({ action: 'tags', label: 'Edit Tags', icon: 'tags' });
+    actions.push({ action: 'tags', label: 'Edit tags', icon: 'tags' });
     actions.push({ action: 'delete', label: 'Delete', icon: 'trash', danger: true });
 
     // Keep action dispatch's existing record lookup; the visible dropdown is
@@ -1467,79 +1465,16 @@ async function confirmMove() {
 }
 
 // ================================================
-// Edit tag (single selection + inline create)
+// Edit tags — the same picker used by Workdeck home and the other apps.
 // ================================================
 
 function openTagsModal(record, kind) {
-    state.tagsTarget = { kind: kind, id: record.id };
-    state.tagSelection = (record.tags || [])[0] || null;
-    $('fbTagsItemName').textContent = record.name;
-    $('fbNewTagName').value = '';
-    renderTagChecks();
-    openModal('fbTagsModal');
-}
-
-function renderTagChecks() {
-    const container = $('fbTagChecks');
-    container.replaceChildren();
-    // Same pool as the sidebar: Filebox-born tags plus Workdeck tags
-    // already in use here
-    const pool = fileboxTags();
-
-    if (!pool.length) {
-        const empty = document.createElement('div');
-        empty.className = 'fb-tags-empty';
-        empty.textContent = 'No tags yet — create one below.';
-        container.replaceChildren(empty);
-        return;
-    }
-
-    const clear = document.createElement('button');
-    clear.type = 'button';
-    clear.className = 'fb-move-option' + (state.tagSelection === null ? ' selected' : '');
-    clear.append(fbDot('#94a3b8'));
-    const clearLabel = document.createElement('span');
-    clearLabel.textContent = 'No tag';
-    clear.append(clearLabel, fbIcon('check'));
-    clear.addEventListener('click', function () {
-        state.tagSelection = null;
-        confirmTags();
+    return WDTagUI.editTags({
+        name: record.name,
+        tags: state.tags,
+        tagId: (record.tags || [])[0] || null,
+        onSave: tagId => applyRecordTags(record, kind, tagId ? [tagId] : []),
     });
-    container.appendChild(clear);
-
-    pool.forEach(function (tag) {
-        const selected = state.tagSelection === tag.id;
-        const row = document.createElement('button');
-        row.type = 'button';
-        row.className = 'fb-move-option' + (selected ? ' selected' : '');
-        row.append(fbDot(tag.color));
-        const label = document.createElement('span');
-        label.textContent = tag.name;
-        row.append(label, fbIcon('check'));
-        row.addEventListener('click', function () {
-            state.tagSelection = tag.id;
-            confirmTags();
-        });
-        container.appendChild(row);
-    });
-}
-
-async function createTagInline() {
-    const name = $('fbNewTagName').value.trim();
-    if (!name) return;
-    const color = APP_CONFIG.folderColors[state.tags.length % APP_CONFIG.folderColors.length];
-    const existingIds = new Set(state.tags.map(function (tag) { return tag.id; }));
-    const data = await fileboxStorage.createTag(name, color);
-    if (data) {
-        applyUserData(data);
-        const created = (data.tags || []).find(function (tag) { return !existingIds.has(tag.id); });
-        if (created) state.tagSelection = created.id;
-        $('fbNewTagName').value = '';
-        renderTagChecks();
-        if (created) confirmTags();
-    } else {
-        showNotification('Failed to create tag', 'error');
-    }
 }
 
 async function applyRecordTags(record, kind, tagIds) {
@@ -1548,28 +1483,20 @@ async function applyRecordTags(record, kind, tagIds) {
 
     record.tags = tagIds.slice();
     render();
-    const data = kind === 'file'
-        ? await fileboxStorage.setFileTags(record.id, tagIds)
-        : await fileboxStorage.setFolderTags(record.id, tagIds);
-    if (data) {
+    try {
+        const data = kind === 'file'
+            ? await fileboxStorage.setFileTags(record.id, tagIds)
+            : await fileboxStorage.setFolderTags(record.id, tagIds);
+        if (!data) throw new Error('Failed to update tags');
         applyUserData(data);
         showNotification('Tags updated', 'success');
-    } else {
+        return true;
+    } catch (error) {
         record.tags = before;
         render();
-        showNotification('Failed to update tags', 'error');
+        showNotification(error.message || 'Failed to update tags', 'error');
+        return false;
     }
-}
-
-async function confirmTags() {
-    const target = state.tagsTarget;
-    if (!target) return;
-    closeModal('fbTagsModal');
-    state.tagsTarget = null;
-
-    const record = target.kind === 'file' ? getFile(target.id) : getFolder(target.id);
-    if (!record) return;
-    await applyRecordTags(record, target.kind, state.tagSelection ? [state.tagSelection] : []);
 }
 
 // ================================================
@@ -1880,17 +1807,6 @@ function setupEventListeners() {
         state.moveFileId = null;
     });
     $('fbMoveConfirm').addEventListener('click', confirmMove);
-
-    // ----- Tags modal -----
-    $('fbTagsCancel').addEventListener('click', function () {
-        closeModal('fbTagsModal');
-        state.tagsTarget = null;
-    });
-
-    $('fbNewTagForm').addEventListener('submit', function (e) {
-        e.preventDefault();
-        createTagInline();
-    });
 
     // ----- Viewer -----
     // Download is wired in openViewer (it needs the open file's id).

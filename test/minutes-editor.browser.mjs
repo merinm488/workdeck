@@ -7,8 +7,11 @@ import path from 'node:path';
 import { handleMinutes } from '../holm/minutes/api.js';
 import { handleTodo } from '../holm/todo/api.js';
 import { handleWorkspace } from '../holm/auth/workspace.js';
+import { assertMinutesNewMeetingLauncher } from './minutes-new-meeting-assertions.browser.mjs';
+import { pageFixture } from './holm-page-fixtures.mjs';
 import { assertMinutesSidebarLikeKanban } from './minutes-sidebar-assertions.browser.mjs';
 import { assertMinutesLoading } from './minutes-loading-assertions.browser.mjs';
+import { assertMinutesTheme } from './minutes-theme-assertions.browser.mjs';
 import { assertMinutesCardStyles, assertMinutesCardCollapse, assertCollapsedPoint } from './minutes-section-assertions.browser.mjs';
 import { assertMinutesSummaryContent, assertMinutesSummaryLayout } from './minutes-summary-assertions.browser.mjs';
 import { assertReviewCopy, assertApprovalVariants } from './minutes-review-assertions.browser.mjs';
@@ -32,6 +35,7 @@ const server = createServer(async (req,res) => {
   try {
     let file = path.join(root, new URL(req.url,'http://local').pathname);
     if (!file.startsWith(root+'/')) throw new Error();
+    file = pageFixture(root, file);
     if ((await stat(file)).isDirectory()) file=path.join(file,'index.html');
     res.setHeader('Content-Type',types[path.extname(file)] || 'application/octet-stream'); res.end(await readFile(file));
   } catch { res.statusCode=404; res.end('Missing'); }
@@ -55,6 +59,7 @@ async function contextFor(theme='light', options={}) {
       if(options.failLoad)return route.fulfill({status:503,json:{success:false,error:'Connection interrupted.'}});
     }
     if(url.pathname==='/api/workdeck'&&body?.action==='renameFile'&&failNextRename){failNextRename=false;return route.fulfill({status:503,json:{success:false,error:'Rename interrupted.'}});}
+    if(url.pathname==='/api/minutes'&&body?.action==='create'&&options.failCreateOnce){options.failCreateOnce=false;return route.fulfill({status:503,json:{success:false,error:'Creation interrupted.'}});}
     if(url.pathname==='/api/minutes'&&body?.action==='save'){
       saveCalls++;
       if(failNextSave){failNextSave=false;return route.fulfill({status:503,json:{success:false,error:'Connection interrupted.'}});}
@@ -76,8 +81,10 @@ async function contextFor(theme='light', options={}) {
 async function saved(page){await page.locator('#saveState[data-state="saved"]').waitFor();}
 async function noOverflow(page,label){assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,label);}
 try {
+  await assertMinutesNewMeetingLauncher(contextFor,origin,ds);
   const {context,page}=await contextFor();
   await page.goto(origin+'/minutes/');await page.locator('#empty').waitFor();
+  await assertMinutesTheme(page,'light');
   await page.locator('#newBtn').click();
   await page.getByRole('dialog',{name:'New meeting',exact:true}).waitFor();
   assert.equal(await page.locator('#createDialog .dialog-description').count(),0,'New meeting has no introductory tagline');
@@ -85,6 +92,7 @@ try {
   await page.getByLabel('Team sync', {exact:false}).check();
   await page.locator('#confirmCreate').click();await page.locator('#editor').waitFor();await saved(page);
   assert.equal(await page.locator('[data-topic]').count(),3,'template seeds three topics');
+  await assertMinutesTheme(page,'light');
   assert.equal(await page.locator('#decisionsList .summary-empty strong').textContent(),'No decisions yet');
   assert.equal(await page.locator('#actionsList .summary-empty strong').textContent(),'No action items yet');
   assert.equal(await page.locator('#actionProgress').count(),0,'summaries have no extra progress ribbon');
@@ -340,6 +348,7 @@ try {
   const dark=await contextFor('dark');await dark.page.goto(origin+'/minutes/?meeting='+id);await dark.page.locator('#editor').waitFor();
   await assertMinutesSidebarLikeKanban(dark.context,dark.page,origin,'dark');
   await assertMinutesCardStyles(dark.page,'dark desktop');
+  await assertMinutesTheme(dark.page,'dark');
   for(const width of [1440,390]){
     await dark.page.setViewportSize({width,height:1000});
     await assertMinutesCardStyles(dark.page,`dark ${width}px`);
@@ -357,6 +366,7 @@ try {
   await dark.page.screenshot({path:screenshots+'/editor-dark.png',fullPage:true});
   await assertApprovalVariants(dark.page,'dark');
   await dark.page.locator('#backBtn').click();await dark.page.locator('.wd-home-card-face').waitFor();await dark.page.screenshot({path:screenshots+'/home-dark.png',fullPage:true});
+  await assertMinutesTheme(dark.page,'dark');
   await dark.context.close();
   await assertMinutesLoading(contextFor,origin,id);
   assert.deepEqual(errors,[],'no uncaught browser errors');

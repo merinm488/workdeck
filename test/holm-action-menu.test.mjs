@@ -35,7 +35,7 @@ test('every list view uses the shared labelled menu and the build ships its asse
   assert.match(script, /!menu\.contains\(event\.target\)/); // internal scrolling must not dismiss it
 });
 
-test('shared tag actions say Edit Tags and still invoke the original button', () => {
+test('shared tag actions say Edit tags and still invoke the original button', () => {
   let clicks = 0;
   const button = {
     classList: { contains: name => name === 'wd-app-card-tag' },
@@ -43,12 +43,12 @@ test('shared tag actions say Edit Tags and still invoke the original button', ()
     querySelector: () => null, getAttribute: () => null, click: () => clicks++,
   };
   const item = window.WDActionMenu.fromButton(button);
-  assert.equal(item.label, 'Edit Tags');
+  assert.equal(item.label, 'Edit tags');
   assert.equal(item.danger, false);
   item.onSelect();
   assert.equal(clicks, 1);
   const files = read('holm/files/main.js');
-  assert.match(files, /action: 'tags', label: 'Edit Tags'/);
+  assert.match(files, /action: 'tags', label: 'Edit tags'/);
   assert.match(files, /action: 'move', label: 'Move to folder'/);
   assert.doesNotMatch(files, /label: '(?:Edit tags|Move to folder)[.…]/i);
 });

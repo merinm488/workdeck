@@ -147,6 +147,7 @@ function openMeeting(meeting, navigate = true) {
   apiFetch('/api/workdeck', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'recordOpen', data: { fileId: meeting.id, app: 'minutes' } }) }).catch(() => {});
 }
 async function load() {
+  let createIntent = null;
   document.documentElement.setAttribute('data-minutes-loading', '');
   $('loadError').classList.add('hidden');
   try {
@@ -158,16 +159,27 @@ async function load() {
     app.meetings = result.data.minutes || []; app.todo = result.data.todo || []; app.events = result.data.events || []; app.tags = result.data.tags || []; app.settings = result.data.settings || {};
     const preference = app.settings.theme;
     if (['light', 'dark', 'system'].includes(preference)) { localStorage.setItem('workdeck_theme', preference); applyTheme(); }
-    const id = new URLSearchParams(location.search).get('meeting') || /^\/minutes\/([a-zA-Z0-9_-]{8,128})\/?$/.exec(location.pathname)?.[1];
+    const params = new URLSearchParams(location.search);
+    const id = params.get('meeting') || /^\/minutes\/([a-zA-Z0-9_-]{8,128})\/?$/.exec(location.pathname)?.[1];
     const meeting = app.meetings.find(item => item.id === id);
     if (meeting) openMeeting(meeting, false);
     else { showHome(false); if (id) throw new Error('This meeting no longer exists or is not available in your account. Your other meetings are shown below.'); }
+    if (!id && params.get('new') === '1') {
+      createIntent = { tagId: app.tags.find(tag => tag.id === params.get('tag'))?.id || null };
+    }
     publishHome();
   } catch (error) {
     await shellReady;
     $('home').classList.remove('hidden'); $('loadError').classList.remove('hidden'); $('loadErrorText').textContent = error.message;
   }
   document.documentElement.removeAttribute('data-minutes-loading');
+  if (createIntent) {
+    // Consume the one-shot launcher URL only after a successful load. Refresh
+    // or Back must not reopen the dialog, while load/sign-in retries retain it.
+    setRoute(null, true);
+    $('newBtn').focus();
+    openCreate(createIntent.tagId);
+  }
 }
 function renderHome() {
   const term = $('search').value.toLowerCase().trim();
@@ -455,13 +467,14 @@ function downloadRecovery() {
   link.href=url;link.download=(app.meeting.title||'Meeting').replace(/[^a-z0-9 -]/gi,'').slice(0,80)+' - recovery.html';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function setBusy(dialog,busy){dialog.dataset.busy=String(busy);dialog.querySelectorAll('button,input,select').forEach(control=>control.disabled=busy);}
-function openCreate(){ $('createForm').reset();$('createError').hidden=true;$('createDialog').showModal();$('createName').focus(); }
+let creationTagId = null;
+function openCreate(tagId = null){ creationTagId = tagId; $('createForm').reset();$('createError').hidden=true;$('createDialog').showModal();$('createName').focus(); }
 async function createMeeting(event) {
   event.preventDefault();
   const chosen = new FormData($('createForm')).get('template') || 'blank';
   setBusy($('createDialog'),true);$('createError').hidden=true;
   try{
-    const result=await request('create',{title:$('createName').value.trim(),date:today()});
+    const result=await request('create',{title:$('createName').value.trim(),date:today(),tagId:creationTagId});
     app.meetings.unshift(result.meeting);$('createDialog').close();openMeeting(result.meeting);publishHome();
     app.meeting.agenda=(templates[chosen]||templates.blank).map(title=>({id:uid(),title,points:[blankPoint()]}));
     changed();renderRows();await save();$('title').focus();
@@ -480,7 +493,7 @@ function init() {
   $('settingsBtn').onclick=event=>{event.stopPropagation();$('settingsDropdown').classList.toggle('hidden');};
   document.querySelectorAll('#settingsDropdown [data-theme]').forEach(button=>button.onclick=async()=>{const theme=button.dataset.theme;localStorage.setItem('workdeck_theme',theme);applyTheme();$('accountError').hidden=true;try{const response=await apiFetch('/api/workdeck',{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'updateSettings',data:{settings:{theme}}})});if(!response.ok)throw new Error('Theme could not be saved. Please try again.');}catch(error){$('accountError').textContent=error.message;$('accountError').hidden=false;}});
   $('logoutBtn').onclick=async()=>{if(!await save())return;$('logoutBtn').disabled=true;try{const response=await apiFetch('/auth/logout',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json'}});if(!response.ok)throw new Error('Could not sign out. Please try again.');location.assign('/');}catch(error){$('accountError').textContent=error.message;$('accountError').hidden=false;}finally{$('logoutBtn').disabled=false;}};
-  ['newBtn','emptyNew'].forEach(id=>$(id).onclick=openCreate);$('createForm').onsubmit=createMeeting;$('reviewForm').onsubmit=applyReview;
+  ['newBtn','emptyNew'].forEach(id=>$(id).onclick=()=>openCreate());$('createForm').onsubmit=createMeeting;$('reviewForm').onsubmit=applyReview;
   document.querySelectorAll('[data-close]').forEach(button=>button.onclick=()=>$(button.dataset.close).close());
   document.querySelectorAll('.minutes-dialog').forEach(dialog=>dialog.addEventListener('cancel',event=>{if(dialog.dataset.busy==='true')event.preventDefault();}));
   $('search').oninput=renderHome;$('clearSearch').onclick=()=>{$('search').value='';$('search').dispatchEvent(new Event('input',{bubbles:true}));$('search').focus();};

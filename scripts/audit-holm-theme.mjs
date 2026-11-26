@@ -19,7 +19,7 @@ const tag = { id:'tag-audit', name:'Project', color:'#3b82f6' };
 const accentColors = {
   home:['#eab308','#facc15'], docs:['#4285f4','#4285f4'],
   todo:['#188038','#4ade80'], kanban:['#a21caf','#e879f9'],
-  minutes:['#276b53','#276b53'], calendar:['#0284c7','#38bdf8'],
+  minutes:['#5451a6','#5451a6'], calendar:['#0284c7','#38bdf8'],
   sheets:['#22c55e','#22c55e'], forms:['#7248b9','#a78bfa'],
   slides:['#ea580c','#fb923c'], draw:['#e11d48','#fb7185'],
   files:['#0d9488','#0d9488'], blog:['#0d9488','#2dd4bf'],

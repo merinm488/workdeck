@@ -1,5 +1,6 @@
 import { workdeckHomeIcon, workdeckHomeLink } from './sidebar-home.mjs';
 import { withPageBoot } from './navigation-build.mjs';
+import { appArtwork } from './app-artwork.mjs';
 
 // Reuse the reference home's component CSS instead of maintaining lookalikes.
 export function homeComponentCSS(source) {
@@ -17,6 +18,7 @@ export function homeComponentCSS(source) {
     section('/* ---------- Files grid view ---------- */', '/* ---------- Files list view ---------- */'),
     section('/* ---------- Sidebar rows ---------- */', '/* ---------- Move-to-project modal ---------- */'),
     section('.wd-modal {', '/* Connect AI modal */'),
+    section('/* ---------- Move-to-project modal ---------- */', '/* ---------- Breakpoints ---------- */'),
     section('.wd-sandbox-frame {', '/* ---------- Loading overlay'),
   ].join('\n');
 }
@@ -27,7 +29,7 @@ export function homeIconsJS(source) {
   icons.workdeck = workdeckHomeIcon;
   const preview = source.match(/<textarea id="wdPreviewFrameDoc" hidden>([\s\S]*?)<\/textarea>/)?.[1];
   if (!preview) throw new Error('Missing sandboxed card preview document');
-  return 'window.WDHomeIcons = ' + JSON.stringify(icons) + ';window.WDHomeLink = ' + JSON.stringify(workdeckHomeLink) + ';window.WDPreviewFrameDoc = ' + JSON.stringify(preview) + ';';
+  return 'window.WDAppArtwork = ' + JSON.stringify(appArtwork) + ';window.WDHomeIcons = ' + JSON.stringify(icons) + ';window.WDHomeLink = ' + JSON.stringify(workdeckHomeLink) + ';window.WDPreviewFrameDoc = ' + JSON.stringify(preview) + ';';
 }
 
 export function withHomeUI(page) {
@@ -36,8 +38,7 @@ export function withHomeUI(page) {
   page = page.replace(/<button\b[^>]*id="saveBtn"[^>]*>[\s\S]*?<\/button>/g,
     page.includes('id="saveState"') ? '' : '<span id="saveState" class="wd-save-status" role="status" aria-live="polite">All changes saved</span>');
   page = page.replace('</head>', '<script src="/js/autosave.js"></script></head>');
-  page = page.replace(/<button id="fbTagsConfirm"[^>]*>Save<\/button>/, '')
-    .replace('id="evSaveBtn" class="btn btn-primary">Save', 'id="evSaveBtn" class="btn btn-primary">Create event')
+  page = page.replace('id="evSaveBtn" class="btn btn-primary">Save', 'id="evSaveBtn" class="btn btn-primary">Create event')
     .replace('id="confirmWipLimit" class="btn btn-primary">Save', 'id="confirmWipLimit" class="btn btn-primary">Done')
     .replace('id="confirmNameModal" class="btn btn-primary">Save', 'id="confirmNameModal" class="btn btn-primary">Create')
     .replace('id="confirmReview" class="primary">Save status', 'id="confirmReview" class="primary">Apply status');
