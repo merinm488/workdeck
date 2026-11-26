@@ -2,12 +2,12 @@
 .wd-account-trigger, #settingsBtn.wd-account-trigger, #fbSettingsBtn.wd-account-trigger {
   box-sizing:border-box!important; flex-shrink:0!important;
   width:42px!important; height:42px!important; padding:0!important; display:grid!important; place-items:center!important;
-  border:1px solid var(--wd-menu-line)!important; border-radius:50%!important;
-  background:var(--wd-menu-surface)!important; color:var(--wd-menu-ink)!important;
+  border:0!important; border-radius:50%!important;
+  background:transparent!important; color:var(--wd-menu-ink)!important;
   box-shadow:none!important; cursor:pointer;
 }
 .wd-account-trigger:hover, #settingsBtn.wd-account-trigger:hover, #fbSettingsBtn.wd-account-trigger:hover,
-.wd-account-trigger[aria-expanded="true"], #settingsBtn.wd-account-trigger[aria-expanded="true"], #fbSettingsBtn.wd-account-trigger[aria-expanded="true"] { background:var(--wd-menu-hover)!important; }
+.wd-account-trigger[aria-expanded="true"], #settingsBtn.wd-account-trigger[aria-expanded="true"], #fbSettingsBtn.wd-account-trigger[aria-expanded="true"] { background:transparent!important; }
 .wd-account-trigger svg { display:block; width:22px; height:22px; }
 body { --wd-menu-surface:var(--wd-ui-bg-elevated); --wd-menu-ink:var(--wd-ui-text); --wd-menu-line:var(--wd-ui-border); --wd-menu-hover:var(--wd-ui-bg-input); --wd-menu-muted:var(--wd-ui-text-secondary); }
 .wd-account-panel, #settingsDropdown.wd-account-panel, #fbSettingsDropdown.wd-account-panel, #settingsMenu.wd-account-panel {

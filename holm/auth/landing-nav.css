@@ -7,9 +7,9 @@
 .lp-nav-links .lp-workspace-link[hidden] { display:none; }
 .lp-nav-links .lp-workspace-link:hover { background:#8c6a10; color:#fff; }
 .lp-account-menu { position:relative; flex:none; }
-.lp-account-toggle { box-sizing:border-box; flex-shrink:0; padding:0; width:42px; height:42px; display:grid; place-items:center; border:1px solid var(--lp-line); border-radius:50%; background:var(--lp-surface); color:var(--lp-ink); cursor:pointer; }
+.lp-account-toggle { box-sizing:border-box; flex-shrink:0; padding:0; width:42px; height:42px; display:grid; place-items:center; border:0; border-radius:50%; background:transparent; color:var(--lp-ink); box-shadow:none; cursor:pointer; }
 .lp-account-toggle svg { display:block; width:22px; height:22px; }
-.lp-account-toggle:hover,.lp-account-toggle[aria-expanded="true"] { border-color:#c5a453; background:var(--lp-line); }
+.lp-account-toggle:hover,.lp-account-toggle[aria-expanded="true"] { background:transparent; }
 .lp-account-toggle:focus-visible,.lp-menu-item:focus-visible,.lp-workspace-link:focus-visible { outline:3px solid #d39a00; outline-offset:3px; }
 .lp-account-panel { position:absolute; top:calc(100% + 10px); right:0; width:250px; padding:8px; border:1px solid var(--lp-line); border-radius:10px; background:var(--lp-surface); box-shadow:0 12px 30px rgba(0,0,0,.16); }
 .lp-account-panel[hidden],.lp-account-panel [hidden] { display:none; }

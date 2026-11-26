@@ -924,18 +924,21 @@ class BoardController {
         const isDrawer = () => window.matchMedia('(max-width: 700px)').matches;
 
         const setSidebarOpen = (open) => {
+            const restoreFocus = document.activeElement === toggle || (!open && sidebar.contains(document.activeElement));
             sidebar.classList.toggle('hidden', !open);
             sidebar.classList.toggle('open', isDrawer() && open);
             scrim.classList.toggle('show', isDrawer() && open);
             this.syncSidebarAria();
+            if (restoreFocus) toggle.focus({ preventScroll: true });
             try { localStorage.setItem('kanban_sidebar', open ? 'on' : 'off'); } catch (err) { /* private mode */ }
         };
         this.setSidebarOpen = setSidebarOpen;
 
         toggle.addEventListener('click', () => {
-            setSidebarOpen(isDrawer() || sidebar.classList.contains('hidden'));
+            setSidebarOpen(toggle.getAttribute('aria-expanded') !== 'true');
         });
-        document.getElementById('kbSidebarClose').addEventListener('click', () => setSidebarOpen(false));
+        // A breakpoint change must not leave a stale scrim or chevron state.
+        window.matchMedia('(max-width: 700px)').addEventListener('change', () => this.closeSidebarDrawer());
         document.getElementById('kbTodoRefresh').addEventListener('click', () => this.refreshTodos());
         scrim.addEventListener('click', () => this.closeSidebarDrawer());
 
@@ -1018,7 +1021,24 @@ class BoardController {
         const visible = drawer
             ? sidebar.classList.contains('open')
             : !sidebar.classList.contains('hidden');
-        document.getElementById('kbSidebarToggle').setAttribute('aria-expanded', String(visible));
+        const toggle = document.getElementById('kbSidebarToggle');
+        const restoreFocus = document.activeElement === toggle || (!visible && sidebar.contains(document.activeElement));
+        // Like the other Workdeck sidebars, keep this same toggle inside the
+        // mobile drawer while open so it stays reachable above the scrim.
+        const toolbar = document.getElementById('boardToolbar');
+        const parent = drawer && visible ? sidebar.querySelector('.kb-sidebar-actions') : toolbar;
+        if (toggle.parentNode !== parent) {
+            if (parent === toolbar) parent.prepend(toggle); else parent.append(toggle);
+        }
+        sidebar.inert = !visible;
+        toggle.setAttribute('aria-expanded', String(visible));
+        const label = visible ? 'Close cards sidebar' : 'Open cards sidebar';
+        toggle.setAttribute('aria-label', label);
+        toggle.title = label;
+        toggle.querySelector('path').setAttribute('d', visible
+            ? 'm11 6-6 6 6 6m8-12-6 6 6 6'
+            : 'm5 6 6 6-6 6m8-12 6 6-6 6');
+        if (restoreFocus) toggle.focus({ preventScroll: true });
     }
 
     closeSidebarDrawer() {

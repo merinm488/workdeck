@@ -21,11 +21,12 @@ test('app home components and app icons are generated from Workdeck, not separat
 test('shared scripts are outside the dashboard sandbox template', () => {
   const page = '<html><head></head><body><template><body>inert</body></template><main>home</main></body></html>';
   const built = withHomeUI(page);
-  for (const script of ['tag-ui', 'home-ui', 'home-icons', 'previews']) {
+  for (const script of ['tag-ui', 'home-ui', 'home-icons', 'previews', 'search-suggestions']) {
     assert.ok(built.indexOf(`src="/js/${script}.js"`) > built.indexOf('</template>'));
     assert.equal(built.split(`src="/js/${script}.js"`).length, 2);
   }
   assert.match(built, /href="\/home-components.css"/);
+  assert.ok(built.indexOf('src="/js/search-suggestions.js"') < built.indexOf('src="/js/home-ui.js"'));
 });
 
 test('all static app homes omit redundant title ribbons without removing controls', () => {
@@ -39,7 +40,7 @@ test('all static app homes omit redundant title ribbons without removing control
     blog: ['blog/index.html', 'postsSearch', 'postsList', 'emptyNewPostBtn'],
     calendar: ['calendar/index.html', 'searchInput', 'pageTitle'],
     files: ['files/index.html', 'fbSearchInput', 'fbBreadcrumb', 'fbGrid'],
-    minutes: ['minutes/index.html', 'search', 'filter', 'meetingList', 'newBtn'],
+    minutes: ['holm/minutes/index.html', 'search', 'meetingList', 'newBtn'],
   };
   for (const [app, [file, ...controls]] of Object.entries(homes)) {
     const built = withHomeUI(read(file));

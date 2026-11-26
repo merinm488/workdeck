@@ -111,7 +111,7 @@ test('Holm packages theme assets on every app home, editor and public viewer, af
     const pages = ['home.html','docs/index.html',...['todo','kanban','minutes','calendar','sheets','forms','slides','draw','files','blog'].map(app=>`${app}/index.html`),
       ...['sheets','forms','slides','draw'].flatMap(app=>[`${app}/editor.html`,`${app}/shared.html`])];
     for (const path of pages) {
-      const page = readFileSync(join(dir,'web',path),'utf8');
+      const page = readFileSync(join(dir,path === 'home.html' ? 'api' : 'web',path),'utf8');
       assert.match(page, /<html data-wd-app="[a-z]+"/, path);
       assert.equal((page.match(/src="\/js\/suite-theme\.js"/g)||[]).length,1,path);
       assert.match(page, /href="\/suite-tokens\.css"/, path);
@@ -124,7 +124,7 @@ test('Holm packages theme assets on every app home, editor and public viewer, af
     assert.match(readFileSync(join(dir,'web/sheets/js/spreadsheet.js'),'utf8'), /toggleDarkMode\(wantDark\)/);
     assert.match(readFileSync(join(dir,'web/sheets/js/shared.js'),'utf8'), /this\.themeObserver/);
     // Marketing and public blog article designs aren't workspace chrome.
-    assert.doesNotMatch(readFileSync(join(dir,'web/index.html'),'utf8'), /data-wd-app/);
+    assert.doesNotMatch(readFileSync(join(dir,'api/landing.html'),'utf8'), /data-wd-app/);
     assert.doesNotMatch(readFileSync(join(dir,'web/blog-public.html'),'utf8'), /data-wd-app/);
   } finally { rmSync(dir,{recursive:true,force:true}); }
 });

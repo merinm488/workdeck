@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -12,7 +12,9 @@ test('Holm serves the original signed-in dashboard markup without legacy access 
   const dir = mkdtempSync(join(tmpdir(), 'holm-workdeck-'));
   try {
     execFileSync(process.execPath, [join(root, 'scripts/build-holm-landing.mjs'), dir]);
-    const html = readFileSync(join(dir, 'web/home.html'), 'utf8');
+    assert.equal(existsSync(join(dir, 'web/index.html')), false, 'static root must not bypass session routing');
+    assert.equal(existsSync(join(dir, 'web/home.html')), false, 'static home must not bypass session routing');
+    const html = readFileSync(join(dir, 'api/home.html'), 'utf8');
     const script = readFileSync(join(dir, 'web/js/workdeck.js'), 'utf8');
     const previewDoc = html.match(/<textarea id="wdPreviewFrameDoc" hidden>([\s\S]*?)<\/textarea>/)?.[1];
     assert.ok(previewDoc, 'Slides/Draw card preview iframe template must ship in Holm home');
@@ -109,13 +111,13 @@ test('Holm serves the original signed-in dashboard markup without legacy access 
       'sheets/index.html', 'sheets/editor.html', 'forms/index.html', 'forms/editor.html',
       'slides/index.html', 'slides/editor.html', 'draw/index.html', 'draw/editor.html',
       'files/index.html', 'blog/index.html']) {
-      const built = readFileSync(join(dir, 'web', page), 'utf8');
+      const built = readFileSync(join(dir, page === 'home.html' ? 'api' : 'web', page), 'utf8');
       assert.match(built, /href="\/settings-menu\.css"/, page);
       assert.match(built, /src="\/js\/settings-menu\.js"/, page);
     }
-    assert.match(readFileSync(join(dir, 'web/index.html'), 'utf8'), /id="landingMenuToggle"[^>]*aria-label="Account menu"/);
-    for (const page of ['index.html', 'apps.html']) {
-      assert.match(readFileSync(join(dir, 'web', page), 'utf8'), /id="landingWorkspaceLink"[^>]*href="\/home"[^>]*hidden>Open Workdeck<\/a>/);
+    assert.match(readFileSync(join(dir, 'api/landing.html'), 'utf8'), /id="landingMenuToggle"[^>]*aria-label="Account menu"/);
+    for (const page of ['api/landing.html', 'web/apps.html']) {
+      assert.match(readFileSync(join(dir, page), 'utf8'), /id="landingWorkspaceLink"[^>]*href="\/home"[^>]*hidden>Open Workdeck<\/a>/);
     }
     assert.match(readFileSync(join(dir, 'web/landing.js'), 'utf8'), /if \(workspaceLink\) workspaceLink\.hidden = false/);
     assert.match(readFileSync(join(dir, 'web/landing-nav.css'), 'utf8'), /\.lp-theme-setting \{[^}]*padding:8px 12px 12px/);
@@ -132,11 +134,16 @@ test('Holm serves the original signed-in dashboard markup without legacy access 
     assert.doesNotMatch(script, /wdAuth|sessionStorage|\{ hash: state\.userHash/);
     assert.ok(readFileSync(join(dir, 'api/workspace.js'), 'utf8').includes('workspace_tags'));
     assert.doesNotMatch(readFileSync(join(dir, 'web/landing.js'), 'utf8'), /location\.(?:replace|assign)\('\/home'\)/);
-    assert.match(html, /href="\/" class="wd-logo" aria-label="Workdeck landing page"/);
+    assert.match(html, /href="\/home" class="wd-logo" aria-label="Workdeck home"/);
+    assert.match(html, /class="wd-logo-icon"><img class="wd-workdeck-icon" src="\/icons\/icon-192x192.png"/);
+    const sw = readFileSync(join(dir, 'web/sw.js'), 'utf8');
+    assert.match(sw, /e.request.mode === 'navigate'/);
+    const cachedFiles = JSON.parse(sw.match(/const FILES = (\[[^;]+\]);/)[1].replaceAll("'", '"'));
+    assert.ok(cachedFiles.every(file => /\.(css|js|json|png)$/.test(file)), 'never cache session-dependent pages');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('Holm landing stays public for members while the dashboard requires sign-in', async () => {
+test('Holm routes members straight home and guests to landing before sending HTML', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'holm-workdeck-'));
   try {
     execFileSync(process.execPath, [join(root, 'scripts/build-holm-landing.mjs'), dir]);
@@ -148,22 +155,45 @@ test('Holm landing stays public for members while the dashboard requires sign-in
       getLoginURL: path => `/auth/login?redirect=${encodeURIComponent(path)}`,
       getLogoutURL: () => '/auth/logout',
       getAccountURL: path => `/auth/account?redirect=${encodeURIComponent(path)}` },
+    private: { read: template => { urls.push('api/' + template); return readFileSync(join(dir, 'api', template), 'utf8'); } },
     web: { fetch: req => { urls.push(new URL(req.url).pathname); return new Response('public', { status: 200 }); } },
   } });
   const request = path => new Request('https://workdeck.test' + path);
-  assert.equal((await app.fetch(request('/'), env(false))).status, 200);
-  assert.equal(urls[0], '/');
-  const signedInLanding = await app.fetch(request('/'), env(true));
-  assert.equal(signedInLanding.status, 200);
-  assert.equal(signedInLanding.headers.get('location'), null);
-  assert.equal(urls.at(-1), '/');
+  for (const route of ['/', '/?from=app', '/index', '/index.html']) {
+    const guest = await app.fetch(request(route), env(false));
+    assert.equal(guest.status, 200);
+    assert.equal(urls.at(-1), 'api/landing.html');
+    assert.match(await guest.text(), /id="landingView"/);
+    assert.match(guest.headers.get('cache-control'), /no-store/);
+    assert.match(guest.headers.get('vary'), /Cookie/);
+    const count = urls.length;
+    const signedInLanding = await app.fetch(request(route), env(true));
+    assert.equal(signedInLanding.status, 302);
+    assert.equal(signedInLanding.headers.get('location'), 'https://workdeck.test/home');
+    assert.match(signedInLanding.headers.get('cache-control'), /no-store/);
+    assert.equal(await signedInLanding.text(), '', 'no landing markup sent to members');
+    assert.equal(urls.length, count, 'members never fetch landing HTML');
+  }
   assert.equal((await app.fetch(request('/account'), env(true))).headers.get('location'), 'https://workdeck.test/home');
-  assert.equal((await app.fetch(request('/home'), env(false))).headers.get('location'), 'https://workdeck.test/auth/login?redirect=%2Fhome');
+  for (const route of ['/home', '/home/', '/home.html']) {
+    assert.equal((await app.fetch(request(route), env(false))).headers.get('location'), 'https://workdeck.test/');
+  }
+  for (const route of ['/home/', '/home.html']) {
+    assert.equal((await app.fetch(request(route), env(true))).headers.get('location'), 'https://workdeck.test/home');
+  }
+  for (const signedIn of [true, false]) {
+    assert.equal((await app.fetch(request('/apps'), env(signedIn))).status, 200);
+    assert.equal(urls.at(-1), '/apps', 'app catalogue stays available');
+  }
   const session = await (await app.fetch(request('/api/me'), env(true))).json();
   assert.equal(session.loginURL, '/auth/login?redirect=%2Fhome');
   assert.equal(session.accountURL, '/auth/account?redirect=%2Fhome');
-  assert.equal((await app.fetch(request('/home'), env(true))).status, 200);
-  assert.equal(urls.at(-1), '/home.html');
+  const dashboard = await app.fetch(request('/home'), env(true));
+  assert.equal(dashboard.status, 200);
+  assert.match(dashboard.headers.get('cache-control'), /no-store/);
+  assert.equal(urls.at(-1), 'api/home.html');
+  assert.match(await dashboard.text(), /id="homeView"/);
+  assert.match(dashboard.headers.get('content-security-policy'), /object-src 'none'/);
   assert.equal((await app.fetch(request('/kanban/rec_123456789'), env(true))).status, 200);
   assert.equal(urls.at(-1), '/kanban/index.html');
   assert.equal((await app.fetch(request('/kanban/config/config.js'), env(true))).status, 200);

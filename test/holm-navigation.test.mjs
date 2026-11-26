@@ -26,7 +26,7 @@ test('only sidebar app homes mark results pending before any app script runs', (
   assert.doesNotMatch(withHomeUI(shell.replace('src="/js/app-sidebar.js"', 'src="editor.js"')), /data-wd-home-pending/);
 });
 
-test('app sidebars share one Workdeck home icon and dashboard retains the landing link', () => {
+test('all Workdeck home buttons pair the app artwork with its name and go directly to /home', () => {
   for (const path of ['files/index.html', 'calendar/index.html']) {
     const result = withHomeUI(read(path));
     assert.ok(result.includes(workdeckHomeLink), path);
@@ -40,7 +40,21 @@ test('app sidebars share one Workdeck home icon and dashboard retains the landin
   assert.match(read('holm/auth/app-sidebar.js'), /wd-app-side-brand wd-sidebar-brand/);
   assert.match(read('holm/auth/app-sidebar.js'), /window\.WDHomeLink/);
   assert.match(read('holm/docs-src/src/App.jsx'), /className="wd-sidebar-home" href="\/home" aria-label="Workdeck home"/);
-  assert.match(withHomeUI(read('public/index.html')), /href="\/" class="wd-logo" aria-label="Workdeck landing page"/);
+  assert.match(workdeckHomeIcon, /<img[^>]*src="\/icons\/icon-192x192.png"[^>]*alt=""/);
+  assert.doesNotMatch(workdeckHomeIcon, /<svg/);
+  assert.ok(workdeckHomeLink.includes(`<span class="wd-sidebar-home-icon">${workdeckHomeIcon}</span><span class="wd-sidebar-home-text">Workdeck</span>`));
+  assert.match(read('holm/docs-src/src/App.jsx'), /<span className="wd-sidebar-home-text">Workdeck<\/span>/);
+  const dashboard = withHomeUI(read('public/index.html'));
+  assert.match(dashboard, /href="\/home" class="wd-logo" aria-label="Workdeck home"/);
+  assert.ok(dashboard.includes(`<div class="wd-logo-icon">${workdeckHomeIcon}</div>`));
+  assert.doesNotMatch(dashboard, /Workdeck landing page|M3 12l9-9/);
+  for (const path of ['minutes/index.html', 'draw/shared.html']) {
+    const built = withHomeUI(read(path));
+    assert.match(built, /href="\/home"[^>]*aria-label="Workdeck home"/);
+    assert.ok(built.includes(workdeckHomeIcon), path);
+    assert.match(built, /class="wd-sidebar-home-text">Workdeck<\/span>/, path);
+    assert.doesNotMatch(built, /M3 9.5 12 3l9/);
+  }
 });
 
 function boardFixture(saveBoard) {

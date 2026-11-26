@@ -42,12 +42,16 @@ export function withHomeUI(page) {
     .replace('id="confirmNameModal" class="btn btn-primary">Save', 'id="confirmNameModal" class="btn btn-primary">Create')
     .replace('id="confirmReview" class="primary">Save status', 'id="confirmReview" class="primary">Apply status');
   // Native sidebars share the same link as the runtime-mounted app sidebars.
-  // Preserve Calendar's close control and the dashboard's separate landing link.
-  page = page.replace('<a href="/" class="home-link"', '<a href="/home" class="home-link"')
+  // Keep every Workdeck button pointed directly at /home, never via landing.
+  // App-specific Back controls still return to their own app home.
+  page = page.replace(/<a href="\/" class="home-link"[^>]*>[\s\S]*?<\/a>/, workdeckHomeLink.replace('class="wd-sidebar-home"', 'class="home-link wd-sidebar-home"'))
     .replace('<a class="blog-home-link" href="/"', '<a class="blog-home-link" href="/home"')
     .replace('<div class="cal-sidebar-head"><strong>Calendar</strong>', `<div class="cal-sidebar-head wd-sidebar-brand">${workdeckHomeLink}`)
     .replace(/<a href="\/" class="fb-brand">[\s\S]*?<\/a>/, `<div class="wd-sidebar-brand">${workdeckHomeLink}</div>`)
-    .replace('<a href="/" class="wd-logo">', '<a href="/" class="wd-logo" aria-label="Workdeck landing page" title="Workdeck landing page">');
+    .replace('<a href="/" class="wd-logo">', '<a href="/home" class="wd-logo" aria-label="Workdeck home" title="Workdeck home">')
+    .replace(/<div class="wd-logo-icon">[\s\S]*?<\/div>/g, `<div class="wd-logo-icon">${workdeckHomeIcon}</div>`)
+    .replace(/<svg class="wd-empty-icon"[\s\S]*?<\/svg>/, workdeckHomeIcon.replace('wd-workdeck-icon', 'wd-empty-icon'))
+    .replace(/<a class="present-btn" href="\/" title="Made with Workdeck">[\s\S]*?<\/a>/, workdeckHomeLink);
   // App homes go straight from the main header to their content. Remove only
   // redundant title-only strips, never toolbars with navigation or controls.
   // Sheets tolerates the absent viewTitle; Docs owns its equivalent in React.
@@ -60,6 +64,6 @@ export function withHomeUI(page) {
   // closing body. Append to the OUTER document, never that inert template.
   const end = page.lastIndexOf('</body>');
   const preview = page.includes('src="/js/previews.js"') ? '' : '<script src="/js/previews.js"></script>';
-  page = page.slice(0, end) + preview + '<script src="/js/home-icons.js"></script><script src="/js/action-menu.js"></script><script src="/js/dialogs.js"></script><script src="/js/tag-ui.js"></script><script src="/js/home-ui.js"></script>' + page.slice(end);
+  page = page.slice(0, end) + preview + '<script src="/js/home-icons.js"></script><script src="/js/action-menu.js"></script><script src="/js/dialogs.js"></script><script src="/js/tag-ui.js"></script><script src="/js/search-suggestions.js"></script><script src="/js/home-ui.js"></script>' + page.slice(end);
   return withPageBoot(page.replace('</head>', '<link rel="stylesheet" href="/home-components.css"><link rel="stylesheet" href="/home-ui.css"><link rel="stylesheet" href="/action-menu.css"></head>'));
 }

@@ -1,0 +1,8 @@
+/* Photo overlay keeps the original icon available if the image cannot load. */
+.wd-account-trigger, #landingMenuToggle { position:relative; }
+.wd-account-trigger > .wd-profile-image, #landingMenuToggle > .wd-profile-image {
+  position:absolute; inset:0; width:100%; height:100%;
+  max-width:none; border-radius:50%; object-fit:cover; opacity:0; pointer-events:none;
+}
+.wd-photo-loaded > .wd-profile-image { opacity:1!important; }
+.wd-photo-loaded > svg, .wd-photo-loaded > span { visibility:hidden; }

@@ -1,7 +1,17 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
-export function SearchBar({ value, onChange }) {
-  const input = useRef(null);
+export function SearchBar({ value, onChange, titles = [] }) {
+  const input = useRef(null), completion = useRef(null);
+  const current = useRef({ titles, onChange });
+  current.current = { titles, onChange };
+  useEffect(() => {
+    completion.current = window.WDSearchSuggestions?.mount(input.current, {
+      getTitles: () => current.current.titles,
+      onAccept: title => current.current.onChange(title),
+    });
+    return () => { completion.current?.destroy(); completion.current = null; };
+  }, []);
+  useEffect(() => { completion.current?.refresh(); }, [value, titles]);
   const clear = () => { onChange(''); input.current?.focus(); };
   return <div className="wd-home-search-box">
     <svg className="wd-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" aria-hidden="true"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>

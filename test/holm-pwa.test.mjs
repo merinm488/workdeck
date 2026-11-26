@@ -58,7 +58,7 @@ test('Holm installs each app independently using its catalogue artwork', () => {
       assert.match(worker, /request.mode === 'navigate'/);
       assert.match(worker, new RegExp(`url.pathname.startsWith\\('/${app}/'\\)`));
     }
-    const home = readFileSync(join(dir, 'web/home.html'), 'utf8');
+    const home = readFileSync(join(dir, 'api/home.html'), 'utf8');
     assert.ok(home.indexOf('src="/js/settings-menu.js"') > home.lastIndexOf('</textarea>'), 'Account behavior is in the real page, not the preview document');
     for (const app of ['forms', 'slides', 'draw', 'sheets']) {
       for (const page of ['editor.html', 'shared.html']) {

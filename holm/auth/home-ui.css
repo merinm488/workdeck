@@ -6,22 +6,34 @@ html[data-wd-app] .wd-sidebar-brand {
   border-bottom:1px solid var(--wd-ui-border);
 }
 html[data-wd-app] .wd-sidebar-home {
-  display:inline-flex; align-items:center; justify-content:center; flex:none;
-  width:42px; height:42px; padding:0; border-radius:10px;
-  text-decoration:none; cursor:pointer;
+  display:inline-flex; align-items:center; gap:10px; flex:none;
+  height:42px; padding:0; border:0; border-radius:10px;
+  background:transparent; color:var(--wd-ui-text); text-decoration:none; cursor:pointer;
 }
-/* Navigation is neutral like the account avatar, not a primary app action. */
-html[data-wd-app] :is(.wd-sidebar-home, .wd-side-brand .wd-logo-icon) {
+html[data-wd-app] .wd-sidebar-home-icon {
+  display:inline-flex; align-items:center; justify-content:center; flex:none;
+  width:42px; height:42px; border-radius:10px;
+}
+/* Match the Workdeck dashboard wordmark; the whole icon + label is one link. */
+html[data-wd-app] .wd-sidebar-home-text {
+  display:block; font-size:18px; font-weight:700; white-space:nowrap;
+}
+/* Only the icon has a neutral tile, just like the dashboard brand. */
+html[data-wd-app] :is(.wd-sidebar-home-icon, .wd-side-brand .wd-logo-icon) {
   box-sizing:border-box; border:1px solid var(--wd-ui-border);
   background:var(--wd-ui-bg-elevated); color:var(--wd-ui-text);
   box-shadow:none;
 }
-html[data-wd-app] .wd-sidebar-home svg { display:block; width:20px; height:20px; }
-html[data-wd-app] :is(.wd-sidebar-home:hover, .wd-side-brand .wd-logo:hover .wd-logo-icon) { background:var(--wd-ui-bg-input); }
+html[data-wd-app] .wd-workdeck-icon { display:block; width:32px; height:32px; object-fit:contain; border-radius:7px; }
+html[data-wd-app] :is(.wd-sidebar-home:hover .wd-sidebar-home-icon, .wd-side-brand .wd-logo:hover .wd-logo-icon) { background:var(--wd-ui-bg-input); }
 html[data-wd-app] :is(.wd-sidebar-home, .wd-side-brand .wd-logo):focus-visible { outline:2px solid var(--wd-ui-text-secondary); outline-offset:3px; }
 /* Calendar pads its whole sidebar; compensate only in its brand row. */
 html[data-wd-app="calendar"] .cal-sidebar-head.wd-sidebar-brand { margin:-14px -12px 12px; }
 
+/* Use the Minutes app artwork in both New launchers, at the same chip size as
+   the other apps. File/type icons and the filter chooser keep their line art. */
+html[data-wd-app="home"] .wd-app-launcher .wd-app-icon-artwork { background:transparent; }
+html[data-wd-app="home"] .wd-app-launcher .wd-app-icon-artwork img { display:block; width:100%; height:100%; object-fit:contain; border-radius:inherit; }
 /* All-items is a shared sidebar control, including React Docs. The active
    fill comes from the app's soft accent in suite-theme.css, not Home yellow. */
 html[data-wd-app] .wd-app-side-all {
@@ -96,6 +108,14 @@ html[data-wd-app] .wd-home-search input::-webkit-search-decoration { -webkit-app
 html[data-wd-app] .wd-home-search .wd-search-input:focus { border-color:var(--wd-control-focus); box-shadow:0 0 0 3px var(--wd-control-soft); }
 html[data-wd-app] .wd-home-search .wd-search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--wd-ui-text-tertiary); pointer-events:none; }
 html[data-wd-app] .wd-home-search .wd-search-clear { position:absolute; right:10px; top:50%; transform:translateY(-50%); display:flex; align-items:center; justify-content:center; width:26px; height:26px; padding:0; border:0; border-radius:50%; color:var(--wd-ui-text-tertiary); background:none; }
+/* Inline completion mirrors Home's muted suffix without replacing the actual
+   typed text, moving its caret, or creating another layout column. */
+html[data-wd-app] .wd-search-completion { position:absolute; left:43px; right:41px; top:1px; bottom:1px; display:flex; align-items:center; justify-content:center; overflow:hidden; white-space:pre; pointer-events:none; font:14px/18px Inter,system-ui,sans-serif; }
+html[data-wd-app] .wd-search-completion[hidden] { display:none; }
+.wd-search-completion-anchor { position:relative; flex:0 0 auto; }
+.wd-search-completion-prefix { visibility:hidden; }
+.wd-search-completion-rest { position:absolute; top:0; left:100%; color:var(--wd-ui-text-tertiary); }
+.wd-search-completion-hint { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
 html[data-wd-app] .wd-home-search .wd-search-clear:is(.hidden,[hidden]) { display:none; }
 html[data-wd-app] .wd-home-search .wd-search-clear:hover { background:var(--wd-ui-bg-elevated); color:var(--wd-ui-text); }
 html[data-wd-app] #boardsView.wd-home-content,

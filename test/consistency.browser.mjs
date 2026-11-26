@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile, stat, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { pageFixture } from './holm-page-fixtures.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH || 'playwright');
 const root = path.resolve(process.env.WORKDECK_UI_BUILD || '/tmp/workdeck-holm-release', 'web');
 const output = '/tmp/workdeck-consistency-interactions';
@@ -13,6 +14,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://local');
     let file = path.join(root, url.pathname === '/home' ? 'home.html' : url.pathname);
     if (!file.startsWith(root + '/')) throw Error('Invalid path');
+    file = pageFixture(root, file);
     if ((await stat(file)).isDirectory()) file = path.join(file, 'index.html');
     res.setHeader('Content-Type', ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' })[path.extname(file)] || 'application/octet-stream');
     res.end(await readFile(file));

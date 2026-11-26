@@ -1,5 +1,4 @@
-// Holm Minutes. This is intentionally the current unfinished notebook feature
-// set, without a legacy access key, account hash or external storage backend.
+// Holm Minutes: member-private meetings, without legacy access keys or external storage.
 // Meeting revisions and linked Todo actions are saved in ONE member-DS
 // transaction, so a meeting can never claim to have created a missing task.
 const MINUTES = 'meeting_minutes';
@@ -79,7 +78,7 @@ function syncTasks(tx, meeting, prior) {
   for (const section of meeting.agenda) for (const point of section.points) {
     if (point.type !== 'action' || !point.text) continue;
     const prev = oldPoints.get(point.id);
-    const dest = point.todoListId && tx.findOne(TODO, point.todoListId);
+    const dest = point.todoListId && (dirtyLists.get(point.todoListId) || tx.findOne(TODO, point.todoListId));
     const task = dest?.items?.find(item => item.id === point.todoTaskId);
     if (task) {
       let changed = false;
@@ -91,8 +90,8 @@ function syncTasks(tx, meeting, prior) {
       if (changed) dirtyLists.set(dest.id, dest);
     } else if (!point.todoTaskId) {
       if (!list || list.items.length >= 256) {
-        list = tx.find(TODO, {}, { limit: 200 }).find(row => row.name === 'Meeting actions' && row.items.length < 256 &&
-          !dirtyLists.has(row.id)) || null;
+        list = [...dirtyLists.values(), ...tx.find(TODO, {}, { limit: 200 }).filter(row => !dirtyLists.has(row.id))].find(row =>
+          row.name === 'Meeting actions' && row.items.length < 256) || null;
         if (!list) {
           if (tx.count(TODO, {}) >= 200) throw new Error('Todo list limit reached');
           const createdAt = stamp();
@@ -154,6 +153,34 @@ export async function handleMinutes(request, env) {
     return meeting ? json({ success: true, meeting }) : fail('Meeting limit reached.', 409);
   }
   if (typeof data.id !== 'string' || !ID.test(data.id)) return fail('Invalid meeting ID.', 400);
+  if (action === 'setActionCompleted') {
+    if (typeof data.pointId !== 'string' || !ID.test(data.pointId) || typeof data.completed !== 'boolean' ||
+        Object.keys(data).some(key => !['id', 'pointId', 'completed'].includes(key))) return fail('Invalid task completion request.', 400);
+    let result;
+    try {
+      result = ds.transaction(tx => {
+        const meeting = tx.findOne(MINUTES, data.id);
+        if (!meeting) return { error: 'Meeting not found.', status: 404 };
+        const point = (meeting.agenda || []).flatMap(section => section.points || []).find(point => point.id === data.pointId && point.type === 'action');
+        if (!point) return { error: 'Action item not found. Refresh the meeting and try again.', status: 404 };
+        // Resolve links from the stored member-owned meeting, never from client IDs.
+        const list = point.todoListId && tx.findOne(TODO, point.todoListId);
+        const task = list?.items?.find(item => item.id === point.todoTaskId);
+        if (!task) return { error: 'The linked Todo task is unavailable. Refresh the action items.', status: 409 };
+        // Follow-ups may be completed after finalization: the meeting itself stays frozen.
+        // Patch only completion on the latest list, preserving concurrent Todo edits.
+        if (task.completed !== data.completed) {
+          task.completed = data.completed;
+          list.version += 1; list.updatedAt = stamp();
+          tx.update(TODO, { id: list.id }, { $set: { items: list.items, version: list.version, updatedAt: list.updatedAt } });
+        }
+        return { status: 200, todoList: list };
+      });
+    } catch {
+      return fail('Could not update task completion. Please try again.', 503);
+    }
+    return result.error ? fail(result.error, result.status) : json({ success: true, todoList: result.todoList });
+  }
   if (action === 'save') {
     if (!Number.isSafeInteger(data.revision) || data.revision < 0) return fail('Invalid revision.', 400);
     let result;

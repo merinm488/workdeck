@@ -1492,7 +1492,8 @@ function runSearch(query) {
     const wrap = $('searchResults');
     wrap.replaceChildren();
 
-    if (!query.trim()) {
+    if (!query.trim() || !userData) {
+        window.WDHomeUI?.setSearchTitles?.([]);
         wrap.classList.add('hidden');
         return;
     }
@@ -1520,6 +1521,7 @@ function runSearch(query) {
 
     matches.sort((a, b) => a.sortMs - b.sortMs);
     const top = matches.slice(0, 30);
+    window.WDHomeUI?.setSearchTitles?.(top.map(match => match.record.title));
 
     if (!top.length) {
         const empty = document.createElement('div');
@@ -1560,6 +1562,7 @@ function gotoOccurrence(record, occKey) {
 }
 
 function clearSearch() {
+    window.WDHomeUI?.setSearchTitles?.([]);
     $('searchInput').value = '';
     $('searchClear').classList.add('hidden');
     $('searchResults').classList.add('hidden');
@@ -2030,6 +2033,8 @@ async function init() {
     renderEvents();
     renderFooter();
     initCalendar();
+    // A query entered while the account was loading must use the loaded data.
+    if ($('searchInput').value.trim()) runSearch($('searchInput').value);
 
     reminderTimer = setInterval(checkReminders, APP_CONFIG.reminders.tickMs);
     checkReminders();

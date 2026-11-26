@@ -1,6 +1,7 @@
 // Holm app entrypoint. Private app data is always scoped to the member in
 // Holm's verified session cookie; legacy account hashes are never trusted.
 import { handleTodo } from './todo.js';
+import { handleProfile, memberProfile } from './profile.js';
 import { handleWorkspace } from './workspace.js';
 import { handleKanban } from './kanban.js';
 import { handleMinutes } from './minutes.js';
@@ -21,6 +22,23 @@ export { workspaceCreate, workspaceUpdate, todoRenameList, kanbanCreateBoard,
   canvasAddObject, canvasUpdateObject, sheetCreate, sheetReadCells,
   sheetWriteCells, sheetCells, folderCreate, fileUpload, fileRead } from './mcp-extra.js';
 
+// Never reuse session-dependent HTML or redirects after sign-in/sign-out.
+function sessionRedirect(path, request) {
+  return new Response(null, { status: 302, headers: {
+    Location: new URL(path, request.url).href, 'Cache-Control': 'private, no-store', Vary: 'Cookie',
+  } });
+}
+function sessionPage(template, request, env) {
+  // These templates must live in api/, not web/: Holm serves static files
+  // before this handler, which would bypass both the session gate and redirect.
+  return new Response(request.method === 'HEAD' ? null : env.holm.private.read(template), { headers: {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'private, no-store', Vary: 'Cookie',
+    'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin',
+    'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self'; media-src 'self' blob: https:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'",
+  } });
+}
+
 export default {
   fetch(request, env) {
     const { pathname } = new URL(request.url);
@@ -37,6 +55,7 @@ export default {
     if (pathname === '/api/filebox') return handleFilebox(request, env);
     if (pathname === '/api/blog') return handleBlog(request, env);
     if (pathname === '/api/site') return handleSite(request, env);
+    if (pathname === '/api/profile') return handleProfile(request, env);
     if (pathname === '/api/me') {
       if (request.method !== 'GET') {
         return new Response(null, { status: 405, headers: { Allow: 'GET' } });
@@ -47,6 +66,7 @@ export default {
           id: member.id,
           name: member.name || '',
           email: member.email || '',
+          ...memberProfile(member, env.holm.app.member.kv),
           theme: env.holm.app.member.kv.get('workdeck_settings')?.theme || 'dark',
         } : null,
         loginURL: env.holm.auth.getLoginURL('/home'),
@@ -57,14 +77,17 @@ export default {
     if (pathname.startsWith('/api/')) {
       return Response.json({ error: 'Not found.' }, { status: 404 });
     }
-    // The landing page stays public for members too. /home is the workspace;
-    // signing in must never prevent someone from visiting the public site.
-    if (pathname === '/account') {
-      return Response.redirect(new URL('/home', request.url), 302);
+    // Decide before serving HTML so a member can never paint the landing page.
+    // Cover static/extensionless aliases too; /apps remains a public catalogue.
+    if (['/', '/index', '/index.html'].includes(pathname)) {
+      if (env.holm.auth.getMember()) return sessionRedirect('/home', request);
+      return sessionPage('landing.html', request, env);
     }
-    if (pathname === '/home') {
-      if (!env.holm.auth.getMember()) return Response.redirect(new URL(env.holm.auth.getLoginURL('/home'), request.url), 302);
-      return env.holm.web.fetch(new Request(new URL('/home.html', request.url), request));
+    if (pathname === '/account') return sessionRedirect('/home', request);
+    if (['/home', '/home/', '/home.html'].includes(pathname)) {
+      if (!env.holm.auth.getMember()) return sessionRedirect('/', request);
+      if (pathname !== '/home') return sessionRedirect('/home', request);
+      return sessionPage('home.html', request, env);
     }
     if (pathname.startsWith('/files/') && pathname !== '/files/' && !pathname.includes('.', 7)) {
       return env.holm.web.fetch(new Request(new URL('/files/index.html', request.url), request));

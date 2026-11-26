@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en" data-minutes-loading>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#276b53">
+  <title>Minutes · Workdeck</title>
+  <!-- Hide the unfinished app before deferred scripts assemble the shared shell. -->
+  <style>
+    #minutesLoading{display:none}
+    html[data-minutes-loading] body > :not(#minutesLoading):not(script):not(style):not(noscript){visibility:hidden!important}
+    html[data-minutes-loading] #minutesLoading{display:grid;position:fixed;inset:0;z-index:500;place-content:center;justify-items:center;gap:16px;background:var(--wd-ui-bg,#f8f9fa);color:var(--wd-ui-text,#202124);font:14px/1.5 Inter,system-ui,sans-serif}
+  </style>
+  <link rel="stylesheet" href="/minutes/vendor-quill.snow.css">
+  <link rel="stylesheet" href="/minutes/styles.css">
+</head>
+<body>
+  <div id="minutesLoading" role="status" aria-live="polite"><span class="minutes-loading-spinner" aria-hidden="true"></span><span>Loading Minutes…</span><noscript><p>JavaScript is required to open Minutes. Enable it and reload this page.</p></noscript></div>
+  <header class="topbar">
+    <div class="editor-heading editor-only">
+      <button id="backBtn" class="icon-button" aria-label="All meetings" title="All meetings"><svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg></button>
+      <div class="document-identity"><button id="documentName" type="button" title="Rename meeting" aria-haspopup="dialog">Untitled meeting</button><span id="saveState" role="status" aria-live="polite"></span></div>
+    </div>
+    <div class="home-search-source"><input id="search" type="search" aria-label="Search meetings" autocomplete="off" placeholder="Search"></div>
+    <button id="retryBtn" class="hidden">Retry save</button>
+    <div class="top-nav-right minutes-home-actions">
+    <button id="reviewBtn" class="primary editor-only">Update Status</button>
+    <button id="newBtn" class="primary home-new-btn" aria-label="New meeting"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="btn-label">New meeting</span></button>
+    <div class="wd-minutes-account"><button id="settingsBtn" type="button" aria-expanded="false">Account menu</button><div id="settingsDropdown" class="hidden"><div class="theme-dropdown-container"><button data-theme="light">Light</button><button data-theme="dark">Dark</button><button data-theme="system">System</button></div><p id="accountError" class="wd-dialog-error" role="alert" hidden></p><button id="logoutBtn" class="wd-account-item">Logout</button></div></div>
+    </div>
+  </header>
+  <main id="home" class="home hidden" aria-label="Meetings">
+    <div id="meetingList" class="meeting-list"></div>
+    <div id="empty" class="empty hidden"><span class="empty-art"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h3"/></svg></span><h1>A place for every meeting</h1><p>Keep the conversation, decisions, and next steps together.</p><button id="emptyNew" class="primary">Create a meeting</button></div>
+    <div id="noResults" class="empty hidden"><h2>No meetings found</h2><p>Try a different title, person, or topic.</p><button id="clearSearch">Show all meetings</button></div>
+    <div id="loadError" class="empty hidden" role="alert"><h2>Meetings couldn’t be loaded</h2><p id="loadErrorText"></p><button id="loadRetry">Try again</button></div>
+  </main>
+  <main id="editor" class="editor hidden" aria-label="Meeting editor">
+    <div id="overviewScrim" class="overview-scrim" hidden aria-hidden="true"></div>
+    <aside id="meetingOverview" class="agenda-rail" aria-label="Meeting overview">
+      <div class="rail-header"><a class="rail-heading" href="#documentHeading">MEETING OVERVIEW</a></div>
+      <div class="rail-date" id="railDate"></div>
+      <div class="rail-section-title">Agenda <span id="topicCount">0</span></div>
+      <nav id="outline" aria-label="Agenda topics"></nav>
+      <button id="railAddTopic" class="text-button">+ Add topic</button>
+      <div class="rail-summary"><a href="#decisionsSection"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>Decisions<span id="decisionCount">0</span></a><a href="#actionsSection"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/></svg>Action items<span id="actionCount">0</span></a></div>
+      <div class="rail-hint"><span>Made for the conversation.</span><p><kbd>Enter</kbd> to add the next note<br><kbd>Shift Enter</kbd> for a new line</p></div>
+    </aside>
+    <div class="editor-main">
+      <div id="editorToolbar" class="editor-toolbar">
+        <button id="overviewToggle" type="button" class="icon-button" title="Close meeting overview" aria-label="Close meeting overview" aria-controls="meetingOverview" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 6-6 6 6 6m8-12-6 6 6 6"/></svg></button>
+      </div>
+      <div id="documentScroll" class="document-scroll">
+    <div class="document-column">
+      <div id="saveError" class="save-error hidden" role="alert"><div><strong id="saveErrorTitle">Your changes haven’t been saved</strong><p id="saveErrorText"></p></div><button id="downloadRecovery">Download a copy</button></div>
+      <article class="sheet" id="sheet">
+        <header class="document-heading" id="documentHeading">
+          <div class="heading-top"><span class="eyebrow"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h3"/></svg>Meeting minutes</span><div class="meeting-status"><span id="stateChip" class="state-chip">Draft</span><span id="approvalName" class="approval-name" hidden></span></div></div>
+          <input id="title" class="meeting-title" aria-label="Meeting title" placeholder="Untitled meeting" maxlength="200">
+          <div class="meeting-meta"><label><span>Date</span><input id="date" type="date"></label><label><span>Location</span><input id="location" placeholder="Room or video call" maxlength="300"></label><label><span>Attendees</span><input id="attendees" placeholder="Names" maxlength="1000"></label><label><span>Note-taker</span><input id="noteTaker" placeholder="Your name" maxlength="120"></label></div>
+          <details class="more-details"><summary>More meeting details</summary><div class="detail-grid"><label>Start time<input id="startTime" type="time"></label><label>End time<input id="endTime" type="time"></label><label>Meeting series<input id="series" placeholder="e.g. Weekly team sync" maxlength="120"></label><label>Chair<input id="chair" placeholder="Name" maxlength="120"></label><label>Apologies<input id="apologies" placeholder="Unable to attend" maxlength="1000"></label><label>Calendar event<select id="calendarEventId"><option value="">No linked event</option></select></label></div></details>
+        </header>
+        <div class="notes-heading"><h1>Agenda & notes</h1><span id="pointCount" class="count">0 notes</span></div>
+        <div id="notesList"></div>
+        <button id="addTopic" class="add-topic">+ Add a topic</button>
+        <section id="decisionsSection" class="summary-section" aria-labelledby="decisionsHeading">
+          <div class="summary-heading"><span class="summary-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span><div class="summary-title"><h2 id="decisionsHeading">Decisions</h2><span id="decisionSummaryCount" class="summary-count">0</span></div></div>
+          <ol id="decisionsList" class="summary-list" aria-label="Meeting decisions"></ol>
+        </section>
+        <section id="actionsSection" class="summary-section" aria-labelledby="actionsHeading">
+          <div class="summary-heading"><span class="summary-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/></svg></span><div class="summary-title"><h2 id="actionsHeading">Action items</h2><span id="actionSummaryCount" class="summary-count">0</span></div><button id="refreshTasks" class="summary-refresh" title="Refresh linked Todo status">Refresh</button></div>
+          <ol id="actionsList" class="summary-list" aria-label="Meeting action items"></ol>
+          <p id="actionError" class="summary-error" role="alert" hidden></p>
+        </section>
+      </article>
+    </div>
+      </div>
+    </div>
+  </main>
+  <dialog id="createDialog" class="minutes-dialog" aria-labelledby="createTitle"><form id="createForm"><div class="dialog-heading"><h2 id="createTitle">New meeting</h2><button type="button" class="dialog-close" data-close="createDialog" aria-label="Close">×</button></div><label class="field-label" for="createName">Meeting name</label><input id="createName" placeholder="e.g. Monday team sync" maxlength="200" autocomplete="off"><fieldset class="template-options"><legend>Choose a starting point</legend><label class="template-option"><input type="radio" name="template" value="blank" checked><span><strong>Blank meeting</strong><small>A fresh page for any conversation</small></span></label><label class="template-option"><input type="radio" name="template" value="team"><span><strong>Team sync</strong><small>Updates, blockers, and priorities</small></span></label><label class="template-option"><input type="radio" name="template" value="one"><span><strong>One-on-one</strong><small>Check-in, feedback, and growth</small></span></label><label class="template-option"><input type="radio" name="template" value="project"><span><strong>Project review</strong><small>Progress, decisions, and next steps</small></span></label></fieldset><p id="createError" class="dialog-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" data-close="createDialog">Cancel</button><button id="confirmCreate" class="primary" type="submit">Create meeting</button></div></form></dialog>
+  <dialog id="reviewDialog" class="minutes-dialog" aria-labelledby="reviewTitle"><form id="reviewForm"><div class="dialog-heading"><h2 id="reviewTitle">Review</h2><button type="button" class="dialog-close" data-close="reviewDialog" aria-label="Close">×</button></div><div id="reviewIssues"></div><label class="field-label" for="recordState">Meeting status</label><select id="recordState"><option value="draft">Draft — still taking notes</option><option value="review">In review — ready for a check</option><option value="final">Final — lock editing</option></select><div id="approvedLabel" hidden><label class="field-label" for="approvedBy">Approved by (optional)</label><input id="approvedBy" placeholder="Name of approver" maxlength="120"></div><p id="reviewError" class="dialog-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" data-close="reviewDialog">Cancel</button><button id="confirmReview" type="submit" class="primary">Apply status</button></div></form></dialog>
+  <script src="/js/wd-links.js"></script>
+  <script src="/minutes/vendor-quill.js"></script>
+  <script src="/minutes/vendor-purify.js"></script>
+  <script src="/minutes/app.js"></script>
+</body>
+</html>

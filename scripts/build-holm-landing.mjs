@@ -12,7 +12,7 @@ import { withSheetAutosave } from '../holm/sheets/autosave-build.mjs';
 import { withSheetEditorChrome } from '../holm/sheets/editor-build.mjs';
 import { homeComponentCSS, homeIconsJS, withHomeUI } from '../holm/auth/home-ui-build.mjs';
 import { withoutDocPins } from '../holm/docs-src/pin-free-build.mjs';
-import { accountAvatar, withAccountAvatars, withDocsAccountAvatar } from '../holm/auth/account-build.mjs';
+import { accountAvatar, withAccountAvatars, withDocsAccountAvatar, withProfilePhotos } from '../holm/auth/account-build.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const output = resolve(process.argv[2] || '/tmp/workdeck-holm-landing');
@@ -72,7 +72,7 @@ ${homeMarkup}
 <script src="/js/themes.js"></script><script src="/js/wd-links.js"></script>
 <script src="/js/wd-mentions.js"></script><script src="/js/previews.js"></script>
 <script src="/js/workdeck.js"></script><script src="/js/connect-ai.js"></script></body></html>`;
-// Kanban's board UI is unchanged; remove only key-based login/account chrome.
+// Preserve Kanban's board UI while updating Holm account and sidebar controls.
 let kanban = readFileSync(join(root, 'kanban/index.html'), 'utf8');
 const cut = (start, end) => {
   const a = kanban.indexOf(start), b = kanban.indexOf(end, a + start.length);
@@ -84,6 +84,11 @@ kanban = kanban.replace('                    <button class="settings-dropdown-it
   '                    <a class="settings-dropdown-item" href="/account">My account</a>\n                    <button class="settings-dropdown-item" id="logoutBtn">');
 cut('    <!-- Key Info Modal -->', '    <!-- Name Modal (new board / rename board) -->');
 cut('    <!-- Authentication Check Script -->', '    <!-- Custom JavaScript -->');
+// One double-chevron toggle replaces the panel icon and redundant Cards ×.
+kanban = kanban
+  .replace(/<button\b[^>]*id="kbSidebarClose"[^>]*>[\s\S]*?<\/button>/, '')
+  .replace(/<button\b[^>]*id="kbSidebarToggle"[^>]*>[\s\S]*?<\/button>/,
+    '<button type="button" id="kbSidebarToggle" class="kb-icon-btn" title="Close cards sidebar" aria-label="Close cards sidebar" aria-controls="kbSidebar" aria-expanded="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 6-6 6 6 6m8-12-6 6 6 6"/></svg></button>');
 let calendar = readFileSync(join(root, 'calendar/index.html'), 'utf8');
 const cutCalendar = (start, end) => {
   const a = calendar.indexOf(start), b = calendar.indexOf(end, a + start.length);
@@ -472,13 +477,14 @@ const withSignIns = html => {
   // outer page, not the inert preview template's closing body.
   const end = styled.lastIndexOf('</body>');
   if (end < 0) throw new Error('Missing outer body for account controls');
-  return styled.slice(0, end) + '<script src="/js/settings-menu.js"></script>' + styled.slice(end);
+  return withProfilePhotos(styled.slice(0, end) + '<script src="/js/settings-menu.js"></script>' + styled.slice(end));
 };
 const withSidebar = (html, app) => html
   .replace('</head>', '<link rel="stylesheet" href="/app-sidebar.css"></head>')
   .replace('</body>', `<script src="/js/app-sidebar.js" data-app="${app}"></script></body>`);
-writeFileSync(join(web, 'index.html'), html());
-writeFileSync(join(web, 'home.html'), withHomeUI(withSuiteTheme(withSignIns(homeHTML), 'home')));
+// No public index/home HTML: Holm's static-first routing would bypass auth.
+writeFileSync(join(output, 'api/landing.html'), withProfilePhotos(html()));
+writeFileSync(join(output, 'api/home.html'), withHomeUI(withSuiteTheme(withSignIns(homeHTML), 'home')));
 kanban = kanban.replace('<div id="boardsView">', '<div id="boardsView" class="hidden">')
   .replace('id="loadingOverlay" class="loading-overlay hidden"', 'id="loadingOverlay" class="loading-overlay"');
 writeFileSync(join(web, 'kanban/index.html'), withAppPwa(withSidebar(withSignIns(kanban), 'kanban'), 'kanban'));
@@ -496,7 +502,7 @@ writeFileSync(join(web, 'files/index.html'), withAppPwa(withSignIns(filePage), '
 writeFileSync(join(web, 'blog/index.html'), withAppPwa(withSidebar(withSignIns(blogPage), 'blog'), 'blog'));
 cpSync(join(root, 'holm/blog/public.html'), join(web, 'blog-public.html'));
 cpSync(join(root, 'public/blog.css'), join(web, 'blog.css'));
-writeFileSync(join(web, 'apps.html'), html(true));
+writeFileSync(join(web, 'apps.html'), withProfilePhotos(html(true)));
 writeFileSync(join(web, 'landing.js'), `(() => {
   let themePreference = 'dark';
   const systemTheme = () => matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -578,7 +584,7 @@ writeFileSync(join(web, 'landing.js'), `(() => {
         // The public catalogue needs a direct login link for guests, but a
         // signed-in member should open Docs rather than revisit Holm login.
         document.getElementById('lp-docs-open')?.setAttribute('href', '/docs/');
-        // Keep the landing public, but give members a visible route back to
+        // On the public catalogue, give members a visible route back to
         // their workspace without having to open an app or type its URL.
         if (workspaceLink) workspaceLink.hidden = false;
         link.hidden = true;
@@ -601,15 +607,16 @@ writeFileSync(join(web, 'landing.js'), `(() => {
     } catch (_) { /* The sign-in link remains available if the session check fails. */ }
   });
 })();\n`);
-writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v28';
-const FILES = ['/', '/apps', '/landing.css', '/landing-nav.css', '/landing.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
+writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v29';
+// Cache artwork/styles only. HTML and redirects depend on the current session.
+const FILES = ['/landing.css', '/landing-nav.css', '/landing.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('workdeck-landing-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   // Nested apps own their own service workers and caches. Never intercept
   // their navigations or assets from the site-wide landing worker.
-  if (url.origin !== self.location.origin || e.request.method !== 'GET' ||
+  if (url.origin !== self.location.origin || e.request.method !== 'GET' || e.request.mode === 'navigate' ||
       ['/docs/', '/sheets/', '/files/', '/todo/', '/calendar/', '/kanban/', '/minutes/', '/forms/', '/slides/', '/draw/', '/blog/'].some(path => url.pathname.startsWith(path)) ||
       url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || Response.error())));
@@ -632,12 +639,15 @@ cpSync(join(root, 'holm/auth/suite-theme.js'), join(web, 'js/suite-theme.js'));
 cpSync(join(root, 'holm/fonts'), join(web, 'fonts'), { recursive: true });
 cpSync(join(root, 'holm/auth/settings-menu.css'), join(web, 'settings-menu.css'));
 cpSync(join(root, 'holm/auth/settings-menu.js'), join(web, 'js/settings-menu.js'));
+cpSync(join(root, 'holm/auth/profile-photo.js'), join(web, 'js/profile-photo.js'));
+cpSync(join(root, 'holm/auth/profile-photo.css'), join(web, 'profile-photo.css'));
 cpSync(join(root, 'holm/auth/app-sidebar.css'), join(web, 'app-sidebar.css'));
 cpSync(join(root, 'holm/auth/app-sidebar.js'), join(web, 'js/app-sidebar.js'));
 writeFileSync(join(web, 'home-components.css'), homeComponentCSS(readFileSync(join(root, 'public/workdeck.css'), 'utf8')));
 cpSync(join(root, 'holm/auth/home-ui.css'), join(web, 'home-ui.css'));
 cpSync(join(root, 'holm/auth/dialogs.js'), join(web, 'js/dialogs.js'));
 cpSync(join(root, 'holm/auth/home-ui.js'), join(web, 'js/home-ui.js'));
+cpSync(join(root, 'holm/auth/search-suggestions.js'), join(web, 'js/search-suggestions.js'));
 writeFileSync(join(web, 'js/home-icons.js'), homeIconsJS(source));
 cpSync(join(root, 'holm/auth/tag-ui.js'), join(web, 'js/tag-ui.js'));
 cpSync(join(root, 'holm/auth/action-menu.js'), join(web, 'js/action-menu.js'));
@@ -712,14 +722,15 @@ for (const file of ['auth.js', 'storage.js', 'app.js', 'board.js']) {
 cpSync(join(root, 'kanban/js/themes.js'), join(web, 'kanban/js/themes.js'));
 cpSync(join(root, 'kanban/styles.css'), join(web, 'kanban/styles.css'));
 cpSync(join(root, 'holm/kanban/config.js'), join(web, 'kanban/config/config.js'));
-const minutesPage = readFileSync(join(root, 'minutes/index.html'), 'utf8').replace(
-  '<button id="themeBtn" class="icon-button" title="Switch theme" aria-label="Switch theme">◐</button>',
-  '<div class="wd-minutes-account"><button id="settingsBtn" type="button" aria-expanded="false">Account menu</button><div id="settingsDropdown" class="hidden"><div class="theme-dropdown-container"><button data-theme="light">Light</button><button data-theme="dark">Dark</button><button data-theme="system">System</button></div><p id="accountError" class="wd-dialog-error" role="alert" hidden></p><button id="logoutBtn" class="wd-account-item">Logout</button></div></div>'
-);
-if (!minutesPage.includes('id="settingsBtn"')) throw new Error('Minutes account header no longer matches');
+const minutesPage = readFileSync(join(root, 'holm/minutes/index.html'), 'utf8');
 writeFileSync(join(web, 'minutes/index.html'), withAppPwa(withSidebar(withSignIns(minutesPage), 'minutes'), 'minutes'));
-cpSync(join(root, 'minutes/styles.css'), join(web, 'minutes/styles.css'));
-cpSync(join(root, 'holm/minutes/app.js'), join(web, 'minutes/app.js'));
+for (const file of ['styles.css', 'app.js', 'vendor-purify.js', 'DOMPURIFY-LICENSE.txt']) {
+  cpSync(join(root, 'holm/minutes', file), join(web, 'minutes', file));
+}
+// Use the suite's pinned, self-hosted Quill rather than a runtime CDN dependency.
+for (const file of ['vendor-quill.js', 'vendor-quill.snow.css', 'QUILL-LICENSE.txt']) {
+  cpSync(join(root, 'holm/blog', file), join(web, 'minutes', file));
+}
 for (const file of ['auth.js', 'storage.js', 'config.js', 'editor.js']) {
   const dest = file === 'config.js' ? join(web, 'calendar/config', file) : join(web, 'calendar/js', file);
   cpSync(join(root, 'holm/calendar', file), dest);
@@ -840,9 +851,9 @@ try {
   // Changing the Docs HTML also changes Workbox's precache revision. On
   // upgrade, clients whose Docs cache was erased by the old root worker get
   // a fresh copy of the navigation shell.
-  writeFileSync(join(docsBuild, 'index.html'), withHomeUI(withSuiteTheme(index.replace('    <link rel="stylesheet" href="/docs/assets/markdown-editor.css" />\n', '')
+  writeFileSync(join(docsBuild, 'index.html'), withProfilePhotos(withHomeUI(withSuiteTheme(index.replace('    <link rel="stylesheet" href="/docs/assets/markdown-editor.css" />\n', '')
     .replace('</head>', '<link rel="stylesheet" href="/settings-menu.css"></head>')
-    .replace('  <body>', '  <body>\n    <!-- Holm Docs: refreshed navigation precache -->'), 'docs')));
+    .replace('  <body>', '  <body>\n    <!-- Holm Docs: refreshed navigation precache -->'), 'docs'))));
   execFileSync(join(root, 'docs-src/node_modules/.bin/vite'), ['build'], {
     cwd: docsBuild, timeout: 120_000, maxBuffer: 10_000_000,
   });
@@ -851,6 +862,7 @@ try {
   rmSync(docsBuild, { recursive: true, force: true });
 }
 cpSync(join(root, 'holm/auth/main.js'), join(output, 'api/main.js'));
+cpSync(join(root, 'holm/auth/profile.js'), join(output, 'api/profile.js'));
 cpSync(join(root, 'holm/auth/mcp.js'), join(output, 'api/mcp.js'));
 cpSync(join(root, 'holm/auth/mcp-extra.js'), join(output, 'api/mcp-extra.js'));
 const mcpContract = JSON.parse(readFileSync(join(root, 'holm/auth/mcp-contract.json'), 'utf8'));

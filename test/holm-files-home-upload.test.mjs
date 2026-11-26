@@ -51,8 +51,10 @@ for (const [app, code] of [['Holm', source], ['legacy', legacySource]]) {
     elements.set('fbViewToggle', viewToggle);
     const $ = id => { if (!elements.has(id)) elements.set(id, node()); return elements.get(id); };
     const state = { view: 'grid', searchQuery: '', activeTag: null, files: [] };
+    let suggested = [];
     const renderContent = runInNewContext(code.slice(from, to) + '\nrenderContent', {
-      state, $, visibleFolders: () => [], visibleFiles: () => state.files,
+      state, $, window: { WDHomeUI: { setSearchTitles(titles) { suggested = Array.from(titles); } } },
+      visibleFolders: () => [], visibleFiles: () => state.files,
       sortBy: records => records, buildFileCard: record => record, buildFileRow: record => record,
       renderFooter: () => {},
     });
@@ -72,6 +74,11 @@ for (const [app, code] of [['Holm', source], ['legacy', legacySource]]) {
     assert.equal($('fbList').classList.contains('hidden'), true);
     assert.equal($('fbGrid').classList.contains('hidden'), false);
     assert.equal($('fbGrid').children.length, 1);
+    if (app === 'Holm') {
+      assert.deepEqual(suggested, ['new.txt']);
+      state.files = []; renderContent();
+      assert.deepEqual(suggested, [], 'Empty results clear stale autocomplete candidates');
+    }
   });
 }
 

@@ -158,8 +158,9 @@
         try { localStorage.setItem(`wd_${app}_layout`, grid.classList.contains('as-list') ? 'list' : 'cards'); } catch (_) { /* private mode */ }
       };
       const viewNav = app === 'blog' ? nav.querySelector('.blog-topbar-actions')
-        : app === 'kanban' ? document.querySelector('.top-nav-right') : nav;
-      if (app === 'minutes') viewNav.insertBefore(view, nav.querySelector('#newBtn'));
+        : app === 'kanban' ? document.querySelector('.top-nav-right')
+        : app === 'minutes' ? nav.querySelector('.minutes-home-actions') || nav : nav;
+      if (app === 'minutes') viewNav.insertBefore(view, viewNav.querySelector('#newBtn'));
       else viewNav.prepend(view);
     }
     let actionMenu = null;
@@ -221,12 +222,14 @@
     function filterCards() {
       const byId = new Map(records.map(record => [record.id, record]));
       let shown = 0;
+      const searchTitles = [];
       for (const card of grid.children) {
         if (!card.dataset.id) continue;
         const visible = !active || byId.get(card.dataset.id)?.tagId === active;
         card.classList.toggle('wd-app-tag-hidden', !visible);
         if (visible) shown++;
         const record = byId.get(card.dataset.id);
+        if (visible && record) searchTitles.push(record.name || record.title || '');
         const assignedTag = tags.find(tag => tag.id === record?.tagId);
         syncCardDot(card, assignedTag);
         const existingButton = card.querySelector('.wd-app-card-tag');
@@ -268,6 +271,7 @@
         decorateRow(card, assignedTag, record);
         window.WDHomeUI?.decorateCard(card, app, record, assignedTag, config.actions);
       }
+      window.WDHomeUI?.setSearchTitles?.(searchTitles);
       const noResults = aside.querySelector('.wd-app-side-no-results');
       if (noResults) noResults.remove();
       if (active && shown === 0) {

@@ -736,6 +736,7 @@ function renderContent() {
     grid.classList.toggle('hidden', !total || asList);
     list.classList.toggle('hidden', !total || !asList);
     if (!total) {
+        window.WDHomeUI?.setSearchTitles?.([]);
         empty.classList.remove('hidden');
         $('fbEmptyTitle').textContent = state.searchQuery.trim()
             ? 'No matches found'
@@ -756,6 +757,7 @@ function renderContent() {
     const ordered = state.sort === 'recent'
         ? sortBy(folders.concat(files), function () { return 0; })
         : folders.concat(files);
+    window.WDHomeUI?.setSearchTitles?.(ordered.map(record => record.name));
 
     if (state.view === 'list') {
         ordered.forEach(function (record) {

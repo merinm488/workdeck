@@ -433,7 +433,8 @@ function App() {
             {/* Logo */}
             <div className="wd-sidebar-brand">
               <a className="wd-sidebar-home" href="/home" aria-label="Workdeck home" title="Workdeck home">
-                <span dangerouslySetInnerHTML={{ __html: window.WDHomeIcons.workdeck }} />
+                <span className="wd-sidebar-home-icon" dangerouslySetInnerHTML={{ __html: window.WDHomeIcons.workdeck }} />
+                <span className="wd-sidebar-home-text">Workdeck</span>
               </a>
               {/* On mobile the header toggle is covered by the drawer; keep its close action here. */}
               <button
@@ -561,7 +562,7 @@ function App() {
                     <SearchBar
                       value={searchQuery}
                       onChange={setSearchQuery}
-                      resultCount={filteredDocs.length}
+                      titles={filteredDocs.map(doc => doc.title)}
                     />
                   </div>
 

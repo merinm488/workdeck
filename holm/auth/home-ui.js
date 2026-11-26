@@ -1,5 +1,10 @@
 /* Shared home-page presentation. Editors are deliberately not selected here. */
 (() => {
+  let searchTitles = [], searchCompletion = null;
+  function setSearchTitles(titles) {
+    searchTitles = titles;
+    searchCompletion?.refresh();
+  }
   const labels = { docs: 'Doc', sheets: 'Sheet', forms: 'Form', slides: 'Slide', draw: 'Draw', todo: 'Todo', kanban: 'Kanban', blog: 'Blog', minutes: 'Minutes' };
   function formatDate(iso) {
     if (!iso) return '';
@@ -26,7 +31,7 @@
       let actions = card.querySelector(actionsSelector);
       if (!actions && app === 'minutes') {
         actions = document.createElement('div');
-        card.querySelectorAll('.delete-meeting,.wd-app-card-tag').forEach(button => actions.append(button));
+        card.querySelectorAll('.rename-meeting,.delete-meeting,.wd-app-card-tag').forEach(button => actions.append(button));
         const remove = actions.querySelector('.delete-meeting');
         if (remove) { remove.classList.add('danger'); remove.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M6 7l1 14h10l1-14M9 7V4h6v3M10 11v6m4-6v6"/></svg>'; }
       }
@@ -96,6 +101,7 @@
       if (event.key === 'Escape' && input.value) { event.preventDefault(); event.stopImmediatePropagation(); clearSearch(); }
     }, true);
     syncClear();
+    searchCompletion = window.WDSearchSuggestions?.mount(input, { getTitles: () => searchTitles });
     const nav = document.querySelector(config[1]);
     if (nav && app !== 'calendar') {
       const home = document.querySelector({ todo: '#listsView', kanban: '#boardsView', blog: '#postsView', minutes: '#home' }[app] || '.home-main');
@@ -110,7 +116,7 @@
     const grids = ['#homeGrid', '#listsGrid', '#boardsGrid', '#postsList', '#meetingList', '#spreadsheetsContainer'];
     grids.forEach(selector => document.querySelector(selector)?.classList.add('wd-home-grid'));
   }
-  window.WDHomeUI = { decorateCard, formatDate };
+  window.WDHomeUI = { decorateCard, formatDate, setSearchTitles };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();

@@ -172,6 +172,7 @@ const WD_APPS = [
     },
     {
         id: 'minutes', name: 'Minutes', label: 'Minutes', accent: 'minutes', icon: 'minutes',
+        launcherIcon: '/icons/minutes192.png',
         route: '/minutes/', editorParam: 'meeting',
         create: { action: 'createMinutes', payload: {}, pickNewest: function (data) { return data.minutes && data.minutes[0]; } },
         contentSearch: true
@@ -856,20 +857,30 @@ function renderViewToggle() {
  * Shared item for the app dropdowns ("+ New" menus and the filter chooser):
  * icon chip + app name.
  */
-function buildAppMenuItem(app, selected) {
+function buildAppMenuItem(app, selected, launcher = false) {
     const btn = $('wdDropdownItemTemplate').content.firstElementChild.cloneNode(true);
     btn.dataset.app = app.id;
     if (selected) btn.dataset.selected = 'true';
     const chip = btn.querySelector('.wd-app-icon');
     chip.classList.add('wd-app-icon-' + app.accent);
-    chip.append(wdIcon(app.icon));
+    if (launcher && app.launcherIcon) {
+        const image = document.createElement('img');
+        image.src = app.launcherIcon;
+        image.alt = ''; // The adjacent app name already labels this button.
+        image.width = 48;
+        image.height = 48;
+        chip.classList.add('wd-app-icon-artwork');
+        chip.append(image);
+    } else {
+        chip.append(wdIcon(app.icon));
+    }
     btn.querySelector('.wd-dropdown-item-title').textContent = app.name;
     return btn;
 }
 
 
 function renderNewMenus() {
-    const items = WD_APPS.filter(function (app) { return ['todo', 'kanban', 'minutes', 'calendar', 'docs', 'sheets', 'forms', 'slides', 'draw', 'filebox', 'blog'].includes(app.id); }).map(function (app) { return buildAppMenuItem(app); });
+    const items = WD_APPS.filter(function (app) { return ['todo', 'kanban', 'minutes', 'calendar', 'docs', 'sheets', 'forms', 'slides', 'draw', 'filebox', 'blog'].includes(app.id); }).map(function (app) { return buildAppMenuItem(app, false, true); });
     $('newDropdown').replaceChildren(...items);
     $('emptyNewDropdown').replaceChildren(...items.map(function (item) { return item.cloneNode(true); }));
 }

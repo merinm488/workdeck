@@ -158,6 +158,16 @@ test('Holm Kanban keeps the original board UI but never ships access-key login',
     assert.match(sidebarCSS, /@media\(max-width:700px\) \{ #boardsSearchToggle:not\(\.hidden\) \{ display:inline-flex; \} \}/);
     assert.match(html, /id="listsSearchInput"/);
     assert.match(html, /id="newBoardBtn"/);
+    assert.doesNotMatch(html, /id="kbSidebarClose"/);
+    assert.equal((html.match(/id="kbSidebarToggle"/g) || []).length, 1, 'one Cards sidebar toggle');
+    const toggle = html.match(/<button\b[^>]*id="kbSidebarToggle"[^>]*>[\s\S]*?<\/button>/)?.[0];
+    assert.match(toggle, /aria-controls="kbSidebar"/);
+    assert.match(toggle, /aria-label="Close cards sidebar"/);
+    assert.match(toggle, /d="m11 6-6 6 6 6m8-12-6 6 6 6"/);
+    assert.doesNotMatch(toggle, /<rect|<line/);
+    const boardScript = readFileSync(join(dir, 'web/kanban/js/board.js'), 'utf8');
+    assert.doesNotMatch(boardScript, /kbSidebarClose/);
+    assert.match(boardScript, /m5 6 6 6-6 6m8-12 6 6-6 6/);
     assert.equal(css, readFileSync(new URL('../kanban/styles.css', import.meta.url), 'utf8'));
     for (const marker of ['sortablejs@1.15.6', 'id="boardView"', 'id="boardRoot"',
       'id="cardModal"', 'id="kbTodoList"', 'id="checklistModal"', 'id="wipLimitModal"']) {
