@@ -1,6 +1,6 @@
 // Cache only non-executable, same-origin artwork/fonts. HTML, JS and CSS
 // must stay together on the current release, including /editor?id=... links.
-const STATIC_CACHE = 'sheets-static-holm-v3';
+const STATIC_CACHE = 'sheets-static-holm-v4';
 
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate', event => {

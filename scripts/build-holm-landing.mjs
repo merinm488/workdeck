@@ -9,6 +9,7 @@ import { operations as extraMcpOperations } from '../holm/auth/mcp-extra-contrac
 import { buildThemeTokens, withSuiteTheme } from '../holm/auth/theme-build.mjs';
 import { withSheetEditorTheme, withSharedSheetTheme } from '../holm/sheets/theme-build.mjs';
 import { withSheetAutosave } from '../holm/sheets/autosave-build.mjs';
+import { withSheetEditorChrome } from '../holm/sheets/editor-build.mjs';
 import { homeComponentCSS, homeIconsJS, withHomeUI } from '../holm/auth/home-ui-build.mjs';
 import { withoutDocPins } from '../holm/docs-src/pin-free-build.mjs';
 import { accountAvatar, withAccountAvatars, withDocsAccountAvatar } from '../holm/auth/account-build.mjs';
@@ -102,6 +103,7 @@ const sheetPage = (filename) => {
     page = page.slice(0, a) + page.slice(b);
   };
   if (filename === 'index.html') {
+    page = page.replace('<html lang="en">', '<html lang="en" data-wd-sheets-home="4">');
     cutPart('                                <button class="settings-dropdown-item" id="viewKeyBtn">',
       '                                <button class="settings-dropdown-item" id="logoutBtn">');
     page = page.replace('                                <button class="settings-dropdown-item" id="logoutBtn">',
@@ -118,7 +120,9 @@ const sheetPage = (filename) => {
       '                    <a class="settings-dropdown-item" href="/account">My account</a>\n                    <button class="settings-dropdown-item" id="logoutBtn">');
     cutPart('    <!-- Key Info Modal -->', '    <!-- Rename Reminder Modal -->');
     cutPart('    <!-- Authentication Check Script -->', '    <!-- Univer JS is loaded in <head>');
-    page = page.replace('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js', '/sheets/js/vendor-xlsx.js');
+    page = page.replace('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js', '/sheets/js/vendor-xlsx.js')
+      .replace('<script src="js/spreadsheet.js"></script>', '<script src="js/snapshot.js"></script><script src="js/spreadsheet.js"></script>');
+    page = withSheetEditorChrome(page);
   }
   return page.replaceAll('https://workdeck-amber-tau.vercel.app/', 'https://mer-workdeck.fazt.sh/');
 };
@@ -265,7 +269,7 @@ const accountMenu = `<div class="lp-account-menu">
                     </div>
                 </div>`;
 const replacements = [
-  ['<a href="/apps">Explore apps</a>', '<a href="/apps">Apps</a>'],
+  ['<a href="/apps">Explore apps</a>', '<a href="/apps">Apps</a><a id="landingWorkspaceLink" class="lp-workspace-link" href="/home" hidden>Open Workdeck</a>'],
   ['<a href="/#about">The idea</a>', ''],
   ['<button type="button" id="landingThemeToggle" class="lp-theme-toggle" aria-label="Switch colour theme" title="Switch colour theme">◐</button>\n                <span class="lp-nav-status"><span class="lp-status-dot"></span> Email sign-in coming soon</span>', accountMenu],
   ['<p class="lp-hero-lead">The ideas you write down. The plans you put in motion. The everyday details that keep things moving. Workdeck brings them together, without getting in your way.</p>', ''],
@@ -561,6 +565,7 @@ writeFileSync(join(web, 'landing.js'), `(() => {
     const link = document.getElementById('landingAccountLink');
     if (!link) return; // Account page handles its own signed-in view.
     const signOut = document.getElementById('landingSignOut');
+    const workspaceLink = document.getElementById('landingWorkspaceLink');
     try {
       const response = await fetch('/api/me', { credentials: 'same-origin', cache: 'no-store' });
       if (!response.ok) throw new Error('Session check failed');
@@ -569,8 +574,9 @@ writeFileSync(join(web, 'landing.js'), `(() => {
         // The public catalogue needs a direct login link for guests, but a
         // signed-in member should open Docs rather than revisit Holm login.
         document.getElementById('lp-docs-open')?.setAttribute('href', '/docs/');
-        // Keep the public UI in place for signed-in visitors. Replace only
-        // Sign in with Sign out; do not redirect or add account-only content.
+        // Keep the landing public, but give members a visible route back to
+        // their workspace without having to open an app or type its URL.
+        if (workspaceLink) workspaceLink.hidden = false;
         link.hidden = true;
         signOut.hidden = false;
         signOut.addEventListener('click', async () => {
@@ -591,7 +597,7 @@ writeFileSync(join(web, 'landing.js'), `(() => {
     } catch (_) { /* The sign-in link remains available if the session check fails. */ }
   });
 })();\n`);
-writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v27';
+writeFileSync(join(web, 'sw.js'), `const CACHE = 'workdeck-landing-v28';
 const FILES = ['/', '/apps', '/landing.css', '/landing-nav.css', '/landing.js', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('workdeck-landing-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
@@ -725,6 +731,11 @@ writeFileSync(join(web, 'sheets/js/shared.js'), withSharedSheetTheme(readFileSyn
 cpSync(join(root, 'holm/sheets/vendor-xlsx.js'), join(web, 'sheets/js/vendor-xlsx.js'));
 cpSync(join(root, 'holm/sheets/SHEETJS-LICENSE.txt'), join(web, 'sheets/SHEETJS-LICENSE.txt'));
 cpSync(join(root, 'holm/sheets/service-worker.js'), join(web, 'sheets/service-worker.js'));
+cpSync(join(root, 'holm/sheets/snapshot.js'), join(web, 'sheets/js/snapshot.js'));
+cpSync(join(root, 'holm/sheets/editor-header.css'), join(web, 'sheets/editor-header.css'));
+// Old installed shells fetch this CSS network-first: hide the retired ribbon
+// even before their upgraded home script replaces the obsolete markup.
+writeFileSync(join(web, 'sheets/home.css'), readFileSync(join(root, 'sheets/home.css'), 'utf8') + '\n.home-view-indicator { display: none !important; }\n');
 cpSync(join(root, 'forms/styles.css'), join(web, 'forms/styles.css'));
 cpSync(join(root, 'holm/forms/editor-dark.css'), join(web, 'forms/editor-dark.css'));
 for (const file of ['config.js']) cpSync(join(root, 'holm/forms', file), join(web, 'forms/config', file));

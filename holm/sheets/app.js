@@ -114,6 +114,8 @@ class SheetsApp {
             this.cleanURL();
 
             this.isInitialized = true;
+            WDSheetSnapshots.refreshSavedPreview(spreadsheetManager, sheetsStorage,
+                () => this.hasUnsavedChanges).catch(error => console.warn('[SHEETS] Preview refresh skipped:', error));
             return true;
         } catch (error) {
             console.error('[APP] Application initialization error:', error);
@@ -130,7 +132,7 @@ class SheetsApp {
         // Settings menu toggle
         this.setupSettingsMenu();
 
-        // File mentions (toolbar button + footer hint)
+        // File mentions (account-menu action + footer hint)
         this.setupMentionTools();
 
         // Editable title
@@ -157,8 +159,12 @@ class SheetsApp {
                     this.showError('File links unavailable (libraries failed to load)');
                     return;
                 }
+                const accountButton = document.getElementById('settingsBtn');
+                const anchor = (accountButton || mentionBtn).getBoundingClientRect();
+                document.getElementById('settingsDropdown')?.classList.remove('active');
+                accountButton?.setAttribute('aria-expanded', 'false');
                 WDMentions.open({
-                    anchor: mentionBtn.getBoundingClientRect(),
+                    anchor,
                     excludeIds: this.spreadsheetId ? [this.spreadsheetId] : [],
                     onPick: (entry) => {
                         const ok = spreadsheetManager.setCellMention({
@@ -247,9 +253,11 @@ class SheetsApp {
 
         // Toggle settings dropdown
         if (settingsBtn && settingsDropdown) {
+            settingsBtn.setAttribute('aria-expanded', 'false');
             settingsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                settingsDropdown.classList.toggle('active');
+                const expanded = settingsDropdown.classList.toggle('active');
+                settingsBtn.setAttribute('aria-expanded', String(expanded));
             });
         }
 
@@ -258,6 +266,7 @@ class SheetsApp {
             // Only close settings dropdown if not clicking within it
             if (settingsDropdown && !e.target.closest('.top-nav-settings')) {
                 settingsDropdown.classList.remove('active');
+                settingsBtn?.setAttribute('aria-expanded', 'false');
                 // Also close theme submenu when closing settings
                 if (themeSubmenu) {
                     themeSubmenu.classList.remove('active');
@@ -1289,18 +1298,19 @@ class SheetsApp {
  * Set up app and start initialization
  */
 function ensureSheetsRuntime() {
-    if (window.WDAutosave) return true;
+    if (window.WDAutosave && window.WDSheetSnapshots) return true;
     const url = new URL(window.location.href);
-    const hasRuntimeScript = document.querySelector('script[src*="/js/autosave.js"]');
+    const hasRuntimeScript = document.querySelector('script[src*="/js/autosave.js"]') &&
+        document.querySelector('script[src*="js/snapshot.js"]');
     if (!hasRuntimeScript && !url.searchParams.has('wd-shell')) {
         // A v2 worker may have served an old query-string editor shell with
         // fresh app.js. A new cache key bypasses it before any workbook loads
         // or edits can be made. The canonical URL is restored after boot.
-        url.searchParams.set('wd-shell', '3');
+        url.searchParams.set('wd-shell', '5');
         window.location.replace(url.href);
         return false;
     }
-    throw new Error('The Sheets autosave script could not load. Check your connection and reload.');
+    throw new Error('The Sheets runtime could not load. Check your connection and reload.');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

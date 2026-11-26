@@ -91,6 +91,22 @@ html[data-wd-app="minutes"] { --wd-control-on-accent: #fff; }
   --scrollbar-thumb: var(--wd-ui-border-strong);
 }
 
+/* One borderless double-chevron control across native and shared sidebars.
+   Preserve the suite's focus-visible outline and a full-sized hit target. */
+html[data-wd-app] :is(.wd-app-side-toggle, .wd-sidebar-toggle, .fb-sidebar-toggle,
+  .cal-sidebar-toggle, button[aria-controls="docsSidebar"]) {
+  border: 0;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+  color: var(--wd-ui-text-secondary);
+}
+html[data-wd-app] :is(.wd-app-side-toggle, .wd-sidebar-toggle, .fb-sidebar-toggle,
+  .cal-sidebar-toggle, button[aria-controls="docsSidebar"]):hover {
+  background: transparent;
+  color: var(--wd-ui-text);
+}
+
 /* Docs consumes space-separated RGB variables, unlike the other apps. Set
    them on both the root and React's nested .dark scope to avoid legacy values. */
 html[data-wd-app="docs"], html[data-wd-app="docs"] :is(body, .dark) {

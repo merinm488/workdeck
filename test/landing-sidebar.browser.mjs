@@ -70,7 +70,15 @@ try {
         const home = page.locator('aside').getByRole('link', { name: 'Workdeck home', exact: true, includeHidden: true });
         await home.waitFor({ state: 'attached' });
         const toggle = page.locator(app === 'docs' ? 'header button[aria-controls="docsSidebar"]:visible' : app === 'files' ? '#fbSidebarToggle' : app === 'calendar' ? '#sidebarToggleBtn' : '.wd-app-side-toggle');
+        const assertBorderless = async () => assert.deepEqual(await toggle.evaluate(el => {
+          const s = getComputedStyle(el);
+          return [s.borderTopWidth, s.borderRightWidth, s.borderBottomWidth, s.borderLeftWidth, s.boxShadow, s.backgroundColor];
+        }), ['0px', '0px', '0px', '0px', 'none', 'rgba(0, 0, 0, 0)'], app + ' borderless chevrons');
+        await assertBorderless();
+        try { await toggle.hover(); } catch (error) { console.error({ app, errors, url: page.url() }); throw error; }
+        await assertBorderless();
         if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+        await assertBorderless();
         await home.waitFor({ state: 'visible' });
         await page.waitForTimeout(250); // drawer transition
         assert.equal(await home.getAttribute('href'), '/home', app);
@@ -102,11 +110,29 @@ try {
         await page.locator('#landingSignOut:not([hidden])').waitFor({ state: 'attached' });
         assert.equal(page.url(), origin + '/', app + ' landing must not redirect signed-in visitors');
         assert.equal(await page.locator('#landingAccountLink').getAttribute('hidden'), '');
+        const workspaceLink = page.getByRole('link', { name: 'Open Workdeck', exact: true });
+        await workspaceLink.waitFor();
+        assert.equal(await workspaceLink.getAttribute('href'), '/home');
         assert.equal(logouts, 0, 'visiting landing must not sign out');
         await checkAccountAvatars(page);
       }
       // Same public main content whether signed in or out; only account action changes.
       const memberMain = await page.locator('.lp > main').innerHTML();
+      // The workspace entry is outside the closed menu and works by keyboard.
+      if (width === 390) {
+        await page.setViewportSize({ width: 320, height: 900 });
+        const bounds = await page.locator('#landingWorkspaceLink').boundingBox();
+        assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 320, 'workspace link fits a narrow phone');
+        const accountBounds = await page.locator('#landingMenuToggle').boundingBox();
+        assert.ok(accountBounds.x >= 0 && accountBounds.x + accountBounds.width <= 320, 'account remains reachable');
+        await page.setViewportSize({ width, height: 900 });
+      }
+      await page.locator('#landingWorkspaceLink').focus();
+      await page.keyboard.press('Enter');
+      await page.waitForURL(origin + '/home');
+      await page.goBack();
+      await page.waitForURL(origin + '/');
+      await page.locator('#landingWorkspaceLink:not([hidden])').waitFor();
       await page.reload();
       await page.locator('#landingSignOut:not([hidden])').waitFor({ state: 'attached' });
       assert.equal(page.url(), origin + '/');
@@ -129,6 +155,7 @@ try {
       await page.getByRole('link', { name: 'Sign in', exact: true }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Sign out', exact: true }).count(), 0);
       assert.equal(member, false);
+      assert.equal(await page.locator('#landingWorkspaceLink').isVisible(), false, 'guest has no member shortcut');
       assert.equal(logouts, 2);
       assert.equal(await page.locator('.lp > main').innerHTML(), memberMain, 'public UI unchanged');
       assert.equal(await page.locator('#landingAccountLink').getAttribute('href'), '/auth/login?redirect=%2Fhome');
@@ -137,11 +164,14 @@ try {
       await page.locator('#landingMenuToggle').click();
       await page.getByRole('link', { name: 'Sign in', exact: true }).waitFor();
       assert.equal(page.url(), origin + '/', 'session failure leaves public page usable');
+      assert.equal(await page.locator('#landingWorkspaceLink').isVisible(), false, 'failed session check does not imply membership');
       failSession = false; member = true;
       await page.goto(origin + '/apps');
       await page.locator('#landingSignOut:not([hidden])').waitFor({ state: 'attached' });
       assert.equal(page.url(), origin + '/apps');
       assert.equal(await page.locator('#lp-docs-open').getAttribute('href'), '/docs/');
+      await page.getByRole('link', { name: 'Open Workdeck', exact: true }).click();
+      await page.waitForURL(origin + '/home');
       assert.deepEqual(errors, []);
       console.log(`PASS ${theme} ${width}px: neutral home/avatar palettes, 11 sidebar links, dashboard -> landing, member/guest UI, logout and failure states`);
     } finally { await context.close(); }

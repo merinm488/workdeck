@@ -21,7 +21,7 @@ class SheetsStorage {
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result.success) {
         console.error('[SHEETS] ' + (action || 'load') + ' failed:', result.error || response.status);
-        if (response.status === 409) alert('Sheet changed in another tab. Reload before editing further.');
+        if (response.status === 409 && action !== 'updateSheetPreview') alert('Sheet changed in another tab. Reload before editing further.');
         return null;
       }
       if (Array.isArray(result.data?.sheets)) this.remember(result.data);
@@ -54,6 +54,13 @@ class SheetsStorage {
       const version = this.versions.get(sheetId);
       if (!Number.isSafeInteger(version)) return false;
       return !!(await this.request('PUT', 'updateSheet', { sheetId, version, sheetData }));
+    });
+  }
+  savePreview(sheetId, version, thumbnail) {
+    return this.queue(sheetId, async () => {
+      // Use the captured checkpoint's version, never a newer queued save.
+      if (this.versions.get(sheetId) !== version) return false;
+      return !!(await this.request('PUT', 'updateSheetPreview', { sheetId, version, thumbnail }));
     });
   }
   deleteSpreadsheet(sheetId) {

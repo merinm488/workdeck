@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 function worker({ offline = false, cached = null, brokenCache = false } = {}) {
   const listeners = {}, deleted = [], put = [], fetched = [];
-  const keys = ['sheets-static-holm-v2', 'sheets-dynamic-holm-v2', 'sheets-api-holm-v2', 'sheets-static-holm-v3', 'workdeck-docs-hashed-v1', 'filebox-static-v1'];
+  const keys = ['sheets-static-holm-v2', 'sheets-dynamic-holm-v2', 'sheets-api-holm-v2', 'sheets-static-holm-v3', 'sheets-static-holm-v4', 'workdeck-docs-hashed-v1', 'filebox-static-v1'];
   const self = { location: { origin: 'https://workdeck.test' }, clients: { claim: async () => {} }, skipWaiting: async () => {}, addEventListener: (name, fn) => { listeners[name] = fn; } };
   runInNewContext(read('holm/sheets/service-worker.js'), {
     self, URL, Response, console,
@@ -44,7 +44,7 @@ test('Sheets worker never intercepts editor shells, runtime code, auth, APIs or 
 test('Sheets migration removes every obsolete Sheets cache without touching other apps', async () => {
   const sw = worker(); let task;
   sw.listeners.activate({ waitUntil: promise => { task = promise; } }); await task;
-  assert.deepEqual(sw.deleted, ['sheets-static-holm-v2', 'sheets-dynamic-holm-v2', 'sheets-api-holm-v2']);
+  assert.deepEqual(sw.deleted, ['sheets-static-holm-v2', 'sheets-dynamic-holm-v2', 'sheets-api-holm-v2', 'sheets-static-holm-v3']);
 });
 
 test('artwork is network-first; offline misses always resolve to a Response', async () => {
@@ -64,15 +64,18 @@ test('stale Sheets shells recover once before initialization, without reloading 
   const source = read('holm/sheets/app.js');
   const start = source.indexOf('function ensureSheetsRuntime()');
   const end = source.indexOf("document.addEventListener('DOMContentLoaded'", start);
-  function run({ runtime = false, script = false, url = 'https://workdeck.test/sheets/editor?id=synthetic-book' } = {}) {
-    const replaced = [], context = { URL, window: { WDAutosave: runtime ? {} : undefined, location: { href: url, replace: value => replaced.push(value) } }, document: { querySelector: () => script } };
+  function run({ runtime = false, snapshot = runtime, script = false, url = 'https://workdeck.test/sheets/editor?id=synthetic-book' } = {}) {
+    const replaced = [], context = { URL, window: { WDAutosave: runtime ? {} : undefined, WDSheetSnapshots: snapshot ? {} : undefined, location: { href: url, replace: value => replaced.push(value) } }, document: { querySelector: () => script } };
     runInNewContext(source.slice(start, end), context);
     return { ensure: context.ensureSheetsRuntime, replaced };
   }
   const old = run(); assert.equal(old.ensure(), false);
-  const url = new URL(old.replaced[0]); assert.equal(url.searchParams.get('id'), 'synthetic-book'); assert.equal(url.searchParams.get('wd-shell'), '3');
+  const url = new URL(old.replaced[0]); assert.equal(url.searchParams.get('id'), 'synthetic-book'); assert.equal(url.searchParams.get('wd-shell'), '5');
   assert.throws(() => run({ url: url.href }).ensure(), /could not load/);
   assert.throws(() => run({ script: true }).ensure(), /could not load/);
+  const missingSnapshot = run({ runtime: true, snapshot: false });
+  assert.equal(missingSnapshot.ensure(), false);
+  assert.equal(new URL(missingSnapshot.replaced[0]).searchParams.get('wd-shell'), '5');
   const current = run({ runtime: true, script: true });
   assert.equal(current.ensure(), true); assert.deepEqual(current.replaced, []);
   assert.match(source.slice(end), /if \(!ensureSheetsRuntime\(\)\) return;/);

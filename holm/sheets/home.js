@@ -35,6 +35,19 @@ class SheetsHome {
      * Initialize home page
      */
     async init() {
+        // v2's cache-first /sheets/ navigation can deliver a retired shell once.
+        // Its JS is network-first, so recover here before rendering any cards.
+        document.querySelector('.home-view-indicator')?.remove();
+        const url = new URL(location.href);
+        if (document.documentElement.dataset.wdSheetsHome !== '4' && !url.searchParams.has('wd-shell')) {
+            url.searchParams.set('wd-shell', '4');
+            location.replace(url.href);
+            return;
+        }
+        if (document.documentElement.dataset.wdSheetsHome === '4' && url.searchParams.has('wd-shell')) {
+            url.searchParams.delete('wd-shell');
+            history.replaceState(null, '', url.href);
+        }
         try {
             if (!(await authManager.verifySession())) {
                 location.assign('/auth/login?redirect=' + encodeURIComponent(location.pathname + location.search));

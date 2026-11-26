@@ -114,6 +114,10 @@ test('Holm serves the original signed-in dashboard markup without legacy access 
       assert.match(built, /src="\/js\/settings-menu\.js"/, page);
     }
     assert.match(readFileSync(join(dir, 'web/index.html'), 'utf8'), /id="landingMenuToggle"[^>]*aria-label="Account menu"/);
+    for (const page of ['index.html', 'apps.html']) {
+      assert.match(readFileSync(join(dir, 'web', page), 'utf8'), /id="landingWorkspaceLink"[^>]*href="\/home"[^>]*hidden>Open Workdeck<\/a>/);
+    }
+    assert.match(readFileSync(join(dir, 'web/landing.js'), 'utf8'), /if \(workspaceLink\) workspaceLink\.hidden = false/);
     assert.match(readFileSync(join(dir, 'web/landing-nav.css'), 'utf8'), /\.lp-theme-setting \{[^}]*padding:8px 12px 12px/);
     assert.match(readFileSync(join(dir, 'web/landing-nav.css'), 'utf8'), /@media\(max-width:750px\) \{[\s\S]*?\.lp-hero-art \{ height:auto; min-height:0; display:flex;/);
     assert.match(readFileSync(join(dir, 'web/landing-nav.css'), 'utf8'), /\.lp-art-label \{ position:static; align-self:flex-start; \}/);

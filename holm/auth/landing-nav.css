@@ -2,11 +2,15 @@
 .lp { display:flex; flex-direction:column; }
 .lp > main { flex:1; }
 .lp-header { position:relative; z-index:10; }
+.lp-nav-links { align-items:center; }
+.lp-nav-links .lp-workspace-link { display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:0 12px; border-radius:8px; background:var(--lp-ink); color:var(--lp-bg); white-space:nowrap; }
+.lp-nav-links .lp-workspace-link[hidden] { display:none; }
+.lp-nav-links .lp-workspace-link:hover { background:#8c6a10; color:#fff; }
 .lp-account-menu { position:relative; flex:none; }
 .lp-account-toggle { box-sizing:border-box; flex-shrink:0; padding:0; width:42px; height:42px; display:grid; place-items:center; border:1px solid var(--lp-line); border-radius:50%; background:var(--lp-surface); color:var(--lp-ink); cursor:pointer; }
 .lp-account-toggle svg { display:block; width:22px; height:22px; }
 .lp-account-toggle:hover,.lp-account-toggle[aria-expanded="true"] { border-color:#c5a453; background:var(--lp-line); }
-.lp-account-toggle:focus-visible,.lp-menu-item:focus-visible { outline:3px solid #d39a00; outline-offset:3px; }
+.lp-account-toggle:focus-visible,.lp-menu-item:focus-visible,.lp-workspace-link:focus-visible { outline:3px solid #d39a00; outline-offset:3px; }
 .lp-account-panel { position:absolute; top:calc(100% + 10px); right:0; width:250px; padding:8px; border:1px solid var(--lp-line); border-radius:10px; background:var(--lp-surface); box-shadow:0 12px 30px rgba(0,0,0,.16); }
 .lp-account-panel[hidden],.lp-account-panel [hidden] { display:none; }
 .lp-theme-setting { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px 12px; font-size:13px; font-weight:600; line-height:normal; }
@@ -82,3 +86,5 @@
   .lp-art-sticker { bottom:40px; }
 }
 @media(max-width:470px) { .lp-account-toggle { width:38px; height:38px; } .lp-nav-links { font-size:11px; } }
+/* Keep the workspace link and account control reachable on narrow phones. */
+@media(max-width:370px) { .lp-nav { flex-wrap:wrap; padding-block:12px; } .lp-nav-links { order:1; width:100%; justify-content:space-between; } .lp-account-menu { margin-left:auto; } }

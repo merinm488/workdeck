@@ -44,7 +44,7 @@
     chip.hidden = !tag;
     chip.querySelector('.wd-dot').style.background = tag?.color || '';
     chip.querySelector('.wd-file-project-name').textContent = tag?.name || '';
-    const key = `${record.id}:${stamp || ''}`;
+    const key = `${record.id}:${stamp || ''}:${record.thumbnailRevision || 0}`;
     if (face.dataset.preview !== key && window.WDPreviews) {
       face.dataset.preview = key;
       window.WDPreviews.mount(face.querySelector('.wd-file-preview-page'), { id: record.id, app, updatedAt: stamp, raw: record });

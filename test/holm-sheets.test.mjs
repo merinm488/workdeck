@@ -85,6 +85,73 @@ test('Sheets metadata, Univer body and thumbnail remain private with version che
   assert.equal((await call(handleSheets, alice, 'GET', undefined, `/api/users?sheet=${sheet.id}`)).body.data.sheets[body.sheetOrder[0]].cellData[0][0].v, 'Budget');
 });
 
+test('Saved sheet images load directly, revalidate privately, and never cross accounts', async () => {
+  const { member, anon, put } = fixture();
+  const alice = member('alice'), bob = member('bob');
+  const sheet = (await put(handleSheets, alice, 'createSheet', {})).body.sheet;
+  const url = `https://workdeck.test/api/users?thumbnail=${sheet.id}&revision=2`;
+  const get = (env, etag) => handleSheets(new Request(url, { headers: etag ? { 'If-None-Match': etag } : {} }), env);
+  assert.equal((await get(alice)).status, 404);
+  await put(handleSheets, alice, 'updateSheet', { sheetId: sheet.id, version: 1,
+    sheetData: { thumbnail: 'data:image/png;base64,YWJj' } });
+  const first = await get(alice), etag = first.headers.get('etag');
+  assert.equal(first.headers.get('content-type'), 'image/png');
+  assert.equal(first.headers.get('cache-control'), 'private, no-cache');
+  assert.match(first.headers.get('vary'), /Cookie/);
+  assert.equal(await first.text(), 'abc');
+  assert.equal((await get(alice, etag)).status, 304);
+  assert.equal((await get(bob, etag)).status, 404);
+  assert.equal((await get(anon, etag)).status, 401);
+  // A rejected workbook write cannot replace its preview.
+  await put(handleSheets, alice, 'updateSheet', { sheetId: sheet.id, version: 1,
+    sheetData: { thumbnail: 'data:image/png;base64,ZGVm' } });
+  assert.equal((await get(alice, etag)).status, 304);
+  // Include padded payloads in the portable binary decoder regression.
+  await put(handleSheets, alice, 'updateSheet', { sheetId: sheet.id, version: 2,
+    sheetData: { thumbnail: 'data:image/jpeg;base64,aGVsbG8=' } });
+  const next = await get(alice, etag);
+  assert.equal(next.status, 200); assert.equal(await next.text(), 'hello');
+  assert.notEqual(next.headers.get('etag'), etag);
+  await put(handleSheets, alice, 'deleteSheet', { sheetId: sheet.id, version: 3 });
+  assert.equal((await get(alice, next.headers.get('etag'))).status, 404);
+});
+
+test('Light preview upgrades preserve saved content/version/dates and reject stale or foreign writes', async () => {
+  const { member, anon, call, put } = fixture();
+  const alice = member('alice'), bob = member('bob');
+  const original = (await put(handleSheets, alice, 'createSheet', {})).body.sheet;
+  original.thumbnail = 'data:image/jpeg;base64,b2xk'; // Legacy inline dark image.
+  alice.holm.app.member.ds.update('sheet_records', { id: original.id }, { $set: { thumbnail: original.thumbnail } });
+  const before = (await call(handleSheets, alice, 'GET', undefined, `/api/users?sheet=${original.id}`)).body.data;
+  const data = { sheetId: original.id, version: original.version, thumbnail: 'data:image/png;base64,YWJj' };
+  assert.equal((await put(handleSheets, anon, 'updateSheetPreview', data)).status, 401);
+  assert.equal((await put(handleSheets, bob, 'updateSheetPreview', data)).status, 404);
+  assert.equal((await put(handleSheets, alice, 'updateSheetPreview', data, 'https://evil.test')).status, 403);
+  assert.equal((await put(handleSheets, alice, 'updateSheetPreview', { ...data, thumbnail: 'data:text/html;base64,YWJj' })).status, 400);
+  assert.equal((await put(handleSheets, alice, 'updateSheetPreview', { ...data, thumbnail: 'data:image/png;base64,' + 'a'.repeat(600000) })).status, 400);
+  const upgraded = (await put(handleSheets, alice, 'updateSheetPreview', data)).body.data.sheets[0];
+  assert.equal(upgraded.thumbnailStyle, 'univer-light-v1');
+  assert.equal(upgraded.thumbnailRevision, 1);
+  assert.equal(upgraded.thumbnail, null, 'old inline image cannot mask the upgraded snapshot');
+  assert.equal(upgraded.thumbnailContentVersion, original.version);
+  const { thumbnail, thumbRef, thumbnailStyle, thumbnailRevision, thumbnailContentVersion, ...savedMetadata } = upgraded;
+  const { thumbnail: oldImage, ...originalMetadata } = original;
+  assert.deepEqual(savedMetadata, originalMetadata);
+  assert.deepEqual((await call(handleSheets, alice, 'GET', undefined, `/api/users?sheet=${original.id}`)).body.data, before);
+  const url = `https://workdeck.test/api/users?thumbnail=${original.id}`;
+  const image = await handleSheets(new Request(url), alice);
+  assert.equal(image.headers.get('content-type'), 'image/png');
+  assert.equal(await image.text(), 'abc');
+  const etag = image.headers.get('etag');
+  // Same-sized replacement invalidates the cache even with an unchanged body version.
+  await put(handleSheets, alice, 'updateSheetPreview', { ...data, thumbnail: 'data:image/png;base64,ZGVm' });
+  const fresh = await handleSheets(new Request(url, { headers: { 'If-None-Match': etag } }), alice);
+  assert.equal(fresh.status, 200); assert.equal(await fresh.text(), 'def');
+  await put(handleSheets, alice, 'updateSheet', { sheetId: original.id, version: original.version, sheetData: { name: 'New content revision' } });
+  assert.equal((await put(handleSheets, alice, 'updateSheetPreview', data)).status, 409);
+  assert.equal(await (await handleSheets(new Request(url), alice)).text(), 'def');
+});
+
 test('Sheets public read-only share snapshots refresh and revoke on deletion', async () => {
   const { member, anon, call, put } = fixture();
   const alice = member('alice'), bob = member('bob');
@@ -177,8 +244,9 @@ test('Holm Sheets ships same Univer UI, new member auth and reload-safe links', 
     }
     assert.equal(readFileSync(join(dir, 'web/sheets/styles.css'), 'utf8'),
       readFileSync(new URL('../sheets/styles.css', import.meta.url), 'utf8'));
-    assert.equal(readFileSync(join(dir, 'web/sheets/home.css'), 'utf8'),
-      readFileSync(new URL('../sheets/home.css', import.meta.url), 'utf8'));
+    assert.ok(readFileSync(join(dir, 'web/sheets/home.css'), 'utf8').startsWith(
+      readFileSync(new URL('../sheets/home.css', import.meta.url), 'utf8')));
+    assert.match(readFileSync(join(dir, 'web/sheets/home.css'), 'utf8'), /home-view-indicator \{ display: none !important/);
     const manifest = JSON.parse(readFileSync(join(dir, 'web/sheets/manifest.json'), 'utf8'));
     assert.equal(manifest.theme_color, '#22c55e');
     assert.deepEqual(manifest.icons.map(icon => icon.src),
@@ -192,7 +260,7 @@ test('Holm Sheets ships same Univer UI, new member auth and reload-safe links', 
       assert.deepEqual(readFileSync(join(dir, 'web/sheets/icons', filename)),
         readFileSync(new URL('../sheets/icons/' + filename, import.meta.url)));
     }
-    assert.match(readFileSync(join(dir, 'web/sheets/service-worker.js'), 'utf8'), /sheets-static-holm-v3/);
+    assert.match(readFileSync(join(dir, 'web/sheets/service-worker.js'), 'utf8'), /sheets-static-holm-v4/);
     const editor = readFileSync(join(dir, 'web/sheets/editor.html'), 'utf8');
     assert.match(editor, /src="\/sheets\/js\/vendor-xlsx\.js"/);
     const storage = readFileSync(join(dir, 'web/sheets/js/storage.js'), 'utf8');

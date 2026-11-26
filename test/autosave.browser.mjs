@@ -1,5 +1,6 @@
 // Real built editors with synthetic API records. Never uses a production account.
 import assert from 'node:assert/strict';
+import { checkSheetsEditorHeader } from './sheets-editor-header.browser.mjs';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -16,7 +17,9 @@ const server = createServer(async (req, res) => {
   } catch { res.statusCode = 404; res.end('Missing'); }
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-const origin = `http://127.0.0.1:${server.address().port}`;
+// Optional live-asset check still intercepts EVERY API request below with
+// synthetic records; it never signs in or reads/writes a production account.
+const origin = process.env.AUTOSAVE_ORIGIN || `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ headless: true, ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}) });
 try {
   for (const app of (process.env.AUTOSAVE_APPS || 'draw,slides,forms,sheets,todo,calendar,blog').split(',')) {
@@ -24,6 +27,7 @@ try {
     const base = { id: 'record00000000001', name: 'Autosave test', title: 'Autosave test', version: 1, updatedAt: new Date().toISOString() };
     const workbook = { id: base.id, name: base.name, appVersion: '0.10.0', locale: 'enUS', sheetOrder: ['sheet1'], sheets: { sheet1: { id: 'sheet1', name: 'Sheet1', rowCount: 100, columnCount: 20, cellData: {} } }, styles: {} };
     const data = { settings: { theme: 'dark' }, tags: [],
+      docs: [{ id: 'record00000000002', title: 'Linked reference', name: 'Linked reference', content: 'Reference document', updatedAt: base.updatedAt }],
       draws: [{ ...base, objects: [], background: '#ffffff' }],
       slides: [{ ...base, slides: [{ id: 'slide1', background: '#ffffff', objects: [] }] }],
       forms: [{ ...base, components: [{ id: 'Field_1', key: 'name', type: 'textfield', label: 'Name' }, { id: 'submit', type: 'button', action: 'submit', label: 'Submit' }] }],
@@ -33,7 +37,7 @@ try {
       calendars: [{ id: 'cal1', name: 'Personal', color: '#3b82f6' }],
       events: [{ ...base, calId: 'cal1', start: '2026-07-10T10:00:00.000Z', end: '2026-07-10T11:00:00.000Z', allDay: false, reminders: [], links: [], exdates: [] }]
     };
-    const writes = []; let failNext = false;
+    const writes = [], previewWrites = []; let failNext = false;
     await context.route('**/api/**', async route => {
       const url = new URL(route.request().url()), body = route.request().postDataJSON();
       if (url.pathname === '/api/me') return route.fulfill({ json: { member: { id: 'synthetic', name: 'Test User', theme: 'dark' } } });
@@ -41,6 +45,12 @@ try {
       if (url.pathname.startsWith('/api/todo/lists/') && body) {
         writes.push(structuredClone(body)); data.todo[0] = { ...data.todo[0], ...body, version: data.todo[0].version + 1 };
         return route.fulfill({ json: { list: data.todo[0] } });
+      }
+      if (body?.action === 'updateSheetPreview') {
+        assert.equal(body.data.version, data.sheets[0].version);
+        previewWrites.push(structuredClone(body));
+        Object.assign(data.sheets[0], { thumbnail: body.data.thumbnail, thumbnailStyle: 'univer-light-v1',
+          thumbnailRevision: (data.sheets[0].thumbnailRevision || 0) + 1, thumbnailContentVersion: body.data.version });
       }
       if (body?.action && ['updateDrawing', 'updateDeck', 'updateForm', 'updateSheet', 'updateEvent', 'createEvent', 'updatePost'].includes(body.action)) {
         writes.push(structuredClone(body));
@@ -52,16 +62,29 @@ try {
           const [key, field] = mapping[body.action];
           const index = key === 'events' ? data.events.findIndex(event => event.id === body.data.eventId) : 0;
           data[key][index] = { ...data[key][index], ...body.data[field], version: data[key][index].version + 1 };
+          if (key === 'sheets' && body.data[field].thumbnail) {
+            data.sheets[0].thumbnailRevision = (data.sheets[0].thumbnailRevision || 0) + 1;
+            data.sheets[0].thumbnailContentVersion = data.sheets[0].version;
+          }
         }
       }
+      if (url.searchParams.has('thumbnail')) {
+        const image = data.sheets[0].thumbnail;
+        assert.ok(image, 'saved checkpoint exists before card loads');
+        return route.fulfill({ contentType: image.split(';')[0].slice(5), body: Buffer.from(image.split(',')[1], 'base64') });
+      }
       if (url.searchParams.has('sheet')) return route.fulfill({ json: { success: true, data: data.sheets[0].data } });
-      return route.fulfill({ json: { success: true, data, responses: [] } });
+      const listed = structuredClone(data);
+      if (listed.sheets[0].thumbnail) { listed.sheets[0].thumbRef = 1; delete listed.sheets[0].thumbnail; }
+      return route.fulfill({ json: { success: true, data: listed, responses: [] } });
     });
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('dialog', dialog => dialog.dismiss());
     try {
       const url = `${origin}/${app}/${['todo', 'calendar', 'blog'].includes(app) ? '' : 'editor.html'}?${app === 'todo' ? 'list' : app === 'blog' ? 'post' : 'id'}=${base.id}`;
+      const initialPreview = app === 'sheets' ? page.waitForResponse(response => response.request().method() === 'PUT' &&
+        response.request().postDataJSON()?.action === 'updateSheetPreview') : null;
       await page.goto(url);
       assert.equal(await page.locator('#saveBtn').count(), 0);
       if (app === 'draw' || app === 'slides') {
@@ -95,14 +118,93 @@ try {
         await page.reload(); await page.locator('#formTitle').filter({ hasText: 'Automatically saved form' }).waitFor();
       } else if (app === 'sheets') {
         await page.waitForFunction(() => window.sheetsApp?.isInitialized);
+        await initialPreview;
+        assert.equal(previewWrites.length, 1, 'old preview upgrades on open, without an edit');
+        assert.equal(writes.length, 0, 'preview migration does not save workbook contents');
+        assert.equal(data.sheets[0].version, 1);
+        assert.equal(data.sheets[0].updatedAt, base.updatedAt);
+        await checkSheetsEditorHeader(page, () => data.sheets[0]);
         failNext = true;
-        await page.evaluate(() => spreadsheetManager.getCurrentSheetData().getRange('A1').setValue('Autosaved cell'));
+        await page.evaluate(() => {
+          const sheet = spreadsheetManager.getCurrentSheetData();
+          sheet.getRange('A1').setValue('Autosaved cell');
+          sheet.getRange('B2:D4').setBackgroundColor('#22cc66');
+        });
         await page.locator('[data-save-status=error]').waitFor();
         await page.evaluate(() => dispatchEvent(new Event('online')));
         await page.locator('[data-save-status=saved]').waitFor();
         assert.equal(data.sheets[0].data.sheets.sheet1.cellData[0][0].v, 'Autosaved cell');
         await page.goto(url); await page.waitForFunction(() => window.sheetsApp?.isInitialized);
         assert.equal(await page.evaluate(() => spreadsheetManager.getCurrentSheetData().getRange('A1').getValue()), 'Autosaved cell');
+        assert.match(data.sheets[0].thumbnail, /^data:image\/(png|jpeg);base64,/);
+        const checkpoint = data.sheets[0].thumbnail, writeCount = writes.length;
+        const imageStats = await page.evaluate(async src => {
+          const image = new Image(); image.src = src; await image.decode();
+          const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+          const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+          const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          let green = 0, white = 0;
+          for (let i = 0; i < pixels.length; i += 4) {
+            if (pixels[i] < 65 && pixels[i + 1] > 175 && pixels[i + 2] > 70 && pixels[i + 2] < 140) green++;
+            if (pixels[i] > 245 && pixels[i + 1] > 245 && pixels[i + 2] > 245) white++;
+          }
+          return { width: image.width, height: image.height, green, whiteRatio: white / (image.width * image.height) };
+        }, checkpoint);
+        assert.ok(imageStats.width >= 320 && imageStats.height > 100 && imageStats.green > 100, 'snapshot contains authored formatting from the real grid: ' + JSON.stringify(imageStats));
+        assert.equal(imageStats.width, 640, 'pre-migration snapshot dimensions retained');
+        assert.ok(imageStats.whiteRatio > .7, 'saved sheet is light even while editing in dark mode: ' + JSON.stringify(imageStats));
+        assert.deepEqual(await page.evaluate(() => ({ page: document.documentElement.dataset.theme,
+          engine: spreadsheetManager.univerAPI._injector.get(UniverCore.ThemeService).darkMode,
+          tracked: spreadsheetManager.darkModeOn, darkClass: document.documentElement.classList.contains('univer-dark') })),
+          { page: 'dark', engine: true, tracked: true, darkClass: true }, 'capture preserves the actual editor theme');
+        const equivalence = await page.evaluate(() => {
+          const manager = spreadsheetManager, api = manager.univerAPI;
+          const beforeBody = JSON.stringify(manager.getData());
+          const beforePixels = manager.captureCanvasThumbnail();
+          const fromDark = manager.captureThumbnail();
+          const restoredPixels = manager.captureCanvasThumbnail();
+          api.toggleDarkMode(false);
+          const fromLight = manager.captureThumbnail();
+          const realLightCanvas = manager.captureCanvasThumbnail();
+          api.toggleDarkMode(true);
+          manager.captureThumbnail(); // Synchronous repaint/restore for comparison.
+          WDSheetSnapshots.capture(manager, () => { throw new Error('Synthetic failed screenshot'); });
+          return { sameInBothThemes: fromDark === fromLight, copiesActualLightCanvas: fromLight === realLightCanvas,
+            darkPixelsRestored: beforePixels === restoredPixels,
+            failedCaptureRestored: manager.captureCanvasThumbnail() === beforePixels,
+            noContentChange: beforeBody === JSON.stringify(manager.getData()) };
+        });
+        assert.deepEqual(equivalence, { sameInBothThemes: true, copiesActualLightCanvas: true,
+          darkPixelsRestored: true, failedCaptureRestored: true, noContentChange: true });
+        await page.evaluate(() => {
+          spreadsheetManager.getCurrentSheetData().getRange('C7').activate();
+          window.dispatchEvent(new Event('resize'));
+          window.dispatchEvent(new Event('pagehide'));
+        });
+        await page.waitForTimeout(1300);
+        assert.equal(writes.length, writeCount, 'view-only changes do not save a checkpoint');
+        assert.equal(previewWrites.length, 1, 'light previews are not regenerated on reload or view changes');
+        assert.equal(data.sheets[0].thumbnail, checkpoint);
+        // A failed save must leave the prior image visible, not publish the
+        // unsaved canvas. Retry later replaces body and image together.
+        failNext = true;
+        await page.evaluate(() => spreadsheetManager.getCurrentSheetData().getRange('A1').setValue('New checkpoint'));
+        await page.locator('[data-save-status=error]').waitFor();
+        assert.equal(data.sheets[0].thumbnail, checkpoint);
+        await page.evaluate(() => dispatchEvent(new Event('online')));
+        await page.locator('[data-save-status=saved]').waitFor();
+        assert.notEqual(data.sheets[0].thumbnail, checkpoint);
+        const latest = data.sheets[0].thumbnail;
+        console.log('Sheets saved snapshot:', imageStats, checkpoint.length, 'bytes');
+        await page.goto(origin + '/sheets/');
+        const preview = page.locator('.wd-home-card-face .wd-file-preview img').first();
+        await preview.waitFor();
+        await page.waitForFunction(() => document.querySelector('.wd-home-card-face .wd-file-preview img')?.naturalWidth > 0);
+        assert.ok((await preview.getAttribute('src')).includes('/api/users?thumbnail='), 'direct checkpoint image');
+        assert.equal(await page.locator('.wd-file-preview canvas, .home-view-indicator').count(), 0);
+        assert.equal(await page.evaluate(() => typeof window.UniverPresets), 'undefined', 'home never boots the spreadsheet engine');
+        assert.equal(data.sheets[0].thumbnail, latest);
+        await page.screenshot({ path: '/tmp/workdeck-sheets-saved-preview.png' });
       } else if (app === 'todo') {
         await page.waitForFunction(() => typeof currentList !== 'undefined' && currentList?.items?.length);
         await page.evaluate(() => openEditModal('task1'));

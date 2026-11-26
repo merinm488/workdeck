@@ -140,6 +140,8 @@ html[data-wd-app] .wd-home-card-actions button.danger:hover { background:var(--w
    its navigation intact, but remove the independently centered search column. */
 html[data-wd-app="calendar"] .top-nav-left { flex:0 0 auto; }
 html[data-wd-app="calendar"] .top-nav-center { flex:1; max-width:520px; justify-content:flex-start; margin-right:auto; }
+.wd-sheet-preview-empty { display:flex; align-items:center; justify-content:center; height:100%; padding:24px; text-align:center; font:12px/1.5 Inter, sans-serif; color:#6b7280; background:#fff; }
+
 /* Files already has the same preview hierarchy; only normalize its metrics. */
 /* Breadcrumb and results share a centered column, with either sidebar state. */
 html[data-wd-app="files"] .fb-main { --fb-home-gutter:var(--wd-home-gutter); }

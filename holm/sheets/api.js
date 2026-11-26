@@ -13,6 +13,8 @@ const MAX_SHEETS = 200;
 const ID = /^[a-zA-Z0-9_-]{8,128}$/;
 const TOKEN = /^[0-9a-f]{64}$/;
 const validId = value => typeof value === 'string' && ID.test(value);
+const validThumbnail = value => typeof value === 'string' && value.length <= 600_000 &&
+  /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(value);
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 const fail = (error, status) => json({ success: false, error }, status);
 const now = () => new Date().toISOString();
@@ -63,6 +65,34 @@ function checkWorkbook(value) {
 function viewThumb(ds, record) {
   return record?.thumbnail || getRow(ds, THUMBS, record.id)?.image || null;
 }
+function storeThumb(tx, sheetId, image) {
+  const old = getRow(tx, THUMBS, sheetId);
+  if (old) tx.update(THUMBS, { id: old.id }, { $set: { image } });
+  else tx.insert(THUMBS, { sheetId, image });
+}
+function thumbnailResponse(request, ds, record) {
+  const image = viewThumb(ds, record);
+  const match = /^data:(image\/(?:png|jpeg));base64,([A-Za-z0-9+/]+={0,2})$/.exec(image || '');
+  if (!match || match[2].length % 4) return fail('Snapshot not found', 404);
+  // Authenticate/authorize before allowing a cached image to be reused. The
+  // private cache must revalidate even after logout or an account switch.
+  const etag = `"sheet-${record.id}-${record.version}-${record.thumbnailRevision || 0}-${image.length}"`;
+  const headers = { 'Content-Type': match[1], 'Cache-Control': 'private, no-cache',
+    'Vary': 'Cookie, Authorization', 'ETag': etag, 'X-Content-Type-Options': 'nosniff' };
+  if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers });
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const base64 = match[2], padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+  const bytes = new Uint8Array(base64.length / 4 * 3 - padding);
+  let pos = 0;
+  for (let i = 0; i < base64.length; i += 4) {
+    const bits = alphabet.indexOf(base64[i]) << 18 | alphabet.indexOf(base64[i + 1]) << 12 |
+      Math.max(0, alphabet.indexOf(base64[i + 2])) << 6 | Math.max(0, alphabet.indexOf(base64[i + 3]));
+    if (pos < bytes.length) bytes[pos++] = bits >>> 16 & 255;
+    if (pos < bytes.length) bytes[pos++] = bits >>> 8 & 255;
+    if (pos < bytes.length) bytes[pos++] = bits & 255;
+  }
+  return new Response(bytes, { headers });
+}
 export async function handleSheets(request, env) {
   const url = new URL(request.url);
   if (url.pathname !== '/api/users') return fail('Not found.', 404);
@@ -77,6 +107,11 @@ export async function handleSheets(request, env) {
   const { ds, kv } = env.holm.app.member;
   if (request.method === 'GET') {
     const sheetId = url.searchParams.get('sheet');
+    const thumbnailId = url.searchParams.get('thumbnail');
+    if (thumbnailId !== null) {
+      const record = validId(thumbnailId) && ds.findOne(SHEETS, thumbnailId);
+      return record ? thumbnailResponse(request, ds, record) : fail('Sheet not found', 404);
+    }
     const thumbs = url.searchParams.get('thumbs');
     if (sheetId) {
       const record = validId(sheetId) && ds.findOne(SHEETS, sheetId);
@@ -126,6 +161,23 @@ export async function handleSheets(request, env) {
   const owned = ds.findOne(SHEETS, data.sheetId);
   if (!owned) return fail('Sheet not found', 404);
   if (owned.version !== data.version) return fail('Sheet changed in another tab. Reload before saving.', 409);
+  if (action === 'updateSheetPreview') {
+    if (!validThumbnail(data.thumbnail)) return fail('Invalid snapshot.', 400);
+    const saved = ds.transaction(tx => {
+      const current = tx.findOne(SHEETS, data.sheetId);
+      if (!current || current.version !== data.version) return false;
+      storeThumb(tx, data.sheetId, data.thumbnail);
+      tx.update(SHEETS, { id: data.sheetId }, { $set: {
+        thumbRef: 1, thumbnailStyle: 'univer-light-v1', thumbnailRevision: (current.thumbnailRevision || 0) + 1,
+        thumbnailContentVersion: current.version,
+        ...(current.thumbnail ? { thumbnail: null } : {}),
+      } });
+      return true;
+    });
+    // Only the private preview changed. Keep body, modified date, content
+    // version and public shared copies exactly as their last saved checkpoint.
+    return saved ? json({ success: true, data: sheetView(ds, kv) }) : fail('Sheet changed in another tab.', 409);
+  }
   if (action === 'shareSheet') {
     const workbook = getRow(ds, BODIES, data.sheetId)?.data;
     if (!workbook) return fail('Workbook not found.', 404);
@@ -182,8 +234,8 @@ export async function handleSheets(request, env) {
   if (payload.name !== undefined && (typeof payload.name !== 'string' || !payload.name.trim() || payload.name.trim().length > 200) ||
       payload.formatVersion !== undefined && payload.formatVersion !== 2 ||
       payload.data !== undefined && !checkWorkbook(payload.data) ||
-      payload.thumbnail !== undefined && (typeof payload.thumbnail !== 'string' ||
-        !/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(payload.thumbnail) || payload.thumbnail.length > 600_000))
+      payload.thumbnail !== undefined && !validThumbnail(payload.thumbnail) ||
+      payload.thumbnailStyle !== undefined && (payload.thumbnailStyle !== 'univer-light-v1' || !payload.thumbnail))
     return fail('Invalid sheet data.', 400);
   const updated = ds.transaction(tx => {
     const current = tx.findOne(SHEETS, data.sheetId);
@@ -197,10 +249,12 @@ export async function handleSheets(request, env) {
       else tx.insert(BODIES, { sheetId: data.sheetId, data: payload.data });
     }
     if (payload.thumbnail) {
-      const old = getRow(tx, THUMBS, data.sheetId);
-      if (old) tx.update(THUMBS, { id: old.id }, { $set: { image: payload.thumbnail } });
-      else tx.insert(THUMBS, { sheetId: data.sheetId, image: payload.thumbnail });
+      storeThumb(tx, data.sheetId, payload.thumbnail);
       next.thumbRef = 1;
+      if (current.thumbnail) next.thumbnail = null; // Retire any legacy inline image.
+      next.thumbnailStyle = payload.thumbnailStyle || null;
+      next.thumbnailRevision = (current.thumbnailRevision || 0) + 1;
+      next.thumbnailContentVersion = next.version;
     }
     tx.update(SHEETS, { id: data.sheetId }, { $set: next });
     return { ...current, ...next };

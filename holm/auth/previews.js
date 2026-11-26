@@ -3,7 +3,7 @@
  *
  * Live mini-renders of file content for grid cards:
  *   docs   -> markdown/plain text laid out on a virtual page, scaled to fit
- *   sheets -> editor canvas snapshot stored at save (mini-grid sketch fallback)
+ *   sheets -> last saved editor snapshot, loaded directly as an image
  *   forms  -> simplified component rows
  *   slides -> first slide rendered offscreen by fabric@6 in a sandboxed iframe
  *   draw   -> content-fit render by fabric@7 in a sandboxed iframe
@@ -19,8 +19,6 @@
     'use strict';
 
     const VIRTUAL_WIDTH = { docs: 720, forms: 420, todo: 420, kanban: 640, blog: 720 };
-    const MAX_SHEET_COLS = 9;
-    const MAX_SHEET_ROWS = 8;
     const MAX_KANBAN_COLS = 4;
     const MAX_KANBAN_CARDS = 4;
     const KANBAN_PRIORITY = { high: '#dc2626', medium: '#b45309', low: '#15803d' };
@@ -353,149 +351,31 @@
     }
 
     // ================================================
-    // Sheets preview (canvas mini-grid)
+    // Sheets preview (last successfully saved canvas snapshot)
     // ================================================
-
-    function extractSheetCells(raw) {
-        const wb = raw && raw.data;
-        const sheets = wb && wb.sheets;
-        if (!sheets) return null;
-        const firstId = (wb.sheetOrder && wb.sheetOrder[0]) || Object.keys(sheets)[0];
-        const sheet = firstId && sheets[firstId];
-        if (!sheet || !sheet.cellData) return null;
-
-        let minR = Infinity, minC = Infinity, maxR = -1, maxC = -1;
-        Object.keys(sheet.cellData).forEach(function (r) {
-            const ri = Number(r);
-            const row = sheet.cellData[r];
-            Object.keys(row).forEach(function (c) {
-                const cell = row[c];
-                if (!cell || cell.v === undefined || cell.v === '') return;
-                const ci = Number(c);
-                if (ri < minR) minR = ri;
-                if (ci < minC) minC = ci;
-                if (ri > maxR) maxR = ri;
-                if (ci > maxC) maxC = ci;
-            });
-        });
-        if (maxR < 0) return null;
-
-        return {
-            cells: sheet.cellData,
-            startRow: minR,
-            startCol: minC,
-            rows: Math.min(maxR - minR + 1, MAX_SHEET_ROWS),
-            cols: Math.min(maxC - minC + 1, MAX_SHEET_COLS)
-        };
-    }
-
-    function colLabel(index) {
-        let s = '';
-        let n = index;
-        while (n >= 0) {
-            s = String.fromCharCode(65 + (n % 26)) + s;
-            n = Math.floor(n / 26) - 1;
-        }
-        return s;
-    }
 
     function renderSheets(page, file) {
         const raw = file.raw || {};
-        const key = revisionKey(file);
-        page.dataset.fileKey = key;
-
-        // Snapshot stored by the editor at save time (own record since the
-        // thumbnail split); the sketch below only covers legacy files with
-        // neither thumb nor body.
-        const thumb = thumbOf(raw);
-        if (thumb && typeof thumb.then !== 'function') {
-            setImage(page, thumb);
-            return;
-        }
-        if (thumb) {
-            setThumbWhenReady(page, key, thumb);
-            return;
-        }
-
-        const info = extractSheetCells(raw);
-        if (!info) return;
-
-        const box = page.parentElement;
-        const boxW = (box && box.clientWidth) || 280;
-        const boxH = (box && box.clientHeight) || 175;
-        const k = pixelRatio();
-
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(boxW * k);
-        canvas.height = Math.round(boxH * k);
-        canvas.className = 'wd-preview-img';
-        page.innerHTML = '';
-        page.appendChild(canvas);
-
-        const ctx = canvas.getContext('2d');
-        ctx.scale(k, k);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, boxW, boxH);
-
-        const headerW = 24;
-        const headerH = 17;
-        const gridW = boxW - headerW;
-        const gridH = boxH - headerH;
-        const colW = gridW / info.cols;
-        const rowH = gridH / (info.rows + 1);
-
-        ctx.font = '9px Inter, system-ui, sans-serif';
-
-        // Header chrome: column letters + row numbers
-        ctx.fillStyle = '#f3f4f6';
-        ctx.fillRect(0, 0, boxW, headerH);
-        ctx.fillRect(0, 0, headerW, boxH);
-        ctx.fillStyle = '#6b7280';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        for (let c = 0; c < info.cols; c++) {
-            ctx.fillText(colLabel(info.startCol + c), headerW + colW * (c + 0.5), headerH / 2 + 0.5);
-        }
-        for (let r = 0; r < info.rows; r++) {
-            ctx.fillText(String(info.startRow + r + 1), headerW / 2, headerH + rowH * (r + 0.5) + 0.5);
-        }
-
-        // Cell values
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#374151';
-        for (let r = 0; r < info.rows; r++) {
-            const rowData = info.cells[String(info.startRow + r)] || {};
-            for (let c = 0; c < info.cols; c++) {
-                const cell = rowData[String(info.startCol + c)];
-                if (!cell || cell.v === undefined || cell.v === '') continue;
-                const maxW = colW - 8;
-                let label = String(cell.v);
-                while (label.length > 1 && ctx.measureText(label).width > maxW) {
-                    label = label.slice(0, -2) + '…';
-                }
-                ctx.fillText(label, headerW + colW * c + 4, headerH + rowH * (r + 0.5) + 0.5, maxW);
-            }
-        }
-
-        // Grid lines
-        ctx.strokeStyle = '#e1e4ea';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let c = 0; c <= info.cols; c++) {
-            const x = Math.round(headerW + colW * c) + 0.5;
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, boxH);
-        }
-        for (let r = 0; r <= info.rows; r++) {
-            const y = Math.round(headerH + rowH * r) + 0.5;
-            ctx.moveTo(0, y);
-            ctx.lineTo(boxW, y);
-        }
-        ctx.moveTo(headerW + 0.5, 0);
-        ctx.lineTo(headerW + 0.5, boxH);
-        ctx.moveTo(0, headerH + 0.5);
-        ctx.lineTo(boxW, headerH + 0.5);
-        ctx.stroke();
+        const placeholder = () => {
+            const note = document.createElement('div');
+            note.className = 'wd-sheet-preview-empty';
+            note.textContent = 'Preview available after the next saved edit';
+            page.replaceChildren(note);
+        };
+        // No workbook fetch, JS image decoding or offscreen spreadsheet boot.
+        // The browser displays the saved checkpoint directly and can revalidate
+        // its private image cache without downloading unchanged image bytes.
+        const src = raw.thumbnail || (raw.thumbRef ? '/api/users?' + new URLSearchParams({
+            thumbnail: file.id, revision: raw.version || file.updatedAt || '', preview: raw.thumbnailRevision || 0
+        }) : null);
+        if (!src) return placeholder();
+        const img = document.createElement('img');
+        img.className = 'wd-preview-img';
+        img.alt = '';
+        img.decoding = 'async';
+        img.addEventListener('error', placeholder, { once: true });
+        img.src = src;
+        page.replaceChildren(img);
     }
 
     // ================================================

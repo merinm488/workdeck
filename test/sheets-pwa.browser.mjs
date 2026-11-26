@@ -55,6 +55,35 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ headless: true, ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}) });
 try {
+  // The old cache-first home shell used to show the removed ribbon until a
+  // manual refresh. Upgrade it on the very first visit, without user action.
+  {
+    serveLegacyWorker = true;
+    const context = await browser.newContext({ serviceWorkers: 'allow' });
+    const page = await context.newPage();
+    try {
+      await page.goto(origin + '/sheets/worker-test.html');
+      await page.evaluate(async () => {
+        await navigator.serviceWorker.register('/sheets/service-worker.js', { scope: '/sheets/' });
+        await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller) await new Promise(resolve => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
+      });
+      const home = (await readFile(path.join(root, 'sheets/index.html'), 'utf8'))
+        .replace(' data-wd-sheets-home="4"', '')
+        .replace('<body>', '<body data-legacy-shell="true"><div class="home-view-indicator"><h2 id="viewTitle">Your Sheets</h2></div>');
+      await page.evaluate(async html => {
+        await (await caches.open('sheets-static-holm-v2')).put('/sheets/', new Response(html, { headers: { 'Content-Type': 'text/html' } }));
+      }, home);
+      serveLegacyWorker = false;
+      const response = await page.goto(origin + '/sheets/', { waitUntil: 'commit' });
+      assert.equal(response.fromServiceWorker(), true);
+      assert.match(await response.text(), /Your Sheets/);
+      await page.waitForFunction(() => document.documentElement.dataset.wdSheetsHome === '4' && !location.search);
+      await page.locator('.wd-app-side-toggle').waitFor();
+      assert.equal(await page.locator('.home-view-indicator, body[data-legacy-shell]').count(), 0);
+      console.log('PASS first-visit Sheets home recovers cached ribbon without manual refresh');
+    } finally { await context.close(); }
+  }
   // Each URL form previously entered v2's cache-first branch.
   for (const editorPath of [`/sheets/editor?id=${id}`, `/sheets/editor.html?id=${id}`, `/sheets/${id}`]) {
     serveLegacyWorker = true;
