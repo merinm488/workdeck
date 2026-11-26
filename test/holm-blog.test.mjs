@@ -156,7 +156,7 @@ test('Blog header back link returns from the editor to Blog without losing a pen
   const link = node(), state = { editingId: 'post-1' }, history = { replaceState(_data, _unused, url) { this.url = url; } };
   let closed = 0;
   const ui = runInNewContext(`${views}\n${back}\n({ showPostsView, showEditorView, handleHomeLinkClick })`, {
-    state, $, document: { querySelector: selector => selector === '.blog-home-link' ? link : node() },
+    state, $, window: {}, document: { querySelector: selector => selector === '.blog-home-link' ? link : node() },
     history, renderPosts() {}, refreshPublishMenu() {},
     BlogEditor: { close() { closed++; state.editingId = null; ui.showPostsView(); } },
   });

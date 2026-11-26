@@ -57,6 +57,7 @@ const BlogEditor = {
         $('postTitleInput').addEventListener('input', (e) => {
             if (!this.post) return;
             this.post.title = e.target.value;
+            window.WDPageTitle?.file(this.post.title);
             this.scheduleSave();
         });
 
@@ -119,6 +120,7 @@ const BlogEditor = {
         this.pendingSave = false;
 
         $('postTitleInput').value = post.title || '';
+        window.WDPageTitle?.file(post.title);
         WDAutosave.status('saved', $('saveIndicator'));
 
         this.suppressChange = true;

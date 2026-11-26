@@ -180,14 +180,21 @@ function App() {
     window.history.replaceState({}, '', '/docs/?doc=' + encodeURIComponent(pendingDocLink.id));
 
     if (pendingDocLink.edit) {
-      // Editor on first paint: DocDetailView only needs the id in edit mode
-      // (auto-save targets it); title/content start empty like a fresh doc.
+      // Keep the editor open while useDocs loads the new document.
+      // Hydrate this stub below before enabling edits and autosave.
       setEditLinkDoc({ id: pendingDocLink.id });
     }
     // View links are already opened synchronously by the useState
     // initializers above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Edit links need the loaded record too, including its content and tag.
+  // Leaving an ID-only stub here keeps DocDetailView in its loading state.
+  useEffect(() => {
+    if (!editLinkDoc || editLinkDoc.content !== undefined || !hasLoaded) return;
+    setEditLinkDoc(docs.find(doc => doc.id === editLinkDoc.id) || null);
+  }, [editLinkDoc, docs, hasLoaded]);
 
   // Fill in a stubbed deep-link doc once the docs fetch has resolved.
   // A doc that no longer exists (deleted / bad link) closes the view and
@@ -362,6 +369,12 @@ function App() {
     setEditLinkDoc(null);
     window.history.pushState({}, '', '/docs/');
   }, []);
+
+  useEffect(() => {
+    if (!sharedDoc) return;
+    window.WDPageTitle?.file(sharedDoc.title);
+    return () => window.WDPageTitle?.home();
+  }, [sharedDoc]);
 
   // ===== SHARED DOC VIEW - Works without login =====
   if (sharedDoc !== null) {

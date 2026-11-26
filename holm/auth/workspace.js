@@ -104,6 +104,7 @@ export async function handleWorkspace(request, env) {
   if (!body || typeof body !== 'object' || Array.isArray(body) ||
       !body.data || typeof body.data !== 'object' || Array.isArray(body.data)) return fail('Invalid data.', 400);
   const { action, data } = body;
+  let createdFileId = null;
   // Explicitly reject the old protocol even when an attacker has a valid Holm
   // session. No client-selected account, access key, or hash is used here.
   if ('hash' in body || 'key' in body || 'memberId' in body) return fail('Legacy credentials are not accepted.', 400);
@@ -348,50 +349,46 @@ export async function handleWorkspace(request, env) {
     const recentId = calendarApp ? 'calendar' : data.fileId;
     saveSettings(kv, { lastOpened: { ...current.lastOpened, [recentId]: new Date().toISOString() } });
   } else if (action === 'createPost') {
-    const created = ds.transaction(tx => {
+    createdFileId = ds.transaction(tx => {
       if (tx.count(POSTS, {}) >= 200) return false;
       const post = createPostRecord(null, { title: 'Untitled',
         tagId: data.tagId && tx.findOne(TAGS, data.tagId) ? data.tagId : null,
         posts: tx.find(POSTS, {}, { limit: 200 }) });
       const { id: ignored, ...fields } = post;
-      tx.insert(POSTS, { ...fields, version: 1 });
-      return true;
+      return tx.insert(POSTS, { ...fields, version: 1 });
     });
-    if (!created) return fail('Post limit reached.', 409);
+    if (!createdFileId) return fail('Post limit reached.', 409);
   } else if (action === 'createDrawing') {
-    const created = ds.transaction(tx => {
+    createdFileId = ds.transaction(tx => {
       if (tx.count(DRAWS, {}) >= 200) return false;
       const time = new Date().toISOString();
-      tx.insert(DRAWS, { name: 'Untitled Drawing', formatVersion: 1, background: '#ffffff',
+      return tx.insert(DRAWS, { name: 'Untitled Drawing', formatVersion: 1, background: '#ffffff',
         objects: [], viewport: { zoom: 1, panX: 0, panY: 0 }, version: 1,
         tagId: data.tagId && tx.findOne(TAGS, data.tagId) ? data.tagId : null,
         createdAt: time, updatedAt: time });
-      return true;
     });
-    if (!created) return fail('Drawing limit reached.', 409);
+    if (!createdFileId) return fail('Drawing limit reached.', 409);
   } else if (action === 'createDeck') {
-    const created = ds.transaction(tx => {
+    createdFileId = ds.transaction(tx => {
       if (tx.count(SLIDES, {}) >= 200) return false;
       const time = new Date().toISOString();
-      tx.insert(SLIDES, { name: 'Untitled', formatVersion: 1, width: 960, height: 540,
+      return tx.insert(SLIDES, { name: 'Untitled', formatVersion: 1, width: 960, height: 540,
         slides: [{ id: 's1', name: 'Slide 1', background: '#ffffff', objects: [] }],
         version: 1, tagId: data.tagId && tx.findOne(TAGS, data.tagId) ? data.tagId : null,
         createdAt: time, updatedAt: time });
-      return true;
     });
-    if (!created) return fail('Deck limit reached.', 409);
+    if (!createdFileId) return fail('Deck limit reached.', 409);
   } else if (action === 'createForm') {
-    const created = ds.transaction(tx => {
+    createdFileId = ds.transaction(tx => {
       if (tx.count(FORMS, {}) >= 200) return false;
       const time = new Date().toISOString();
-      tx.insert(FORMS, { name: 'Untitled Form', display: 'form', components: [], sharedId: null,
+      return tx.insert(FORMS, { name: 'Untitled Form', display: 'form', components: [], sharedId: null,
         version: 1, tagId: data.tagId && tx.findOne(TAGS, data.tagId) ? data.tagId : null,
         createdAt: time, updatedAt: time });
-      return true;
     });
-    if (!created) return fail('Form limit reached.', 409);
+    if (!createdFileId) return fail('Form limit reached.', 409);
   } else if (action === 'createSheet') {
-    const created = ds.transaction(tx => {
+    createdFileId = ds.transaction(tx => {
       if (tx.count(SHEETS, {}) >= 200) return false;
       const stamp = new Date().toISOString();
       const id = tx.insert(SHEETS, { name: 'Untitled Sheet', formatVersion: 2, version: 1,
@@ -405,50 +402,46 @@ export async function handleWorkspace(request, env) {
           rowCount: 84, columnCount: 60, zoomRatio: 1, scrollTop: 0, scrollLeft: 0,
           defaultColumnWidth: 73, defaultRowHeight: 19, mergeData: [], cellData: {}, rowData: {}, columnData: {},
         } } } });
-      return true;
+      return id;
     });
-    if (!created) return fail('Sheet limit reached.', 409);
+    if (!createdFileId) return fail('Sheet limit reached.', 409);
   } else if (action === 'createDoc') {
-    const created = ds.transaction(tx => {
+    createdFileId = ds.transaction(tx => {
       if (tx.count(DOCS, {}) >= 500) return false;
       const stamp = new Date().toISOString();
-      tx.insert(DOCS, { title: 'Untitled', content: '', contentType: 'plain-text',
+      return tx.insert(DOCS, { title: 'Untitled', content: '', contentType: 'plain-text',
         pinned: false, archived: false, version: 1,
         tagId: data.tagId && tx.findOne(TAGS, data.tagId) ? data.tagId : null,
         createdAt: stamp, updatedAt: stamp });
-      return true;
     });
-    if (!created) return fail('Document limit reached.', 409);
+    if (!createdFileId) return fail('Document limit reached.', 409);
   } else if (action === 'createTodo') {
-    const created = ds.transaction(tx => {
+    createdFileId = ds.transaction(tx => {
       if (tx.count(TODO, {}) >= LIMIT_LISTS) return false;
-      tx.insert(TODO, { name: 'Untitled List', items: [], tagId: data.tagId && tx.findOne(TAGS, data.tagId) ? data.tagId : null,
+      return tx.insert(TODO, { name: 'Untitled List', items: [], tagId: data.tagId && tx.findOne(TAGS, data.tagId) ? data.tagId : null,
         version: 1, updatedAt: new Date().toISOString() });
-      return true;
     });
-    if (!created) return fail('List limit reached.', 409);
+    if (!createdFileId) return fail('List limit reached.', 409);
   } else if (action === 'createKanban') {
-    const created = ds.transaction(tx => {
+    createdFileId = ds.transaction(tx => {
       if (tx.count(KANBAN, {}) >= 200) return false;
       const stamp = new Date().toISOString();
-      tx.insert(KANBAN, { name: 'Untitled Board',
+      return tx.insert(KANBAN, { name: 'Untitled Board',
         columns: [{ id: `col_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`, label: 'Untitled List' }],
         rows: [], cards: [], links: [], version: 1,
         tagId: data.tagId && tx.findOne(TAGS, data.tagId) ? data.tagId : null,
         createdAt: stamp, updatedAt: stamp });
-      return true;
     });
-    if (!created) return fail('Board limit reached.', 409);
+    if (!createdFileId) return fail('Board limit reached.', 409);
   } else if (action === 'createMinutes') {
-    const created = ds.transaction(tx => {
+    createdFileId = ds.transaction(tx => {
       if (tx.count(MINUTES, {}) >= 200) return false;
       const stamp = new Date().toISOString();
-      tx.insert(MINUTES, { title: 'Untitled meeting', date: stamp.slice(0, 10), state: 'draft',
+      return tx.insert(MINUTES, { title: 'Untitled meeting', date: stamp.slice(0, 10), state: 'draft',
         revision: 0, agenda: [], tagId: data.tagId && tx.findOne(TAGS, data.tagId) ? data.tagId : null,
         createdAt: stamp, updatedAt: stamp });
-      return true;
     });
-    if (!created) return fail('Meeting limit reached.', 409);
+    if (!createdFileId) return fail('Meeting limit reached.', 409);
   } else if (action === 'renameFile' && data.app === 'filebox') {
     if (!validId(data.fileId) || !fileName(data.name)) return fail('Invalid file.', 400);
     const result = ds.transaction(tx => {
@@ -619,5 +612,6 @@ export async function handleWorkspace(request, env) {
   } else {
     return fail('App not migrated yet.', 404);
   }
-  return json({ success: true, data: workspace(ds, kv) });
+  return json({ success: true, data: workspace(ds, kv),
+    ...(createdFileId ? { createdFile: { id: createdFileId } } : {}) });
 }

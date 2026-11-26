@@ -90,6 +90,7 @@ class BoardController {
         });
 
         document.getElementById('pageTitle').textContent = this.board.name;
+        window.WDPageTitle?.file(this.board.name || 'Untitled Board');
         document.getElementById('boardView').style.setProperty('--board-accent', kbBoardColor(this.board));
         this.bumpLastOpened();
 

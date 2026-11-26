@@ -67,6 +67,7 @@ class FileboxViewer {
     // ================================================
 
     open(file) {
+        window.WDPageTitle?.file(file.name);
         recordOpenNow(file.id);
         $('fbViewerTitle').textContent = file.name;
         $('fbViewerMeta').textContent = formatBytes(file.size) + ' · ' + formatRelativeDate(file.updatedAt);
@@ -117,6 +118,7 @@ class FileboxViewer {
     close() {
         this.teardown();
         closeModal('fbViewer');
+        window.WDPageTitle?.home();
 
         const loc = window.WDLinks ? WDLinks.parseLocation() : null;
         const params = new URLSearchParams(window.location.search);
@@ -240,6 +242,7 @@ class FileboxViewer {
                 });
             });
             pswp.on('destroy', function () {
+                window.WDPageTitle?.home();
                 const loc = window.WDLinks ? WDLinks.parseLocation() : null;
                 const params = new URLSearchParams(window.location.search);
                 if ((loc && loc.id) || params.get('id')) {

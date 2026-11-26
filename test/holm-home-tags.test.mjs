@@ -48,6 +48,23 @@ test('home tag write failures restore the record and report failure to the picke
   }
 });
 
+test('sidebar tag edits hide the saved confirmation but retain saving and error feedback', () => {
+  const saveState = { hidden: true, textContent: '', dataset: {}, setAttribute() {} };
+  const window = {};
+  runInNewContext(read('holm/auth/autosave.js'), { window, document: { addEventListener() {} } });
+  const callback = read('holm/auth/tag-ui.js').match(/onState: (state => \{[\s\S]*?\n        \})/)[1];
+  const onState = runInNewContext(callback, { saveState, WDAutosave: window.WDAutosave });
+  for (const state of ['saved', 'pending', 'saving', 'error', 'saved']) {
+    onState(state);
+    assert.equal(saveState.dataset.saveStatus, state);
+    assert.equal(saveState.hidden, state === 'saved');
+    if (state === 'saved') assert.equal(saveState.textContent, '');
+    else assert.match(saveState.textContent, state === 'error' ? /Not saved/ : /Saving/);
+  }
+  window.WDAutosave.status('saved', saveState);
+  assert.equal(saveState.textContent, 'All changes saved', 'document editor status remains unchanged');
+});
+
 test('all item tag modals use one component and the original home dropdown styles', () => {
   for (const path of ['holm/auth/dashboard.js', 'holm/auth/app-sidebar.js', 'holm/files/main.js', 'holm/docs-src/src/components/DocTags.jsx']) {
     assert.match(read(path), /WDTagUI\.editTags\(/, path);

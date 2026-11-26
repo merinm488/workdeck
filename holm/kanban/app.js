@@ -57,6 +57,7 @@ function requestedBoardId() {
 // ================================================
 
 function showBoardsView() {
+    window.WDPageTitle?.home();
     document.getElementById('boardsView').classList.remove('hidden');
     document.getElementById('boardView').classList.add('hidden');
     document.getElementById('pageTitle').textContent = 'My Boards';
@@ -317,6 +318,7 @@ function wireChrome() {
             if (ok) {
                 board.name = name;
                 document.getElementById('pageTitle').textContent = name;
+                window.WDPageTitle?.file(name);
                 showNotification('Board renamed');
             } else {
                 showNotification('Rename failed', 'error');

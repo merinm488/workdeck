@@ -950,7 +950,7 @@ class FormsEditorApp {
     updateFormTitle(name) {
         const el = document.getElementById('formTitle');
         if (el) el.textContent = name || 'Untitled Form';
-        document.title = (name || 'Untitled Form') + ' - Forms';
+        window.WDPageTitle?.file(name || 'Untitled Form');
     }
 
     /**

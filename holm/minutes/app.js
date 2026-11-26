@@ -134,7 +134,7 @@ function showHome(navigate = true) {
   app.meeting = null; app.observer?.disconnect(); document.body.classList.remove('minutes-editing'); closeOverviewDrawer();
   $('home').classList.remove('hidden'); $('editor').classList.add('hidden');
   $('saveError').classList.add('hidden'); $('retryBtn').classList.add('hidden');
-  document.title = 'Minutes · Workdeck';
+  window.WDPageTitle?.home();
   if (navigate) setRoute(null);
   renderHome(); publishHome();
 }
@@ -231,7 +231,7 @@ function updateHeading() {
   $('documentName').textContent = app.meeting.title || 'Untitled meeting';
   $('documentName').disabled = !editing();
   $('documentName').title = editing() ? 'Rename meeting' : app.meeting.title || 'Untitled meeting';
-  document.title = `${app.meeting.title || 'Untitled meeting'} · Minutes`;
+  window.WDPageTitle?.file(app.meeting.title || 'Untitled meeting');
   const date = app.meeting.date && new Date(app.meeting.date + 'T12:00:00');
   $('railDate').textContent = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'No date set';
 }

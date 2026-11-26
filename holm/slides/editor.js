@@ -79,6 +79,7 @@ async function init() {
     initCanvas();
 
     $('deckTitle').textContent = editorState.deck.name;
+    window.WDPageTitle?.file(editorState.deck.name);
 
     // skipSync: the canvas was JUST created and is empty 
     loadSlide(0, true);
@@ -2040,6 +2041,7 @@ function confirmRename() {
 
     editorState.deck.name = name;
     $('deckTitle').textContent = name;
+    window.WDPageTitle?.file(name);
 
     closeModal($('renameModal'));
     markDirty();
@@ -2114,6 +2116,7 @@ function closeRenamePrompt(renamed) {
             // apply the name, then continue the interrupted save
             editorState.deck.name = newName;
             $('deckTitle').textContent = newName;
+            window.WDPageTitle?.file(newName);
             markDirty();
         }
         saveDeck({ explicit: false });

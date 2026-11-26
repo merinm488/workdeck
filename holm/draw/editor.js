@@ -95,6 +95,7 @@ async function init() {
     }
     applyViewport(drawing.viewport || { zoom: 1, panX: 0, panY: 0 });
     $('drawingTitle').textContent = drawing.name || 'Untitled Drawing';
+    window.WDPageTitle?.file(drawing.name || 'Untitled Drawing');
 
     bindToolbar();
     bindTopNav();
@@ -1242,6 +1243,7 @@ function confirmRename() {
     const name = $('renameInput').value.trim() || 'Untitled Drawing';
 
     $('drawingTitle').textContent = name;
+    window.WDPageTitle?.file(name);
     closeModal($('renameModal'));
 
     markDirty();      // saveDrawing only runs when the doc is dirty
@@ -1371,6 +1373,7 @@ function closeRenamePrompt(renamed) {
     const newName = $('renamePromptInput').value.trim();
     if (renamed && newName) {
         $('drawingTitle').textContent = newName;
+        window.WDPageTitle?.file(newName);
         markDirty();
     }
 

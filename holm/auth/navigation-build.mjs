@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { withPageTitle } from './page-title-build.mjs';
 const boot = readFileSync(new URL('./page-boot.js', import.meta.url), 'utf8');
 
 // All ordered classic scripts download in parallel without blocking the shell.
@@ -6,6 +7,7 @@ const boot = readFileSync(new URL('./page-boot.js', import.meta.url), 'utf8');
 export function withPageBoot(page) {
   const app = /data-wd-app="([a-z]+)"/.exec(page)?.[1];
   if (!app) return page;
+  page = withPageTitle(page, app);
   page = page.replace(/<template\b[\s\S]*?<\/template>|<textarea\b[\s\S]*?<\/textarea>|<script\b[^>]*>[\s\S]*?<\/script>|<link\b[^>]*>/g, tag => {
     if (tag.startsWith('<link') && /fonts\.(?:googleapis|gstatic)\.com/.test(tag)) return '';
     if (app === 'docs' || !tag.startsWith('<script') || !/\bsrc=/.test(tag) || /\b(?:defer|async|type)=?|suite-theme\.js/.test(tag)) return tag;

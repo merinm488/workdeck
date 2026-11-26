@@ -101,6 +101,7 @@ class SheetsApp {
                 if (newId) {
                     this.spreadsheetId = newId;
                     this.updateURL(newId);
+                    this.updateSpreadsheetTitle(spreadsheetManager.getMetadata()?.name);
                     // Set up Luckysheet change hooks for auto-save
                     this.setupLuckysheetHooks();
                 } else {
@@ -1005,8 +1006,11 @@ class SheetsApp {
      * Display the spreadsheet name from cached data
      */
     updateSpreadsheetTitle(spreadsheetName = null) {
+        if (!this.spreadsheetId) return;
+        // The heading is temporarily replaced by an input while renaming.
+        window.WDPageTitle?.file(spreadsheetName);
         const titleElement = document.getElementById('spreadsheetTitle');
-        if (!titleElement || !this.spreadsheetId) return;
+        if (!titleElement) return;
 
         try {
             // Use provided name, default to 'Untitled Spreadsheet' if not provided

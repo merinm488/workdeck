@@ -39,6 +39,7 @@ try {
         folders: [{ ...record, id: 'folder0000000001', tags: ['tag1'] }], calendars: [], events: [],
       };
       let failNext = false, holdNext = false, release;
+      let failNextTag = false, holdNextTag = false, releaseTag;
       const writes = [];
       await context.route('**/api/**', async route => {
         const url = new URL(route.request().url()), body = route.request().postDataJSON();
@@ -49,6 +50,11 @@ try {
           if (holdNext) { holdNext = false; await new Promise(resolve => { release = resolve; }); }
           const rows = body.action === 'setFileTags' ? data.files : data.folders;
           rows[0].tags = body.data.tagIds;
+        }
+        if (body?.action === 'updateTag') {
+          if (failNextTag) { failNextTag = false; return route.fulfill({ status: 503, json: { success: false, error: 'Offline' } }); }
+          if (holdNextTag) { holdNextTag = false; await new Promise(resolve => { releaseTag = resolve; }); }
+          data.tags = data.tags.map(tag => tag.id === body.data.tagId ? { ...tag, ...body.data.updates } : tag);
         }
         return route.fulfill({ json: url.pathname === '/api/todo/lists' ? { lists: data.todo, tags: data.tags, settings: data.settings } : { success: true, data } });
       });
@@ -133,8 +139,59 @@ try {
             assert.deepEqual(rows[0].tags, []);
           }
         }
+        // Sidebar name/color edits autosave without showing a saved confirmation.
+        const tagForm = page.locator('.wd-tag-ui .wd-project-form').first();
+        const tagStatus = tagForm.locator('.wd-save-status');
+        const openTagEditor = async () => {
+          const row = page.locator('.wd-project-row[data-tag="tag1"]');
+          await row.waitFor({ state: 'attached' });
+          const opener = page.getByRole('button', { name: 'Open sidebar', exact: true });
+          if (await opener.isVisible()) await opener.click();
+          await row.hover(); await row.locator('button.edit').click();
+          await tagForm.waitFor();
+          assert.equal(await tagStatus.isVisible(), false, 'no saved label when the tag editor opens');
+          assert.equal(await tagStatus.textContent(), '');
+        };
+        const silentlySaved = async () => {
+          await tagForm.locator('[data-save-status="saved"]').waitFor({ state: 'attached' });
+          assert.equal(await tagStatus.isVisible(), false, 'saved status takes no space');
+          assert.equal(await tagStatus.textContent(), '', 'no saved confirmation remains in the DOM');
+          assert.equal(await tagForm.getByText('All changes saved', { exact: true }).count(), 0);
+        };
+        for (const width of [1280, 320]) {
+          await page.setViewportSize({ width, height: 900 });
+          await page.waitForTimeout(350); // let responsive sidebar state and transitions settle
+          await openTagEditor();
+          holdNextTag = true;
+          await tagForm.getByRole('textbox', { name: 'Tag name' }).fill(`Updated tag ${width}`);
+          await tagStatus.waitFor();
+          assert.equal(await tagStatus.textContent(), 'Saving…');
+          while (!releaseTag) await new Promise(resolve => setTimeout(resolve, 10));
+          releaseTag(); releaseTag = null;
+          await silentlySaved();
+          assert.equal(data.tags[0].name, `Updated tag ${width}`, 'tag name still autosaves');
+          const color = width === 1280 ? '#EF4444' : '#3B82F6';
+          await tagForm.getByRole('button', { name: `Pick color ${color}`, exact: true }).click();
+          await silentlySaved();
+          assert.equal(data.tags[0].color, color, 'tag color still autosaves');
+          if (width === 320) {
+            failNextTag = true;
+            await tagForm.getByRole('textbox', { name: 'Tag name' }).fill('Recovered tag');
+            await tagForm.locator('[data-save-status="error"]').waitFor();
+            assert.match(await tagStatus.textContent(), /Not saved/);
+            await page.evaluate(() => window.dispatchEvent(new Event('online')));
+            await silentlySaved();
+            assert.equal(data.tags[0].name, 'Recovered tag', 'failed edits still retry');
+          }
+          await page.screenshot({ path: `${output}/${theme}-${app}-${width}-sidebar-edit.png` });
+          await tagForm.getByRole('button', { name: 'Done', exact: true }).click();
+          await tagForm.waitFor({ state: 'hidden' });
+        }
+        await page.reload(); await openTagEditor();
+        assert.equal(await tagForm.getByRole('textbox', { name: 'Tag name' }).inputValue(), 'Recovered tag', 'saved tag survives reload without a confirmation label');
+        await tagForm.getByRole('button', { name: 'Done', exact: true }).click();
         assert.deepEqual(errors, []);
-        console.log(`PASS ${theme} ${app}: home modal parity, labels, keyboard, draft cancel${['home', 'files'].includes(app) ? ', file/folder save, rollback, retry and reload' : ''}`);
+        console.log(`PASS ${theme} ${app}: silent sidebar tag saves, pending/error feedback and retry, home modal parity, labels, keyboard, draft cancel${['home', 'files'].includes(app) ? ', file/folder save, rollback, retry and reload' : ''}`);
       } finally { await context.close(); }
     }
   }

@@ -81,9 +81,7 @@ const WD_APPS = [
         editorParam: 'doc',
         create: {
             action: 'createDoc',
-            payload: { title: 'Untitled' },
-            // The API unshifts, so the newest doc is first.
-            pickNewest: function (data) { return data.docs && data.docs[0]; }
+            payload: { title: 'Untitled' }
         },
         contentSearch: true                 // search matches file content
     },
@@ -97,12 +95,7 @@ const WD_APPS = [
         editorParam: 'id',
         create: {
             action: 'createSheet',
-            payload: {},
-            // The API pushes, so the newest sheet is last.
-            pickNewest: function (data) {
-                const list = data.sheets;
-                return list && list[list.length - 1];
-            }
+            payload: {}
         },
         contentSearch: false
     },
@@ -116,9 +109,7 @@ const WD_APPS = [
         editorParam: 'id',
         create: {
             action: 'createForm',
-            payload: {},
-            // The API unshifts, so the newest form is first.
-            pickNewest: function (data) { return data.forms && data.forms[0]; }
+            payload: {}
         },
         contentSearch: false
     },
@@ -132,9 +123,7 @@ const WD_APPS = [
         editorParam: 'id',
         create: {
             action: 'createDeck',
-            payload: {},
-            // The API unshifts, so the newest slide is first.
-            pickNewest: function (data) { return data.slides && data.slides[0]; }
+            payload: {}
         },
         contentSearch: false
     },
@@ -148,9 +137,7 @@ const WD_APPS = [
         editorParam: 'id',
         create: {
             action: 'createDrawing',
-            payload: {},
-            // The API unshifts, so the newest drawing is first.
-            pickNewest: function (data) { return data.draws && data.draws[0]; }
+            payload: {}
         },
         contentSearch: false
     },
@@ -164,9 +151,7 @@ const WD_APPS = [
         editorParam: 'list',
         create: {
             action: 'createTodo',
-            payload: {},
-            // The API unshifts, so the newest list is first.
-            pickNewest: function (data) { return data.todo && data.todo[0]; }
+            payload: {}
         },
         contentSearch: true                 // search matches task text
     },
@@ -186,9 +171,7 @@ const WD_APPS = [
         editorParam: 'board',
         create: {
             action: 'createKanban',
-            payload: {},
-            // The API unshifts, so the newest board is first.
-            pickNewest: function (data) { return data.kanban && data.kanban[0]; }
+            payload: {}
         },
         contentSearch: false
     },
@@ -202,9 +185,7 @@ const WD_APPS = [
         editorParam: 'post',
         create: {
             action: 'createPost',
-            payload: {},
-            // The API unshifts, so the newest post is first.
-            pickNewest: function (data) { return data.posts && data.posts[0]; }
+            payload: {}
         },
         contentSearch: true                 // search matches the excerpt
     },
@@ -548,7 +529,7 @@ function getVisibleFiles() {
 // API
 // ================================================
 
-async function api(action, payload) {
+async function api(action, payload, resultKey = 'data') {
     const response = await (window.WDBoot?.fetch || fetch)(WD_APP.apiEndpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -559,7 +540,7 @@ async function api(action, payload) {
     if (!result.success) {
         throw new Error(result.error || 'API request failed');
     }
-    return result.data;
+    return result[resultKey];
 }
 
 /**
@@ -1378,9 +1359,9 @@ async function createFile(appId) {
         // Inside a project, new files are created straight into it.
         const payload = Object.assign({}, app.create.payload);
         if (state.activeTag) payload.tagId = state.activeTag;
-        const data = await api(app.create.action, payload);
-        const file = app.create.pickNewest(data);
-        if (!file) throw new Error('File creation failed');
+        // Use the ID returned by this creation, never the workspace list order.
+        const file = await api(app.create.action, payload, 'createdFile');
+        if (!file?.id) throw new Error('File creation failed');
         openInNewTab(WDLinks.url(app.id, file.id, { edit: true }));
         hideLoading();
         loadUserData();  // show the new file in the list right away

@@ -172,6 +172,7 @@ function openRenameList(list) {
             renderLists();
             if (currentList && currentList.id === list.id) {
                 pageTitle.textContent = name;
+                window.WDPageTitle?.file(name);
             }
             showNotification('List renamed!');
         } else {
@@ -328,7 +329,7 @@ function openList(id) {
     pageTitle.textContent = list.name || 'Untitled List';
     pageTitle.classList.add('page-title-editable');
     pageTitle.title = 'Click to rename';
-    document.title = (list.name || 'Untitled List') + ' - Todo';
+    window.WDPageTitle?.file(list.name || 'Untitled List');
     homeBtn.title = 'Back to My Lists';
     homeBtn.setAttribute('aria-label', 'Back to My Lists');
 
@@ -353,7 +354,7 @@ function showLists() {
     pageTitle.textContent = 'My Lists';
     pageTitle.classList.remove('page-title-editable');
     pageTitle.title = '';
-    document.title = 'Todo - Task Lists';
+    window.WDPageTitle?.home();
     homeBtn.title = 'Back to Workdeck';
     homeBtn.setAttribute('aria-label', 'Back to Workdeck');
 
@@ -693,6 +694,7 @@ function makeTitleEditable() {
 }
 
 function restoreTitleDisplay(title) {
+    window.WDPageTitle?.file(title);
     const input = document.querySelector('.page-title-input');
     if (!input) return;
 

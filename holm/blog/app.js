@@ -69,6 +69,7 @@ function setBackLink(inEditor) {
 }
 
 function showPostsView() {
+    window.WDPageTitle?.home();
     state.editingId = null;
     setBackLink(false);
     $('postsView').classList.remove('hidden');

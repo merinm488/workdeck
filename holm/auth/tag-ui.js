@@ -199,7 +199,14 @@
           const result = await props.onSave(tag.id, { name: input.value.trim(), color });
           return result !== false && result !== null;
         },
-        onState: state => WDAutosave.status(state, saveState)
+        onState: state => {
+          // Tag edits autosave silently once complete; keep pending/error feedback.
+          saveState.hidden = state === 'saved';
+          if (state === 'saved') {
+            saveState.textContent = '';
+            saveState.dataset.saveStatus = state;
+          } else WDAutosave.status(state, saveState);
+        }
       });
       renderColors(); form.hidden = false; input.focus();
       form.scrollIntoView({ block: 'nearest' });

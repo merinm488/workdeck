@@ -116,7 +116,7 @@ try {
   await rename.waitFor({state:'detached'});await saved(page);
   assert.equal(ds.findOne('meeting_minutes',id).title,'Product & design weekly');
   assert.equal(await page.locator('#title').inputValue(),'Product & design weekly');
-  assert.equal(await page.title(),'Product & design weekly · Minutes');
+  assert.equal(await page.title(),'Product & design weekly');
   // Compare sidebar position, toolbar offset, surfaces and mobile breakpoint to Kanban.
   await assertMinutesSidebarLikeKanban(context,page,origin,'light');
   // Overview is a full-height sidebar below the file header, with the shared icons.

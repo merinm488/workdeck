@@ -41,6 +41,11 @@ export function DocDetailView({
   const [mode, setMode] = useState(initialMode || (doc?.id ? 'view' : 'edit')); // 'view' | 'edit'
   const [title, setTitle] = useState(doc?.title || '');
 
+  useEffect(() => {
+    window.WDPageTitle?.file(title);
+    return () => window.WDPageTitle?.home();
+  }, [title]);
+
   // Helper function to get content - only convert if it's legacy HTML format
   const getContent = (docContent, contentType = 'markdown') => {
     if (!docContent) return '';
@@ -370,7 +375,7 @@ export function DocDetailView({
     );
   };
 
-  if (doc?.id && doc.content === undefined) return <div role="status">Loading doc…</div>;
+  if (doc?.id && doc.content === undefined) return <div className="fixed inset-0 z-50 grid place-items-center bg-[rgb(var(--bg-primary))] text-gray-600 dark:text-gray-300" role="status">Loading doc…</div>;
 
   return (
     <div

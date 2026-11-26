@@ -10,6 +10,7 @@ import { buildThemeTokens, withSuiteTheme } from '../holm/auth/theme-build.mjs';
 import { appArtwork } from '../holm/auth/app-artwork.mjs';
 import { withSheetEditorTheme, withSharedSheetTheme } from '../holm/sheets/theme-build.mjs';
 import { withSheetAutosave } from '../holm/sheets/autosave-build.mjs';
+import { withSharedPageTitle } from '../holm/auth/page-title-build.mjs';
 import { withSheetEditorChrome } from '../holm/sheets/editor-build.mjs';
 import { homeComponentCSS, homeIconsJS, withHomeUI } from '../holm/auth/home-ui-build.mjs';
 import { withoutDocPins } from '../holm/docs-src/pin-free-build.mjs';
@@ -765,6 +766,10 @@ for (const file of ['home.js', 'editor.js', 'auth.js', 'storage.js'])
   cpSync(join(root, 'holm/draw', file), join(web, 'draw/js', file));
 for (const file of ['themes.js', 'shared.js'])
   cpSync(join(root, 'draw/js', file), join(web, 'draw/js', file));
+for (const app of ['sheets', 'forms', 'slides', 'draw']) {
+  const path = join(web, app, 'js/shared.js');
+  writeFileSync(path, withSharedPageTitle(readFileSync(path, 'utf8'), app));
+}
 cpSync(join(root, 'files/styles.css'), join(web, 'files/styles.css'));
 cpSync(join(root, 'files/icons'), join(web, 'files/icons'), { recursive: true });
 cpSync(join(root, 'holm/files/config.js'), join(web, 'files/config/config.js'));
